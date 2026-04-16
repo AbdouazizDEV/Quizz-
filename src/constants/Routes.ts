@@ -1,0 +1,17 @@
+export const Routes = {
+  SPLASH: '/',
+  WALKTHROUGH: '/(auth)/walkthrough',
+  HOME: '/(tabs)/home',
+  SETTINGS: '/settings',
+  SETTINGS_PERSONAL: '/settings/personal-info',
+  SETTINGS_NOTIFICATIONS: '/settings/notifications',
+  SETTINGS_MUSIC: '/settings/music',
+  SETTINGS_SECURITY: '/settings/security',
+  SETTINGS_HELP: '/settings/help',
+  SETTINGS_ABOUT: '/settings/about',
+  PREMIUM: '/premium',
+  PREMIUM_COMPARE: '/premium/compare',
+  PREMIUM_PLANS: '/premium/plans',
+  PREMIUM_PAYMENT: '/premium/payment',
+  PREMIUM_SUCCESS: '/premium/success',
+} as const;
