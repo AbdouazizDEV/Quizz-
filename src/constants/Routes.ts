@@ -1,6 +1,10 @@
 export const Routes = {
   SPLASH: '/',
   WALKTHROUGH: '/(auth)/walkthrough',
+  CREATE_ACCOUNT_TYPE: '/(auth)/create-account-type',
+  CREATE_ACCOUNT_WORKPLACE: '/(auth)/create-account-workplace',
+  CREATE_ACCOUNT_PROFILE: '/(auth)/create-account-profile',
+  REGISTER: '/(auth)/register',
   HOME: '/(tabs)/home',
   SETTINGS: '/settings',
   SETTINGS_PERSONAL: '/settings/personal-info',

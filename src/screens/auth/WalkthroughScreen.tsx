@@ -2,13 +2,16 @@ import { Nunito_700Bold, useFonts } from '@expo-google-fonts/nunito';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WalkthroughBottomBar } from '@components/ui/walkthrough/WalkthroughBottomBar';
 import { WalkthroughCarousel } from '@components/ui/walkthrough/WalkthroughCarousel';
 import { WalkthroughPagination } from '@components/ui/walkthrough/WalkthroughPagination';
-import { useAutoCarousel } from '@hooks/useAutoCarousel';
+import { onboardingColumn } from '@constants/layout';
+import { Spacing } from '@constants/Spacing';
 import { Routes } from '@constants/Routes';
+import { useAutoCarousel } from '@hooks/useAutoCarousel';
 import type { WalkthroughSlide } from '../../types/walkthrough.types';
 
 const SLIDES: WalkthroughSlide[] = [
@@ -34,8 +37,28 @@ export default function WalkthroughScreen() {
   const listRef = useRef<FlatList<WalkthroughSlide> | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const slides = useMemo(() => SLIDES, []);
+
+  const slideWidth = Math.min(
+    windowWidth - Spacing.screenHorizontal * 2,
+    Spacing.onboardingMaxWidth,
+  );
+
+  const listHeight = useMemo(() => {
+    const bottomBarReserve = 200 + Math.max(16, insets.bottom);
+    const topReserve = Spacing.lg + insets.top;
+    const paginationBlock = 48;
+    const available =
+      windowHeight -
+      topReserve -
+      bottomBarReserve -
+      paginationBlock -
+      Spacing.xl;
+    return Math.max(260, Math.min(520, available));
+  }, [windowHeight, insets.top, insets.bottom]);
 
   useAutoCarousel({
     itemCount: slides.length,
@@ -44,23 +67,38 @@ export default function WalkthroughScreen() {
   });
 
   const onPressStart = () => {
-    router.push(Routes.HOME);
+    router.push(Routes.CREATE_ACCOUNT_TYPE);
   };
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      <View style={styles.carouselBlock}>
-        <WalkthroughCarousel
-          slides={slides}
-          activeIndex={activeIndex}
-          onScrollEnd={setActiveIndex}
-          listRef={listRef}
-          titleFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
-        />
-        <View style={styles.paginationWrap}>
-          <WalkthroughPagination total={slides.length} activeIndex={activeIndex} />
+      <View
+        style={[
+          styles.main,
+          {
+            paddingTop: Spacing.lg + insets.top,
+            paddingHorizontal: Spacing.screenHorizontal,
+            paddingBottom: 200 + Math.max(16, insets.bottom),
+          },
+        ]}
+      >
+        <View style={[styles.column, onboardingColumn]}>
+          <View style={styles.carouselWrap}>
+            <WalkthroughCarousel
+              slides={slides}
+              activeIndex={activeIndex}
+              onScrollEnd={setActiveIndex}
+              listRef={listRef}
+              titleFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
+              slideWidth={slideWidth}
+              listHeight={listHeight}
+            />
+          </View>
+          <View style={styles.paginationWrap}>
+            <WalkthroughPagination total={slides.length} activeIndex={activeIndex} />
+          </View>
         </View>
       </View>
 
@@ -77,17 +115,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  carouselBlock: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    top: 0,
-    height: 541,
+  main: {
+    flex: 1,
+    minHeight: 0,
     alignItems: 'center',
-    gap: 40,
+  },
+  column: {
+    flex: 1,
+    width: '100%',
+    minHeight: 0,
+    justifyContent: 'center',
+    gap: Spacing.xl,
+  },
+  carouselWrap: {
+    flexShrink: 1,
+    minHeight: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   paginationWrap: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: Spacing.sm,
   },
 });

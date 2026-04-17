@@ -1,4 +1,4 @@
-import { RefObject, useEffect } from 'react';
+import { RefObject, useEffect, useMemo } from 'react';
 import {
   FlatList,
   Image,
@@ -11,12 +11,18 @@ import {
 
 import type { WalkthroughSlide } from '../../../types/walkthrough.types';
 
+const SLIDE_GAP = 40;
+
 interface WalkthroughCarouselProps {
   slides: WalkthroughSlide[];
   activeIndex: number;
   onScrollEnd: (index: number) => void;
   listRef: RefObject<FlatList<WalkthroughSlide> | null>;
   titleFontFamily?: string;
+  /** Largeur utile d’une slide (écran − padding, plafonnée à la maquette). */
+  slideWidth: number;
+  /** Hauteur totale du carrousel (image + titre). */
+  listHeight: number;
 }
 
 export function WalkthroughCarousel({
@@ -25,7 +31,22 @@ export function WalkthroughCarousel({
   onScrollEnd,
   listRef,
   titleFontFamily,
+  slideWidth,
+  listHeight,
 }: WalkthroughCarouselProps) {
+  const { imageFrameHeight, titleFontSize, titleLineHeight, titleMinHeight } = useMemo(() => {
+    const imageH = Math.min(300, Math.max(180, Math.round(slideWidth * 0.72)));
+    const remaining = listHeight - SLIDE_GAP - imageH;
+    const fs = slideWidth < 340 ? 18 : slideWidth < 380 ? 20 : 22;
+    const lh = Math.round(fs * 1.35);
+    return {
+      imageFrameHeight: imageH,
+      titleFontSize: fs,
+      titleLineHeight: lh,
+      titleMinHeight: Math.max(96, remaining),
+    };
+  }, [slideWidth, listHeight]);
+
   useEffect(() => {
     listRef.current?.scrollToIndex({
       index: activeIndex,
@@ -49,48 +70,54 @@ export function WalkthroughCarousel({
       showsHorizontalScrollIndicator={false}
       onMomentumScrollEnd={onMomentumScrollEnd}
       renderItem={({ item }) => (
-        <View style={styles.slide}>
-          <View style={styles.imageFrame}>
+        <View style={[styles.slide, { width: slideWidth, minHeight: listHeight }]}>
+          <View style={[styles.imageFrame, { width: slideWidth, height: imageFrameHeight }]}>
             <Image source={item.image} style={styles.image} resizeMode="contain" />
           </View>
-          <Text style={[styles.title, titleFontFamily ? { fontFamily: titleFontFamily } : undefined]}>
+          <Text
+            style={[
+              styles.title,
+              {
+                width: slideWidth,
+                minHeight: titleMinHeight,
+                fontSize: titleFontSize,
+                lineHeight: titleLineHeight,
+              },
+              titleFontFamily ? { fontFamily: titleFontFamily } : undefined,
+            ]}
+          >
             {item.title}
           </Text>
         </View>
       )}
       getItemLayout={(_, index) => ({
-        length: 382,
-        offset: 382 * index,
+        length: slideWidth,
+        offset: slideWidth * index,
         index,
       })}
-      style={styles.list}
+      style={[styles.list, { width: slideWidth, height: listHeight }]}
     />
   );
 }
 
 const styles = StyleSheet.create({
   list: {
-    width: 382,
-    height: 493,
+    alignSelf: 'center',
   },
   slide: {
-    width: 382,
     alignItems: 'center',
-    gap: 40,
+    gap: SLIDE_GAP,
   },
   imageFrame: {
-    width: 382,
-    height: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   image: {
     width: '100%',
     height: '100%',
   },
   title: {
-    width: 382,
-    height: 153,
-    fontSize: 22,
-    lineHeight: 51,
+    paddingHorizontal: 4,
     fontWeight: '700',
     textAlign: 'center',
     color: '#212121',

@@ -8,5 +8,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     env: process.env.EXPO_PUBLIC_ENV ?? 'local',
   },
-  plugins: ['expo-router', 'expo-font', 'expo-secure-store'],
+  plugins: ['expo-router', 'expo-font', 'expo-secure-store', '@react-native-community/datetimepicker'],
 });
