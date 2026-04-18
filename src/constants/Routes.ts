@@ -6,6 +6,7 @@ export const Routes = {
   CREATE_ACCOUNT_PROFILE: '/(auth)/create-account-profile',
   REGISTER: '/(auth)/register',
   HOME: '/(tabs)/home',
+  PROFILE: '/(tabs)/profile',
   SETTINGS: '/settings',
   SETTINGS_PERSONAL: '/settings/personal-info',
   SETTINGS_NOTIFICATIONS: '/settings/notifications',
