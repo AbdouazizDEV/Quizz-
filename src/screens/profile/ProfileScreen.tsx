@@ -65,6 +65,14 @@ export default function ProfileScreen() {
     router.push(Routes.SETTINGS);
   }, [router]);
 
+  const onActivity = useCallback(() => {
+    router.push(Routes.STATISTICS);
+  }, [router]);
+
+  const onDirectMessages = useCallback(() => {
+    router.push(Routes.NETWORK);
+  }, [router]);
+
   const onChooseCoverPhoto = useCallback(async () => {
     const picker = getCoverPhotoPickerService();
     const result = await picker.openPicker();
@@ -108,8 +116,8 @@ export default function ProfileScreen() {
               fonts={fonts}
               actions={{
                 onSettings,
-                onDirectMessages: () => undefined,
-                onActivity: () => undefined,
+                onDirectMessages,
+                onActivity,
               }}
             />
 

@@ -4,8 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import {
   Animated,
+  Dimensions,
   Easing,
   Image,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -13,12 +15,12 @@ import {
 
 import { Colors } from '@constants/Colors';
 import { Routes } from '@constants/Routes';
+import type { AuthBootstrapSnapshot } from '@services/auth/IAuthSessionService';
+import { runAuthBootstrapAndSyncStore } from '@services/auth/authSessionController';
 
 const CENTER_BLOCK = {
   width: 264,
   height: 340,
-  /** Figma: top = 50% - 340/2 - 32.5 */
-  offsetTopExtra: 32.5,
 } as const;
 
 const LOGO_SIZE = 200;
@@ -33,6 +35,18 @@ const LOADER_BOTTOM = 106;
 const DOT_COUNT = 8;
 const DOT_RADIUS = 3;
 const RING_RADIUS = 22;
+
+const MIN_SPLASH_MS = 900;
+
+function resolvePostSplashRoute(snapshot: AuthBootstrapSnapshot): string {
+  if (snapshot.token) {
+    return Routes.HOME;
+  }
+  if (snapshot.hasRegisteredAccount) {
+    return Routes.LOGIN;
+  }
+  return Routes.WALKTHROUGH;
+}
 
 function DotRingLoader() {
   const spin = useRef(new Animated.Value(0)).current;
@@ -99,60 +113,61 @@ export default function SplashScreen() {
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
 
   useEffect(() => {
-    const id = setTimeout(() => {
-      router.replace(Routes.WALKTHROUGH);
-    }, 10_000);
-    return () => clearTimeout(id);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const [snapshot] = await Promise.all([
+          runAuthBootstrapAndSyncStore(),
+          new Promise<void>((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
+        ]);
+        if (cancelled) return;
+        router.replace(resolvePostSplashRoute(snapshot));
+      } catch {
+        if (cancelled) return;
+        router.replace(Routes.WALKTHROUGH);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  const marginTop = -(CENTER_BLOCK.height / 2 + CENTER_BLOCK.offsetTopExtra);
-
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, Platform.OS === 'web' && styles.rootWeb]}>
       <StatusBar style="dark" />
-      <View
-        style={[
-          styles.centerBlock,
-          {
-            marginLeft: -CENTER_BLOCK.width / 2,
-            marginTop,
-            width: CENTER_BLOCK.width,
-            height: CENTER_BLOCK.height,
-          },
-        ]}
-      >
-        <View style={styles.logoShell}>
-          <Image
-            source={require('../../../assets/icons/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
+      <View style={styles.mainColumn}>
+        <View
+          style={[
+            styles.centerBlock,
+            { width: CENTER_BLOCK.width, minHeight: CENTER_BLOCK.height },
+          ]}
+        >
+          <View style={styles.logoShell}>
+            <Image
+              source={require('../../../assets/icons/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
+          </View>
+
+          <View style={styles.titleShell}>
+            <Text
+              style={[
+                styles.title,
+                fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
+              ]}
+              accessibilityRole="header"
+            >
+              Quizz+
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.titleShell}>
-          <Text
-            style={[
-              styles.title,
-              fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
-            ]}
-            accessibilityRole="header"
-          >
-            Quizz+
-          </Text>
+        <View style={[styles.loaderWrap, { paddingBottom: LOADER_BOTTOM }]}>
+          <DotRingLoader />
         </View>
-      </View>
-
-      <View
-        style={[
-          styles.loaderWrap,
-          {
-            bottom: LOADER_BOTTOM,
-            marginLeft: -LOADER_SIZE / 2,
-          },
-        ]}
-      >
-        <DotRingLoader />
       </View>
     </View>
   );
@@ -163,10 +178,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  /** react-native-web: flex:1 alone may not fill the viewport without a parent height */
+  rootWeb: {
+    minHeight: Dimensions.get('window').height,
+  },
+  mainColumn: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   centerBlock: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 20,
   },
@@ -196,10 +219,10 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   loaderWrap: {
-    position: 'absolute',
-    left: '50%',
     width: LOADER_SIZE,
     height: LOADER_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loaderFrame: {
     width: LOADER_SIZE,

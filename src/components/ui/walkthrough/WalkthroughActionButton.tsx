@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 5,
   },
   primary: {
-    backgroundColor: '#FFD700',
+    backgroundColor: 'rgba(255, 215, 0, 0.87)',
     borderBottomColor: '#543ACC',
   },
   secondary: {

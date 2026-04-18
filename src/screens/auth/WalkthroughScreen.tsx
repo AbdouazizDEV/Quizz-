@@ -70,6 +70,10 @@ export default function WalkthroughScreen() {
     router.push(Routes.CREATE_ACCOUNT_TYPE);
   };
 
+  const onPressSignin = () => {
+    router.push(Routes.LOGIN);
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
@@ -104,6 +108,7 @@ export default function WalkthroughScreen() {
 
       <WalkthroughBottomBar
         onPressStart={onPressStart}
+        onPressSignin={onPressSignin}
         buttonFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
       />
     </View>

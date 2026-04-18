@@ -27,6 +27,7 @@ import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingConti
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
+import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
 import { Spacing } from '@constants/Spacing';
 
 const BOTTOM_BAR_MIN = 118;
@@ -153,8 +154,15 @@ export default function RegisterScreen() {
     pulseAnimRef.current.start();
 
     timeoutRef.current = setTimeout(() => {
-      setShowSuccess(false);
-      router.replace(Routes.HOME);
+      void (async () => {
+        setShowSuccess(false);
+        try {
+          await persistLoginAndSyncStore('demo-session');
+        } catch {
+          /* persistance optionnelle : navigation inchangée pour la démo */
+        }
+        router.replace(Routes.HOME);
+      })();
     }, SUCCESS_MODAL_MS);
 
     return () => {

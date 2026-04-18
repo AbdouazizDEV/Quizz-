@@ -1,1 +1,2 @@
-export { default } from '@screens/settings/HelpCenterScreen';
+export { default } from '@screens/settings/SettingsScreen';
+
