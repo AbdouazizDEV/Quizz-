@@ -16,6 +16,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     env: process.env.EXPO_PUBLIC_ENV ?? 'local',
+    /** Lien projet EAS (expo.dev) — requis pour `eas build` avec app.config dynamique. */
+    eas: {
+      projectId: '23a2334f-26a5-4ae1-9911-56fcbed0ca9c',
+    },
   },
   plugins: ['expo-router', 'expo-font', 'expo-secure-store', '@react-native-community/datetimepicker'],
 });
