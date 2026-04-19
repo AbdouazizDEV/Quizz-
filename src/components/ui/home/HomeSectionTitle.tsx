@@ -1,15 +1,24 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface HomeSectionTitleProps {
   title: string;
   action?: string;
+  onActionPress?: () => void;
 }
 
-export function HomeSectionTitle({ title, action }: HomeSectionTitleProps) {
+export function HomeSectionTitle({ title, action, onActionPress }: HomeSectionTitleProps) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {action ? <Text style={styles.sectionAction}>{action}</Text> : null}
+      {action ? (
+        onActionPress ? (
+          <Pressable onPress={onActionPress} hitSlop={8} accessibilityRole="button">
+            <Text style={styles.sectionAction}>{action}</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.sectionAction}>{action}</Text>
+        )
+      ) : null}
     </View>
   );
 }

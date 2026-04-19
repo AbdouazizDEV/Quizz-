@@ -22,5 +22,6 @@ export class DefaultAuthSessionService implements IAuthSessionService {
 
   async signOut(): Promise<void> {
     await this.tokens.clearToken();
+    await this.accountFlags.writeHasRegisteredAccount(false);
   }
 }

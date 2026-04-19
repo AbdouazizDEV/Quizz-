@@ -5,11 +5,13 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Feather } from '@expo/vector-icons';
+import { AxiosError } from 'axios';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   Modal,
@@ -29,10 +31,21 @@ import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
 import { Spacing } from '@constants/Spacing';
+import { apiClient } from '@services/api/apiClient';
+import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
 const BOTTOM_BAR_MIN = 118;
 const SUCCESS_MODAL_MS = 5_000;
 const PLACEHOLDER_COLOR = '#8E8E93';
+
+function formatRegisterApiError(raw: string | undefined): string {
+  if (!raw) return 'Impossible de finaliser l’inscription. Réessayez.';
+  const lower = raw.toLowerCase();
+  if (lower.includes('rate limit') || lower.includes('too many')) {
+    return 'Limite Supabase atteinte : trop d’e-mails ou de tentatives. Attendez ~1 h, ou testez avec une autre adresse (ex. alias +test@gmail.com). Vérifiez aussi Auth → Rate Limits dans le dashboard.';
+  }
+  return raw;
+}
 
 interface SocialActionButtonProps {
   label: string;
@@ -75,6 +88,8 @@ export default function RegisterScreen() {
   const [rememberMe, setRememberMe] = useState(true);
   const [secure, setSecure] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.88)).current;
@@ -89,8 +104,73 @@ export default function RegisterScreen() {
     router.back();
   };
 
-  const handleSignup = () => {
-    setShowSuccess(true);
+  const handleSignup = async () => {
+    if (submitting) return;
+    setFormError(null);
+
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim();
+    if (!trimmedUsername || !trimmedEmail || !password) {
+      setFormError('Renseignez le nom d’utilisateur, l’e-mail et le mot de passe.');
+      return;
+    }
+    if (trimmedUsername.length > 50) {
+      setFormError('Le nom d’utilisateur ne peut pas dépasser 50 caractères.');
+      return;
+    }
+    if (password.length < 6) {
+      setFormError('Le mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+
+    const onboarding = useOnboardingRegisterStore.getState();
+    if (!onboarding.isComplete()) {
+      setFormError('Complétez d’abord le parcours : type de compte, lieu, puis profil (téléphone inclus).');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data } = await apiClient.post<{
+        session: { access_token: string } | null;
+        hint?: string;
+      }>('/auth/register', {
+        email: trimmedEmail,
+        password,
+        username: trimmedUsername,
+        account_type: onboarding.accountTypeId,
+        workplace: onboarding.workplaceId,
+        full_name: onboarding.fullName,
+        birth_date: onboarding.birthDateIso,
+        country_code: onboarding.countryCca2,
+        phone: onboarding.phoneE164,
+      });
+
+      const token = data.session?.access_token;
+      if (token) {
+        await persistLoginAndSyncStore(token);
+        onboarding.clear();
+        setShowSuccess(true);
+        return;
+      }
+
+      Alert.alert(
+        'Session non disponible',
+        data.hint ??
+          'Confirmez votre e-mail ou configurez SUPABASE_SERVICE_ROLE_KEY sur l’API pour obtenir une session immédiate.',
+        [{ text: 'OK', onPress: () => router.replace(Routes.LOGIN) }],
+      );
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error?: string }>;
+      setFormError(
+        formatRegisterApiError(
+          axiosError.response?.data?.error ??
+            (axiosError.message ? axiosError.message : undefined),
+        ),
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -154,15 +234,8 @@ export default function RegisterScreen() {
     pulseAnimRef.current.start();
 
     timeoutRef.current = setTimeout(() => {
-      void (async () => {
-        setShowSuccess(false);
-        try {
-          await persistLoginAndSyncStore('demo-session');
-        } catch {
-          /* persistance optionnelle : navigation inchangée pour la démo */
-        }
-        router.replace(Routes.HOME);
-      })();
+      setShowSuccess(false);
+      router.replace(Routes.HOME);
     }, SUCCESS_MODAL_MS);
 
     return () => {
@@ -321,6 +394,17 @@ export default function RegisterScreen() {
               </View>
             </View>
 
+            {formError ? (
+              <Text
+                style={[
+                  styles.formError,
+                  fontsLoaded ? { fontFamily: 'Nunito_400Regular' } : { fontWeight: '400' },
+                ]}
+              >
+                {formError}
+              </Text>
+            ) : null}
+
             <Pressable style={styles.rememberRow} onPress={() => setRememberMe((prev) => !prev)}>
               <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
                 {rememberMe ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
@@ -367,8 +451,8 @@ export default function RegisterScreen() {
       </View>
 
       <OnboardingContinueBar
-        label="Inscrivez-vous"
-        onPress={handleSignup}
+        label={submitting ? 'Inscription…' : 'Inscrivez-vous'}
+        onPress={() => void handleSignup()}
         fontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
       />
 
@@ -487,6 +571,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: '#424242',
     letterSpacing: 0.2,
+  },
+  formError: {
+    width: '100%',
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#C62828',
   },
   formBlock: {
     width: '100%',

@@ -9,9 +9,34 @@ const REF_WIDTH = 390;
 interface HomeHeaderCardProps {
   glowOpacity: Animated.Value;
   progress: number;
+  /** Initiale(s) dans l’avatar. */
+  avatarInitial?: string;
+  /** Deuxième ligne sous « Bonjour » (ex. « Prénom 👋 »). */
+  displayNameWithEmoji?: string;
+  /** Score affiché en grand (chaîne déjà formatée). */
+  totalScoreDisplay?: string;
+  /** Sous le score (niveau + libellé). */
+  levelLabel?: string;
+  /** Texte à droite avec l’icône médaille (classement — pas encore côté API). */
+  rankLabel?: string;
+  /** Texte à droite avec l’icône horloge (série ou jours actifs). */
+  streakOrDaysLabel?: string;
+  progressLabelLeft?: string;
+  progressLabelRight?: string;
 }
 
-export function HomeHeaderCard({ glowOpacity, progress }: HomeHeaderCardProps) {
+export function HomeHeaderCard({
+  glowOpacity,
+  progress,
+  avatarInitial = 'A',
+  displayNameWithEmoji = 'Joueur 👋',
+  totalScoreDisplay = '0',
+  levelLabel = '🌱 Niveau 1 · Débutant',
+  rankLabel = '#—',
+  streakOrDaysLabel = '0 jour',
+  progressLabelLeft = 'Niv. 1',
+  progressLabelRight = 'Niv. 2',
+}: HomeHeaderCardProps) {
   const { width, fontScale: systemFontScale } = useWindowDimensions();
 
   const sizes = useMemo(() => {
@@ -50,7 +75,7 @@ export function HomeHeaderCard({ glowOpacity, progress }: HomeHeaderCardProps) {
       <Animated.View style={[styles.glowCircle, { opacity: glowOpacity }]} />
       <View style={styles.headerTopRow}>
         <View style={[styles.avatar, { width: sizes.avatarBox, height: sizes.avatarBox, borderRadius: sizes.avatarBox / 2 }]}>
-          <Text style={[styles.avatarText, { fontSize: sizes.avatar }]}>A</Text>
+          <Text style={[styles.avatarText, { fontSize: sizes.avatar }]}>{avatarInitial}</Text>
         </View>
         <View style={styles.headerIdentity}>
           <Text style={[styles.headerGreeting, { fontSize: sizes.greeting }]}>Bonjour</Text>
@@ -60,7 +85,7 @@ export function HomeHeaderCard({ glowOpacity, progress }: HomeHeaderCardProps) {
               { fontSize: sizes.name, lineHeight: sizes.nameLine },
             ]}
           >
-            Abdou 👋
+            {displayNameWithEmoji}
           </Text>
         </View>
         <Pressable style={[styles.bellBadge, { width: sizes.bellBox, height: sizes.bellBox, borderRadius: sizes.bellBox * 0.33 }]}>
@@ -78,23 +103,23 @@ export function HomeHeaderCard({ glowOpacity, progress }: HomeHeaderCardProps) {
               { fontSize: sizes.scoreValue, lineHeight: sizes.scoreValueLine },
             ]}
           >
-            28
+            {totalScoreDisplay}
           </Text>
-          <Text style={[styles.scoreLevel, { fontSize: sizes.level }]}>🌱 Niveau 1 · Débutant</Text>
+          <Text style={[styles.scoreLevel, { fontSize: sizes.level }]}>{levelLabel}</Text>
         </View>
         <View style={styles.scoreMeta}>
           <View style={styles.metaItem}>
             <Feather name="award" size={sizes.metaIcon} color="#F1C943" />
-            <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>#1</Text>
+            <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>{rankLabel}</Text>
           </View>
           <View style={styles.metaItem}>
             <Feather name="clock" size={sizes.metaIcon} color="#FF7A4D" />
-            <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>1 jours</Text>
+            <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>{streakOrDaysLabel}</Text>
           </View>
         </View>
         <View style={styles.progressLabels}>
-          <Text style={[styles.progressLabel, { fontSize: sizes.progressLabel }]}>Niveau 1</Text>
-          <Text style={[styles.progressLabel, { fontSize: sizes.progressLabel }]}>Niveau 2</Text>
+          <Text style={[styles.progressLabel, { fontSize: sizes.progressLabel }]}>{progressLabelLeft}</Text>
+          <Text style={[styles.progressLabel, { fontSize: sizes.progressLabel }]}>{progressLabelRight}</Text>
         </View>
         <View style={[styles.progressTrack, { height: sizes.progressTrack }]}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />

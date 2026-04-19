@@ -49,6 +49,7 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(true);
   const [secure, setSecure] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const titleSize = windowWidth < 360 ? 28 : windowWidth < 400 ? 32 : 36;
 
@@ -62,11 +63,7 @@ export default function LoginScreen() {
   );
 
   const onBack = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    router.replace(Routes.WALKTHROUGH);
+    router.replace(Routes.CREATE_ACCOUNT_TYPE);
   }, [router]);
 
   const onForgotPassword = useCallback(() => {
@@ -82,11 +79,14 @@ export default function LoginScreen() {
     if (submitting) return;
     const trimmed = email.trim();
     if (!trimmed) return;
+    setFormError(null);
     setSubmitting(true);
     try {
       const { accessToken } = await loginGateway.signIn({ email: trimmed, password });
       await persistLoginAndSyncStore(accessToken);
       router.replace(Routes.HOME);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Connexion impossible. Réessayez.');
     } finally {
       setSubmitting(false);
     }
@@ -131,6 +131,12 @@ export default function LoginScreen() {
             </View>
 
             <View style={[styles.formBlock, { gap: FORM_GAP }]}>
+              {formError ? (
+                <Text style={[styles.formError, fonts.regular ? { fontFamily: fonts.regular } : undefined]}>
+                  {formError}
+                </Text>
+              ) : null}
+
               <UnderlineLabeledField
                 label="Email"
                 value={email}
@@ -257,6 +263,12 @@ const styles = StyleSheet.create({
   formBlock: {
     width: '100%',
     alignItems: 'flex-start',
+  },
+  formError: {
+    width: '100%',
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#C62828',
   },
   rememberRow: {
     flexDirection: 'row',

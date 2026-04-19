@@ -9,7 +9,11 @@ export const Routes = {
   CREATE_ACCOUNT_WORKPLACE: '/(auth)/create-account-workplace',
   CREATE_ACCOUNT_PROFILE: '/(auth)/create-account-profile',
   REGISTER: '/(auth)/register',
+  /** Retour après clic sur le lien de confirmation (deep link quizzplus://auth/callback). */
+  AUTH_EMAIL_CALLBACK: '/auth/callback',
   HOME: '/(tabs)/home',
+  /** Liste des catégories (grille). */
+  CATEGORIES: '/categories',
   PROFILE: '/(tabs)/profile',
   STATISTICS: '/statistics',
   NETWORK: '/network',
@@ -26,3 +30,12 @@ export const Routes = {
   PREMIUM_PAYMENT: '/premium/payment',
   PREMIUM_SUCCESS: '/premium/success',
 } as const;
+
+/** Loader 5s + fetch des questions (`app/quiz/[quizId]/index`). */
+export function buildQuizEntryHref(quizId: string, categorySlug?: string | null): string {
+  const id = encodeURIComponent(quizId);
+  if (categorySlug) {
+    return `/quiz/${id}?categorySlug=${encodeURIComponent(categorySlug)}`;
+  }
+  return `/quiz/${id}`;
+}

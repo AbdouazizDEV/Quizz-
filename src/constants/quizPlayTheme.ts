@@ -1,0 +1,32 @@
+export const QuizPlayTheme = {
+  loaderBg: '#FFB800',
+  loaderTrack: '#FFFFFF',
+  loaderFill: '#1F2261',
+  grey900: '#212121',
+  grey100: '#F5F5F5',
+  white: '#FFFFFF',
+  success: '#12D18E',
+  error: '#F75555',
+  primaryButton: 'rgba(255, 215, 0, 0.87)',
+  primaryButtonBorder: '#543ACC',
+  optionBlue: '#3779FF',
+  optionBlueBorder: '#295ECC',
+  optionRed: '#FF6B6B',
+  optionRedBorder: '#C44B4B',
+  optionOrange: '#FF9F1C',
+  optionOrangeBorder: '#CC7F00',
+  optionTeal: '#2EC4B6',
+  optionTealBorder: '#239687',
+  contentMaxWidth: 382,
+  questionImageHeight: 230,
+  optionCardWidth: 185,
+  optionCardHeight: 160,
+  resultBannerHeight: 183,
+} as const;
+
+export const QUIZ_OPTION_CARD_STYLES = [
+  { bg: QuizPlayTheme.optionBlue, border: QuizPlayTheme.optionBlueBorder },
+  { bg: QuizPlayTheme.optionRed, border: QuizPlayTheme.optionRedBorder },
+  { bg: QuizPlayTheme.optionOrange, border: QuizPlayTheme.optionOrangeBorder },
+  { bg: QuizPlayTheme.optionTeal, border: QuizPlayTheme.optionTealBorder },
+] as const;

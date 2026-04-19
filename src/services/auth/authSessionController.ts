@@ -1,4 +1,6 @@
+import { apiClient } from '@services/api/apiClient';
 import { useAuthStore } from '@stores/authStore';
+import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
 import type { AuthBootstrapSnapshot } from './IAuthSessionService';
 import { authSessionService } from './authSessionServiceInstance';
@@ -16,8 +18,17 @@ export async function persistLoginAndSyncStore(token: string): Promise<void> {
   useAuthStore.getState().adoptAuthenticatedSession(token);
 }
 
-/** Déconnexion : efface le jeton stocké et le store (le drapeau « compte déjà créé » reste pour le splash → login). */
+/** Déconnexion : invalide la session côté API si possible, efface le stockage local et le store. */
 export async function signOutAndSyncStore(): Promise<void> {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    try {
+      await apiClient.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+      /* déconnexion locale même si l’API échoue */
+    }
+  }
   await authSessionService.signOut();
+  useOnboardingRegisterStore.getState().clear();
   useAuthStore.getState().clearSession();
 }

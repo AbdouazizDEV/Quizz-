@@ -15,6 +15,7 @@ import { OnboardingSkipBar } from '@components/ui/onboarding/OnboardingSkipBar';
 import { onboardingColumn } from '@constants/layout';
 import { Spacing } from '@constants/Spacing';
 import { Routes } from '@constants/Routes';
+import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
 const WORKPLACE_OPTIONS: AccountTypeOption[] = [
   {
@@ -58,17 +59,19 @@ export default function CreateAccountWorkplaceScreen() {
 
   const [fontsLoaded] = useFonts({ Nunito_700Bold, Nunito_400Regular });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const setWorkplaceId = useOnboardingRegisterStore((s) => s.setWorkplaceId);
 
   const handleBack = () => {
     router.back();
   };
 
   const handleSkip = () => {
-    router.push(Routes.HOME);
+    router.replace(Routes.WALKTHROUGH);
   };
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
+    setWorkplaceId(id);
     router.push(Routes.CREATE_ACCOUNT_PROFILE);
   };
 

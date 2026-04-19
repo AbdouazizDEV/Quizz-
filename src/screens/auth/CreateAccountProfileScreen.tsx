@@ -7,8 +7,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { onboardingColumn } from '@constants/layout';
@@ -23,6 +23,7 @@ import { OnboardingFilledField } from '@components/ui/onboarding/OnboardingFille
 import { OnboardingInternationalPhoneField } from '@components/ui/onboarding/OnboardingInternationalPhoneField';
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
 import { Routes } from '@constants/Routes';
+import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
 function computeAge(birth: Date): number {
   const today = new Date();
@@ -59,7 +60,8 @@ export default function CreateAccountProfileScreen() {
   }, []);
 
   const [selectedCountry, setSelectedCountry] = useState<ICountry>(initialCountry);
-  const phoneInputRef = useRef('');
+  const [phoneValue, setPhoneValue] = useState('');
+  const setProfile = useOnboardingRegisterStore((s) => s.setProfile);
 
   const ageLabel = useMemo(() => String(computeAge(birthDate)), [birthDate]);
 
@@ -68,6 +70,21 @@ export default function CreateAccountProfileScreen() {
   };
 
   const handleContinue = () => {
+    const y = birthDate.getFullYear();
+    const m = String(birthDate.getMonth() + 1).padStart(2, '0');
+    const d = String(birthDate.getDate()).padStart(2, '0');
+    const birthDateIso = `${y}-${m}-${d}`;
+    const phoneE164 = phoneValue.replace(/\s/g, '');
+    if (!fullName.trim() || !phoneE164) {
+      Alert.alert('Profil incomplet', 'Indiquez au minimum votre nom et votre numéro de téléphone.');
+      return;
+    }
+    setProfile({
+      fullName: fullName.trim(),
+      birthDateIso,
+      countryCca2: selectedCountry.cca2,
+      phoneE164,
+    });
     router.push(Routes.REGISTER);
   };
 
@@ -143,7 +160,7 @@ export default function CreateAccountProfileScreen() {
                 country={selectedCountry}
                 onChangeCountry={setSelectedCountry}
                 onChangePhoneNumber={(value) => {
-                  phoneInputRef.current = value;
+                  setPhoneValue(value);
                 }}
                 defaultCountry={selectedCountry.cca2}
                 defaultPhoneNumber="5551234567"
