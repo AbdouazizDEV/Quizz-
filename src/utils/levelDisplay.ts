@@ -1,6 +1,7 @@
 import type { LevelCode } from '@app-types/supabase/database.types';
 
 const LEVEL_ORDER: LevelCode[] = ['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3'];
+const SCORE_PER_LEVEL = 250;
 
 const LEVEL_LABELS: Partial<Record<LevelCode, string>> = {
   Z0: '🌱 Niveau 1 · Débutant',
@@ -17,20 +18,42 @@ export function formatLevelCodeLabel(code: string | undefined): string {
   return LEVEL_LABELS[code as LevelCode] ?? `Niveau ${code}`;
 }
 
-/** Progression visuelle entre deux niveaux (0–1), basée sur le code et l’activité. */
-export function estimateLevelProgress(levelCode: string | undefined, quizzesCompleted: number): number {
-  const idx = Math.max(0, LEVEL_ORDER.indexOf((levelCode ?? 'Z0') as LevelCode));
-  const base = (idx + 1) / 8;
-  const activity = Math.min(0.25, quizzesCompleted * 0.02);
-  return Math.min(0.98, base * 0.85 + activity);
+/** Niveau dérivé du score (palier de 250 points par niveau). */
+export function levelCodeFromScore(totalScore: number): LevelCode {
+  const safeScore = Number.isFinite(totalScore) ? Math.max(0, Math.floor(totalScore)) : 0;
+  const idx = Math.floor(safeScore / SCORE_PER_LEVEL);
+  return LEVEL_ORDER[Math.min(idx, LEVEL_ORDER.length - 1)]!;
+}
+
+/**
+ * Progression visuelle intra-niveau (0–1), basée uniquement sur le score.
+ * Exemple: 260 points => niveau 2 avec ~4% vers niveau 3.
+ */
+export function estimateLevelProgress(totalScore: number): number {
+  const safeScore = Number.isFinite(totalScore) ? Math.max(0, Math.floor(totalScore)) : 0;
+  const idx = Math.min(Math.floor(safeScore / SCORE_PER_LEVEL), LEVEL_ORDER.length - 1);
+  if (idx >= LEVEL_ORDER.length - 1) return 1;
+  const inLevel = safeScore % SCORE_PER_LEVEL;
+  return Math.min(1, Math.max(0, inLevel / SCORE_PER_LEVEL));
 }
 
 /** Libellés courts sous la barre de progression (ex. Niv. 1 → Niv. 2). */
-export function levelProgressEndpoints(levelCode: string | undefined): { left: string; right: string } {
-  const idx = Math.max(0, LEVEL_ORDER.indexOf((levelCode ?? 'Z0') as LevelCode));
+export function levelProgressEndpoints(totalScore: number): { left: string; right: string } {
+  const safeScore = Number.isFinite(totalScore) ? Math.max(0, Math.floor(totalScore)) : 0;
+  const idx = Math.min(Math.floor(safeScore / SCORE_PER_LEVEL), LEVEL_ORDER.length - 1);
   const left = `Niv. ${idx + 1}`;
   const right = idx < LEVEL_ORDER.length - 1 ? `Niv. ${idx + 2}` : 'Palier max';
   return { left, right };
+}
+
+/** Nombre de jours écoulés depuis une date, incrémenté toutes les 24h. */
+export function elapsedDaysSince(dateIso: string | undefined, now = new Date()): number {
+  if (!dateIso) return 0;
+  const startedAt = new Date(dateIso);
+  if (Number.isNaN(startedAt.getTime())) return 0;
+  const diffMs = now.getTime() - startedAt.getTime();
+  if (diffMs <= 0) return 0;
+  return Math.floor(diffMs / (24 * 60 * 60 * 1000));
 }
 
 export function firstNameFromDisplay(display: string): string {

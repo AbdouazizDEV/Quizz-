@@ -17,6 +17,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { ProfileTabId } from '@app-types/profile.types';
 import { CoverPhotoChangeModal } from '@components/ui/profile/CoverPhotoChangeModal';
@@ -72,6 +73,13 @@ export default function ProfileScreen() {
   const onDirectMessages = useCallback(() => {
     router.push(Routes.NETWORK);
   }, [router]);
+
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   const onChooseCoverPhoto = useCallback(async () => {
     const picker = getCoverPhotoPickerService();

@@ -12,6 +12,8 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write 'src/**/*.{ts,tsx}'",
     "api:dev": "npm run dev --prefix server",
+    "render:blueprint": "render blueprints validate render.yaml",
+    "sdk:generate": "openapi-typescript openapi/quizz-api.openapi.yaml -o src/sdk/generated/schema.ts",
     "eas:android:apk": "eas build -p android --profile preview",
     "eas:android:aab": "eas build -p android --profile production"
   },
@@ -34,6 +36,7 @@
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "libphonenumber-js": "^1.12.41",
+    "openapi-fetch": "^0.15.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -49,10 +52,11 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "eas-cli": "^16.28.0",
     "@types/react": "~19.1.0",
+    "eas-cli": "^16.28.0",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~10.0.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.3",
     "typescript": "~5.9.2"
   },
