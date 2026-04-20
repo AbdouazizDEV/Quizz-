@@ -1,0 +1,491 @@
+openapi: 3.0.3
+info:
+  title: Quizz+ API (mobile SDK)
+  description: Contrat HTTP aligné sur `server/src/routes/auth.ts` (base path `/api/v1`).
+  version: 1.0.0
+
+servers:
+  - url: https://quizzplus-api.onrender.com/api/v1
+    description: Production (Render)
+  - url: http://localhost:3000/api/v1
+    description: Développement local
+
+tags:
+  - name: auth
+    description: Authentification Supabase via l’API Node
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: authRegister
+      summary: Inscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Compte créé (session éventuelle)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Erreur de validation ou Supabase
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '502':
+          description: Compte créé mais connexion impossible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterPartialResponse'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: authLogin
+      summary: Connexion e-mail ou téléphone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Session émise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: authLogout
+      summary: Déconnexion globale
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/google:
+    post:
+      tags: [auth]
+      operationId: authGoogleStart
+      summary: URL OAuth Google (flow navigateur / WebBrowser)
+      responses:
+        '200':
+          description: URL à ouvrir
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/google/callback:
+    get:
+      tags: [auth]
+      operationId: authGoogleCallback
+      summary: Échange code OAuth → session
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/forgot-password:
+    post:
+      tags: [auth]
+      operationId: authForgotPassword
+      summary: Demande OTP reset mot de passe (e-mail)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: OTP envoyé (ou ok silencieux)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  dev_otp:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '501':
+          description: SMS non supporté
+        '503':
+          description: Service role manquante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRoleHint'
+
+  /auth/verify-otp:
+    post:
+      tags: [auth]
+      operationId: authVerifyOtp
+      summary: Vérifier le code OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '200':
+          description: Jeton de reset
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reset_token]
+                properties:
+                  reset_token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          description: Service role manquante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRoleHint'
+
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      operationId: authResetPassword
+      summary: Nouveau mot de passe après OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkBody'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          description: Service role manquante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRoleHint'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: authMe
+      summary: Utilisateur courant + profil `profiles`
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User + profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+    Unauthorized:
+      description: Non autorisé
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+
+  schemas:
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        code:
+          type: string
+        hint:
+          type: string
+
+    ServiceRoleHint:
+      type: object
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+
+    OkBody:
+      type: object
+      properties:
+        ok:
+          type: boolean
+
+    Session:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+        - expires_at
+        - expires_in
+        - token_type
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_at:
+          type: number
+        expires_in:
+          type: number
+        token_type:
+          type: string
+
+    AuthUser:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        user_metadata:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - username
+        - account_type
+        - workplace
+        - full_name
+        - birth_date
+        - country_code
+        - phone
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        username:
+          type: string
+          maxLength: 50
+        account_type:
+          type: string
+        workplace:
+          type: string
+        full_name:
+          type: string
+        birth_date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        country_code:
+          type: string
+        phone:
+          type: string
+
+    RegisterResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        session:
+          oneOf:
+            - $ref: '#/components/schemas/Session'
+            - type: 'null'
+        hint:
+          type: string
+
+    RegisterPartialResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        session:
+          type: 'null'
+
+    LoginRequest:
+      type: object
+      required: [password]
+      properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+
+    AuthSessionResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        session:
+          $ref: '#/components/schemas/Session'
+
+    ForgotPasswordRequest:
+      type: object
+      required: [channel]
+      properties:
+        channel:
+          type: string
+          enum: [email, sms]
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+
+    VerifyOtpRequest:
+      type: object
+      required: [channel, code]
+      properties:
+        channel:
+          type: string
+          enum: [email, sms]
+        email:
+          type: string
+        phone:
+          type: string
+        code:
+          type: string
+
+    ResetPasswordRequest:
+      type: object
+      required: [reset_token, new_password]
+      properties:
+        reset_token:
+          type: string
+        new_password:
+          type: string
+          minLength: 6
+
+    ProfileRow:
+      type: object
+      required:
+        - id
+        - username
+        - level_code
+        - total_score
+        - quizzes_completed
+        - days_active
+        - streak_days
+        - is_premium
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        full_name:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        level_code:
+          type: string
+        total_score:
+          type: number
+        quizzes_completed:
+          type: integer
+        days_active:
+          type: integer
+        streak_days:
+          type: integer
+        is_premium:
+          type: boolean
+
+    AuthMeResponse:
+      type: object
+      required:
+        - user
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        profile:
+          oneOf:
+            - $ref: '#/components/schemas/ProfileRow'
+            - type: 'null'

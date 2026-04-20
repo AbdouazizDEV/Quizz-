@@ -1,32 +1,15 @@
-import { apiClient } from '@services/api/apiClient';
+import type { AuthMeResponse } from '@sdk';
+import { getQuizzApiClient } from '@sdk';
 import { useAuthStore } from '@stores/authStore';
 
-/** Réponse de `GET /api/v1/auth/me` (profil public + utilisateur Auth). */
-export interface AuthMeResponse {
-  user: {
-    id: string;
-    email?: string;
-    user_metadata?: Record<string, unknown>;
-  };
-  profile: {
-    id: string;
-    username: string;
-    full_name: string | null;
-    avatar_url: string | null;
-    level_code: string;
-    total_score: number;
-    quizzes_completed: number;
-    days_active: number;
-    streak_days: number;
-    is_premium: boolean;
-  } | null;
-}
+export type { AuthMeResponse };
 
 export async function fetchAuthMe(): Promise<AuthMeResponse | null> {
   const token = useAuthStore.getState().token;
   if (!token?.trim()) return null;
-  const { data } = await apiClient.get<AuthMeResponse>('/auth/me', {
+  const { data, error } = await getQuizzApiClient().GET('/auth/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (error || !data) return null;
   return data;
 }

@@ -28,13 +28,16 @@ import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useHomeLeaderboard } from '@hooks/useHomeLeaderboard';
 import { useAuthStore } from '@stores/authStore';
 import {
+  elapsedDaysSince,
   estimateLevelProgress,
   firstNameFromDisplay,
   formatJoursLabel,
   formatLevelCodeLabel,
   initialsFromName,
+  levelCodeFromScore,
   levelProgressEndpoints,
 } from '@utils/levelDisplay';
 
@@ -64,13 +67,6 @@ const INSIGHTS: HomeInsightItem[] = [
   },
 ];
 
-const LEADERBOARD: HomeLeaderboardUser[] = [
-  { id: 'u-1', name: 'Awa', points: 1940, rank: 1 },
-  { id: 'u-2', name: 'Moussa', points: 1760, rank: 2 },
-  { id: 'u-3', name: 'Fatou', points: 1705, rank: 3 },
-  { id: 'u-4', name: 'Abdou', points: 1640, rank: 4 },
-];
-
 export default function HomeRefactoredScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -81,12 +77,14 @@ export default function HomeRefactoredScreen() {
   const glowAnim = useRef(new Animated.Value(0.35)).current;
   const token = useAuthStore((s) => s.token);
   const { data: me, loading: meLoading, refetch: refetchAuthMe } = useAuthMe();
+  const { data: leaderboardRows, refetch: refetchLeaderboard } = useHomeLeaderboard(5);
   const { data: allCategories, loading: categoriesLoading } = useCategoriesExplore();
 
   useFocusEffect(
     useCallback(() => {
       void refetchAuthMe();
-    }, [refetchAuthMe]),
+      void refetchLeaderboard();
+    }, [refetchAuthMe, refetchLeaderboard]),
   );
 
   const topThreeCategories = useMemo(() => allCategories.slice(0, 3), [allCategories]);
@@ -128,6 +126,7 @@ export default function HomeRefactoredScreen() {
   const headerVm = useMemo(() => {
     const profile = me?.profile;
     const meta = me?.user?.user_metadata as Record<string, unknown> | undefined;
+    const userRaw = me?.user as Record<string, unknown> | undefined;
     const display =
       profile?.full_name?.trim() ||
       (typeof meta?.full_name === 'string' ? meta.full_name.trim() : '') ||
@@ -135,16 +134,16 @@ export default function HomeRefactoredScreen() {
       '';
     const first = firstNameFromDisplay(display || 'Joueur');
     const initials = initialsFromName(display || first);
-    const levelCode = profile?.level_code;
-    const quizzesDone = profile?.quizzes_completed ?? 0;
-    const progress = estimateLevelProgress(levelCode, quizzesDone);
-    const { left, right } = levelProgressEndpoints(levelCode);
+    const score = profile?.total_score ?? 0;
+    const levelCode = levelCodeFromScore(score);
+    const progress = estimateLevelProgress(score);
+    const { left, right } = levelProgressEndpoints(score);
     const streak = profile?.streak_days ?? 0;
-    const daysActive = profile?.days_active ?? 0;
+    const createdAt = typeof userRaw?.created_at === 'string' ? userRaw.created_at : undefined;
+    const elapsedDays = elapsedDaysSince(createdAt);
+    const daysActive = Math.max(profile?.days_active ?? 0, elapsedDays);
     const clockLabel =
       streak > 0 ? formatJoursLabel(streak) : daysActive > 0 ? formatJoursLabel(daysActive) : '0 jour';
-
-    const score = profile?.total_score ?? 0;
     const loadingPlaceholders = Boolean(token?.trim()) && meLoading;
 
     return {
@@ -159,6 +158,18 @@ export default function HomeRefactoredScreen() {
       progress,
     };
   }, [me, meLoading, token]);
+
+  const leaderboardUsers = useMemo<HomeLeaderboardUser[]>(
+    () =>
+      leaderboardRows.map((row, idx) => ({
+        id: row.id,
+        name: row.displayName,
+        points: row.points,
+        avatar: row.avatar,
+        rank: idx + 1,
+      })),
+    [leaderboardRows],
+  );
 
   return (
     <View style={styles.root}>
@@ -214,7 +225,7 @@ export default function HomeRefactoredScreen() {
 
           <View style={styles.section}>
             <HomeSectionTitle title="Top classement" action="Voir complet" />
-            <HomeLeaderboardSection users={LEADERBOARD} />
+            <HomeLeaderboardSection users={leaderboardUsers} />
           </View>
 
           <View style={styles.section}>

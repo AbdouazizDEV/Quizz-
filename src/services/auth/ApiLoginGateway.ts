@@ -1,24 +1,20 @@
-import { apiClient } from '@services/api/apiClient';
-import { AxiosError } from 'axios';
+import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 
 import type { ILoginGateway, LoginCredentials } from './ILoginGateway';
 
 export class ApiLoginGateway implements ILoginGateway {
   async signIn(credentials: LoginCredentials): Promise<{ accessToken: string }> {
-    let data: { session: { access_token: string } | null };
-    try {
-      const response = await apiClient.post<{
-        session: { access_token: string } | null;
-      }>('/auth/login', {
+    const { data, error, response } = await getQuizzApiClient().POST('/auth/login', {
+      body: {
         email: credentials.email,
         password: credentials.password,
-      });
-      data = response.data;
-    } catch (error) {
-      const axiosError = error as AxiosError<{ error?: string }>;
+      },
+    });
+
+    if (error || !data) {
       const message =
-        axiosError.response?.data?.error ??
-        (axiosError.response?.status === 401
+        parseQuizzApiError(error) ??
+        (response?.status === 401
           ? 'Email ou mot de passe incorrect.'
           : 'Impossible de se connecter pour le moment.');
       throw new Error(message);
