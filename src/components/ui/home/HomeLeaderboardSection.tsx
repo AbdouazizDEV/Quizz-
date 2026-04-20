@@ -15,6 +15,14 @@ interface HomeLeaderboardSectionProps {
 }
 
 export function HomeLeaderboardSection({ users }: HomeLeaderboardSectionProps) {
+  if (users.length === 0) {
+    return (
+      <View style={styles.rankCard}>
+        <Text style={styles.emptyText}>Aucun score disponible pour le moment.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.rankCard}>
       {users.map((user, index) => {
@@ -100,5 +108,12 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     fontSize: 14,
     fontWeight: '700',
+  },
+  emptyText: {
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    color: '#6B7280',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

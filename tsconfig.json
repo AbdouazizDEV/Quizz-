@@ -30,6 +30,12 @@
       ],
       "@config": [
         "config/index.ts"
+      ],
+      "@sdk": [
+        "src/sdk/index.ts"
+      ],
+      "@sdk/*": [
+        "src/sdk/*"
       ]
     }
   },

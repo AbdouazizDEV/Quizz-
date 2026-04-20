@@ -1,4 +1,4 @@
-import { apiClient } from '@services/api/apiClient';
+import { getQuizzApiClient } from '@sdk';
 import { useAuthStore } from '@stores/authStore';
 import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
@@ -23,7 +23,9 @@ export async function signOutAndSyncStore(): Promise<void> {
   const token = useAuthStore.getState().token;
   if (token) {
     try {
-      await apiClient.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } });
+      await getQuizzApiClient().POST('/auth/logout', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
     } catch {
       /* déconnexion locale même si l’API échoue */
     }

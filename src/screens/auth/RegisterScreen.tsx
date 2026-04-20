@@ -5,7 +5,6 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Feather } from '@expo/vector-icons';
-import { AxiosError } from 'axios';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -31,7 +30,7 @@ import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
 import { Spacing } from '@constants/Spacing';
-import { apiClient } from '@services/api/apiClient';
+import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
 const BOTTOM_BAR_MIN = 118;
@@ -131,20 +130,24 @@ export default function RegisterScreen() {
 
     setSubmitting(true);
     try {
-      const { data } = await apiClient.post<{
-        session: { access_token: string } | null;
-        hint?: string;
-      }>('/auth/register', {
-        email: trimmedEmail,
-        password,
-        username: trimmedUsername,
-        account_type: onboarding.accountTypeId,
-        workplace: onboarding.workplaceId,
-        full_name: onboarding.fullName,
-        birth_date: onboarding.birthDateIso,
-        country_code: onboarding.countryCca2,
-        phone: onboarding.phoneE164,
+      const { data, error } = await getQuizzApiClient().POST('/auth/register', {
+        body: {
+          email: trimmedEmail,
+          password,
+          username: trimmedUsername,
+          account_type: onboarding.accountTypeId,
+          workplace: onboarding.workplaceId,
+          full_name: onboarding.fullName,
+          birth_date: onboarding.birthDateIso,
+          country_code: onboarding.countryCca2,
+          phone: onboarding.phoneE164,
+        },
       });
+
+      if (error || !data) {
+        setFormError(formatRegisterApiError(parseQuizzApiError(error)));
+        return;
+      }
 
       const token = data.session?.access_token;
       if (token) {
@@ -161,13 +164,7 @@ export default function RegisterScreen() {
         [{ text: 'OK', onPress: () => router.replace(Routes.LOGIN) }],
       );
     } catch (error) {
-      const axiosError = error as AxiosError<{ error?: string }>;
-      setFormError(
-        formatRegisterApiError(
-          axiosError.response?.data?.error ??
-            (axiosError.message ? axiosError.message : undefined),
-        ),
-      );
+      setFormError(formatRegisterApiError(parseQuizzApiError(error)));
     } finally {
       setSubmitting(false);
     }
