@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 
 import { getEnv, hasServiceRoleKey } from '../lib/env.js';
+import { sendPasswordResetOtpEmail } from '../lib/mailer.js';
 import { generateNumericOtp, hashOtp, safeEqualOtp } from '../lib/otp.js';
 import { signResetToken, verifyResetToken } from '../lib/resetToken.js';
 import {
@@ -70,6 +71,26 @@ function identifierForChannel(
   }
   const p = phone?.trim();
   return p || null;
+}
+
+async function resolveUserIdByEmail(email: string): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const admin = createServiceRoleClient();
+  let page = 1;
+  const perPage = 200;
+  while (page <= 20) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      throw new Error(error.message);
+    }
+    const users = data.users ?? [];
+    const found = users.find((u) => (u.email ?? '').trim().toLowerCase() === normalized);
+    if (found?.id) return found.id;
+    if (users.length < perPage) break;
+    page += 1;
+  }
+  return null;
 }
 
 export const authRoutes = new Hono()
@@ -279,28 +300,42 @@ export const authRoutes = new Hono()
     }
 
     const admin = createServiceRoleClient();
-    const { data: userId, error: rpcError } = await admin.rpc('get_user_id_by_email', {
-      search_email: id,
-    });
-
-    if (rpcError) {
-      return c.json({ error: rpcError.message }, 500);
+    let userId: string | null = null;
+    try {
+      userId = await resolveUserIdByEmail(id);
+    } catch (lookupErr) {
+      return c.json(
+        { error: lookupErr instanceof Error ? lookupErr.message : 'Recherche utilisateur impossible.' },
+        500,
+      );
     }
 
     if (!userId) {
       return c.json({ ok: true });
     }
 
-    const code = generateNumericOtp(6);
+    const code = generateNumericOtp(4);
     const hashed = hashOtp(code, env.OTP_PEPPER);
     const { error: insError } = await admin.from('otp_codes').insert({
       identifier: id,
-      user_id: userId as string,
+      user_id: userId,
       code: hashed,
       type: 'password_reset',
     });
     if (insError) {
       return c.json({ error: insError.message }, 500);
+    }
+
+    try {
+      await sendPasswordResetOtpEmail(id, code);
+    } catch (mailErr) {
+      return c.json(
+        {
+          error: 'OTP généré mais envoi e-mail impossible.',
+          details: mailErr instanceof Error ? mailErr.message : String(mailErr),
+        },
+        502,
+      );
     }
 
     const response: Record<string, unknown> = { ok: true };
@@ -348,16 +383,22 @@ export const authRoutes = new Hono()
       return c.json({ error: 'Code invalide ou expiré.' }, 400);
     }
 
-    const { data: userId, error: rpcError } = await admin.rpc('get_user_id_by_email', {
-      search_email: id,
-    });
-    if (rpcError || !userId) {
+    let userId: string | null = null;
+    try {
+      userId = await resolveUserIdByEmail(id);
+    } catch (lookupErr) {
+      return c.json(
+        { error: lookupErr instanceof Error ? lookupErr.message : 'Recherche utilisateur impossible.' },
+        500,
+      );
+    }
+    if (!userId) {
       return c.json({ error: 'Impossible de valider le compte.' }, 400);
     }
 
     await admin.from('otp_codes').update({ is_used: true }).eq('id', row.id);
 
-    const resetToken = signResetToken(userId as string, env.RESET_TOKEN_SECRET);
+    const resetToken = signResetToken(userId, env.RESET_TOKEN_SECRET);
     return c.json({ reset_token: resetToken });
   })
 
