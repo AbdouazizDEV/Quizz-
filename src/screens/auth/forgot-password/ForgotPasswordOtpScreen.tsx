@@ -101,8 +101,8 @@ export default function ForgotPasswordOtpScreen() {
     try {
       await passwordResetGateway.verifyOtp(email, code);
       router.push({ pathname: Routes.FORGOT_PASSWORD_NEW, params: { email } });
-    } catch {
-      setError('Code incorrect ou expiré.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Code incorrect ou expiré.');
     } finally {
       setBusy(false);
     }
@@ -116,8 +116,8 @@ export default function ForgotPasswordOtpScreen() {
       await passwordResetGateway.requestOtp(email);
       setSecondsLeft(RESEND_SECONDS);
       setCode('');
-    } catch {
-      setError('Échec du renvoi du code.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Échec du renvoi du code.');
     } finally {
       setBusy(false);
     }

@@ -17,6 +17,15 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === 'true' || v === '1'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

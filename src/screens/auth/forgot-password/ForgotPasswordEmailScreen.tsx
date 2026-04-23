@@ -75,8 +75,8 @@ export default function ForgotPasswordEmailScreen() {
     try {
       await passwordResetGateway.requestOtp(trimmed);
       router.push({ pathname: Routes.FORGOT_PASSWORD_OTP, params: { email: trimmed } });
-    } catch {
-      setError('Impossible d’envoyer le code. Réessayez.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Impossible d’envoyer le code. Réessayez.');
     } finally {
       setBusy(false);
     }

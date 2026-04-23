@@ -28,7 +28,6 @@ import { ForgotPasswordFlowTheme } from '@constants/forgotPasswordFlowTheme';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
-import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
 import { passwordResetGateway } from '@services/passwordReset/passwordResetGatewayInstance';
 
 const FOOTER_RESERVE = 132;
@@ -82,8 +81,8 @@ export default function ForgotPasswordNewPasswordScreen() {
       setError('Les mots de passe ne correspondent pas ou sont trop courts.');
       return;
     }
-    if (password.length < 4) {
-      setError('Mot de passe trop court.');
+    if (password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères.');
       return;
     }
     setError(null);
@@ -91,22 +90,17 @@ export default function ForgotPasswordNewPasswordScreen() {
     try {
       await passwordResetGateway.completePendingReset(password);
       setSuccessVisible(true);
-    } catch {
-      setError('Impossible d’enregistrer le mot de passe. Réessayez.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Impossible d’enregistrer le mot de passe. Réessayez.');
     } finally {
       setBusy(false);
     }
   }, [password, confirm]);
 
-  const onGoHome = useCallback(async () => {
+  const onGoHome = useCallback(() => {
     setSuccessVisible(false);
-    try {
-      await persistLoginAndSyncStore('stub-reset-session');
-    } catch {
-      /* démo */
-    }
-    router.replace(Routes.HOME);
-  }, [router]);
+    router.replace({ pathname: Routes.LOGIN, params: { email } });
+  }, [email, router]);
 
   if (!email) {
     return null;
