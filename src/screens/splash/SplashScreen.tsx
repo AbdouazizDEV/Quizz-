@@ -39,9 +39,8 @@ const RING_RADIUS = 22;
 const MIN_SPLASH_MS = 900;
 
 function resolvePostSplashRoute(snapshot: AuthBootstrapSnapshot): string {
-  if (snapshot.token) {
-    return Routes.HOME;
-  }
+  // Règle produit: au redémarrage de l'app, forcer le passage par l'écran Login.
+  // On n'auto-redirige plus vers Home même si un token persistant existe.
   if (snapshot.hasRegisteredAccount) {
     return Routes.LOGIN;
   }

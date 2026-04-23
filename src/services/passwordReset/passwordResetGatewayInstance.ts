@@ -1,4 +1,4 @@
 import type { IPasswordResetGateway } from './IPasswordResetGateway';
-import { StubPasswordResetGateway } from './StubPasswordResetGateway';
+import { ApiPasswordResetGateway } from './ApiPasswordResetGateway';
 
-export const passwordResetGateway: IPasswordResetGateway = new StubPasswordResetGateway();
+export const passwordResetGateway: IPasswordResetGateway = new ApiPasswordResetGateway();
