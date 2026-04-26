@@ -1,6 +1,12 @@
 import type { ConnectionsScreenData } from '@app-types/network.types';
+import type { ConnectionFilter } from '@app-types/network.types';
 
-/** Contrat pour charger followers / following (SOLID / DIP). */
+/** Contrat pour charger les utilisateurs du réseau (amis / suggestions). */
 export interface IConnectionsDataProvider {
-  getConnections(userId?: string): Promise<ConnectionsScreenData>;
+  getConnections(params: {
+    filter: ConnectionFilter;
+    query?: string;
+    page: number;
+    limit: number;
+  }): Promise<ConnectionsScreenData>;
 }

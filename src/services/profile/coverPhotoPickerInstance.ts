@@ -1,8 +1,8 @@
-import { StubCoverPhotoPickerService } from './StubCoverPhotoPickerService';
+import { ExpoImagePickerService } from './ExpoImagePickerService';
 
 import type { ICoverPhotoPickerService } from './ICoverPhotoPickerService';
 
-let instance: ICoverPhotoPickerService = new StubCoverPhotoPickerService();
+let instance: ICoverPhotoPickerService = new ExpoImagePickerService();
 
 export function getCoverPhotoPickerService(): ICoverPhotoPickerService {
   return instance;

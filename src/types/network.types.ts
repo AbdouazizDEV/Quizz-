@@ -1,4 +1,4 @@
-export type ConnectionFilter = 'followers' | 'following';
+export type ConnectionFilter = 'friends' | 'suggestions';
 
 export interface ConnectionUser {
   id: string;
@@ -12,6 +12,9 @@ export interface ConnectionUser {
 export interface ConnectionsScreenData {
   /** Titre navbar (ex. nom du profil consulté). */
   viewerDisplayName: string;
-  followers: ConnectionUser[];
-  following: ConnectionUser[];
+  items: ConnectionUser[];
+  page: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
 }

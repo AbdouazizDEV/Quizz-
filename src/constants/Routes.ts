@@ -14,6 +14,8 @@ export const Routes = {
   HOME: '/(tabs)/home',
   /** Liste des catégories (grille). */
   CATEGORIES: '/categories',
+  SCOREBOARD: '/scoreboard',
+  PLAYERS: '/players',
   PROFILE: '/(tabs)/profile',
   STATISTICS: '/statistics',
   NETWORK: '/network',
@@ -30,6 +32,10 @@ export const Routes = {
   PREMIUM_PAYMENT: '/premium/payment',
   PREMIUM_SUCCESS: '/premium/success',
 } as const;
+
+export function buildUserProfileHref(userId: string): string {
+  return `/users/${encodeURIComponent(userId)}`;
+}
 
 /** Loader 5s + fetch des questions (`app/quiz/[quizId]/index`). */
 export function buildQuizEntryHref(quizId: string, categorySlug?: string | null): string {
