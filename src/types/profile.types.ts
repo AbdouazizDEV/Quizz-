@@ -1,6 +1,8 @@
 export type ProfileTabId = 'quizzo' | 'collections' | 'about';
 
 export type QuizVisibility = 'public' | 'private';
+export type ViewerRelationship = 'self' | 'none' | 'pending' | 'friends';
+export type ProfileGender = 'female' | 'male' | 'unknown';
 
 export interface ProfileUserIdentity {
   id: string;
@@ -8,6 +10,8 @@ export interface ProfileUserIdentity {
   handle: string;
   avatarUri: string;
   coverUri: string;
+  gender: ProfileGender;
+  viewerRelationship: ViewerRelationship;
 }
 
 export interface ProfileStatItem {

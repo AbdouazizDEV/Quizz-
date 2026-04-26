@@ -42,6 +42,8 @@ export function mapAuthMeToProfileScreenData(me: AuthMeResponse): ProfileScreenD
       handle,
       avatarUri,
       coverUri: COVER_PLACEHOLDER,
+      gender: 'unknown',
+      viewerRelationship: 'self',
     },
     stats: [
       { id: 'quizzo', valueLabel: String(quizzesDone), caption: 'Quizzo' },

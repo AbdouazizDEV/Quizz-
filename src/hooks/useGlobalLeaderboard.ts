@@ -1,25 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import type { GlobalLeaderboardPayload } from '@app-types/leaderboard.types';
 import { fetchGlobalLeaderboard } from '@services/leaderboard/fetchGlobalLeaderboard';
 import { useAuthStore } from '@stores/authStore';
 
-export interface HomeLeaderboardRow {
-  id: string;
-  displayName: string;
-  points: number;
-  avatar?: string;
-}
-
-interface Result {
-  data: HomeLeaderboardRow[];
+interface Result extends GlobalLeaderboardPayload {
   loading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
 }
 
-export function useHomeLeaderboard(limit = 5): Result {
+const EMPTY: GlobalLeaderboardPayload = { items: [], me: null };
+
+export function useGlobalLeaderboard(limit = 50): Result {
   const token = useAuthStore((s) => s.token);
-  const [data, setData] = useState<HomeLeaderboardRow[]>([]);
+  const [data, setData] = useState<GlobalLeaderboardPayload>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -28,16 +23,10 @@ export function useHomeLeaderboard(limit = 5): Result {
     setError(null);
     try {
       const payload = await fetchGlobalLeaderboard(limit, token);
-      const mapped = payload.items.map((r) => ({
-        id: r.id,
-        displayName: r.displayName,
-        points: r.score,
-        avatar: r.avatarUrl,
-      }));
-      setData(mapped);
+      setData(payload);
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
-      setData([]);
+      setData(EMPTY);
     } finally {
       setLoading(false);
     }
@@ -47,5 +36,6 @@ export function useHomeLeaderboard(limit = 5): Result {
     void load();
   }, [load]);
 
-  return { data, loading, error, refetch: load };
+  return { ...data, loading, error, refetch: load };
 }
+

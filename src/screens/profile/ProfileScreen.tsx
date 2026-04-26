@@ -15,27 +15,35 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import type { ProfileTabId } from '@app-types/profile.types';
+import { ProfileAvatarActionSheet } from '@components/ui/profile/ProfileAvatarActionSheet';
 import { CoverPhotoChangeModal } from '@components/ui/profile/CoverPhotoChangeModal';
 import { ProfileHeaderSection } from '@components/ui/profile/ProfileHeaderSection';
 import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { ProfileNavbar } from '@components/ui/profile/ProfileNavbar';
 import { ProfileSegmentedTabs } from '@components/ui/profile/ProfileSegmentedTabs';
 import { ProfileTabContent } from '@components/ui/profile/ProfileTabContent';
+import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useProfileScreenData } from '@hooks/useProfileScreenData';
 import { getCoverPhotoPickerService } from '@services/profile/coverPhotoPickerInstance';
+import { ApiConnectionFollowService } from '@services/network/ApiConnectionFollowService';
+import { uploadMyAvatar } from '@services/profile/profileAvatarApi';
+import { uploadMyCover } from '@services/profile/profileCoverApi';
 
 const BOTTOM_NAV_HEIGHT = 86;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ userId?: string }>();
+  const viewedUserId = typeof params.userId === 'string' ? params.userId : undefined;
+  const isExternalProfile = Boolean(viewedUserId);
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, Spacing.onboardingMaxWidth);
 
@@ -54,13 +62,67 @@ export default function ProfileScreen() {
     [fontsLoaded],
   );
 
-  const { data, loading, error, refetch } = useProfileScreenData();
+  const { data, loading, error, refetch } = useProfileScreenData(viewedUserId);
   const [tab, setTab] = useState<ProfileTabId>('quizzo');
   const [coverModalVisible, setCoverModalVisible] = useState(false);
+  const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [relationshipOverride, setRelationshipOverride] = useState<
+    'self' | 'none' | 'pending' | 'friends' | null
+  >(null);
+
+  const effectiveRelationship = relationshipOverride ?? data?.identity.viewerRelationship ?? 'none';
+
+  const identityActionVm = useMemo(() => {
+    if (!isExternalProfile) {
+      return {
+        label: 'Edit Profile',
+        variant: 'primary' as const,
+        disabled: false,
+      };
+    }
+    if (effectiveRelationship === 'friends') {
+      return {
+        label: data?.identity.gender === 'female' ? 'Amie' : 'Ami',
+        variant: 'friend' as const,
+        disabled: true,
+      };
+    }
+    if (effectiveRelationship === 'pending') {
+      return {
+        label: 'En attente',
+        variant: 'pending' as const,
+        disabled: true,
+      };
+    }
+    return {
+      label: 'Suivre',
+      variant: 'primary' as const,
+      disabled: followBusy,
+    };
+  }, [data?.identity.gender, effectiveRelationship, followBusy, isExternalProfile]);
 
   const onEditProfile = useCallback(() => {
-    router.push(Routes.SETTINGS_PERSONAL);
-  }, [router]);
+    if (isExternalProfile) {
+      if (!viewedUserId) return;
+      void (async () => {
+        try {
+          setFollowBusy(true);
+          await new ApiConnectionFollowService().setFollowing(viewedUserId, true);
+          setRelationshipOverride('pending');
+          Alert.alert('Demande envoyée', "La demande d'ami a été envoyée.");
+        } catch {
+          Alert.alert('Erreur', "Impossible d'envoyer la demande d'ami.");
+        } finally {
+          setFollowBusy(false);
+        }
+      })();
+      return;
+    }
+    setAvatarSheetVisible(true);
+  }, [isExternalProfile, viewedUserId]);
 
   const onSettings = useCallback(() => {
     router.push(Routes.SETTINGS);
@@ -77,18 +139,52 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setRelationshipOverride(null);
       void refetch();
     }, [refetch]),
   );
 
   const onChooseCoverPhoto = useCallback(async () => {
-    const picker = getCoverPhotoPickerService();
-    const result = await picker.openPicker();
-    setCoverModalVisible(false);
-    if (!result.cancelled) {
-      Alert.alert('Photo', 'Nouvelle image sélectionnée (à persister côté API).');
+    try {
+      setCoverBusy(true);
+      const picker = getCoverPhotoPickerService();
+      const result = await picker.openPicker();
+      setCoverModalVisible(false);
+      if (result.cancelled) return;
+      if (!result.base64) {
+        Alert.alert('Image', "Impossible de lire l'image sélectionnée.");
+        return;
+      }
+      await uploadMyCover(result.base64);
+      void refetch();
+      Alert.alert('Profil', 'Photo de couverture mise à jour.');
+    } catch (e) {
+      Alert.alert('Erreur', e instanceof Error ? e.message : "Mise à jour de la couverture impossible.");
+    } finally {
+      setCoverBusy(false);
     }
-  }, []);
+  }, [refetch]);
+
+  const onChooseAvatarFromGallery = useCallback(async () => {
+    try {
+      setAvatarBusy(true);
+      const picker = getCoverPhotoPickerService();
+      const result = await picker.openPicker();
+      if (result.cancelled) return;
+      if (!result.base64) {
+        Alert.alert('Image', "Impossible de lire l'image sélectionnée.");
+        return;
+      }
+      await uploadMyAvatar(result.base64);
+      setAvatarSheetVisible(false);
+      void refetch();
+      Alert.alert('Profil', 'Avatar mis à jour avec succès.');
+    } catch (e) {
+      Alert.alert('Erreur', e instanceof Error ? e.message : "Mise à jour de l'avatar impossible.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }, [refetch]);
 
   return (
     <View style={styles.root}>
@@ -119,15 +215,25 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.column, { maxWidth: contentWidth, width: '100%' }]}>
-            <ProfileNavbar
-              title="Profile"
-              fonts={fonts}
-              actions={{
-                onSettings,
-                onDirectMessages,
-                onActivity,
-              }}
-            />
+            {isExternalProfile ? (
+              <StatisticsNavbar
+                title={data.identity.displayName}
+                fonts={fonts}
+                onBack={() => router.back()}
+                fullWidth
+                rightAction={{ type: 'more', onPress: () => Alert.alert('Menu', 'Options à venir.') }}
+              />
+            ) : (
+              <ProfileNavbar
+                title="Profile"
+                fonts={fonts}
+                actions={{
+                  onSettings,
+                  onDirectMessages,
+                  onActivity,
+                }}
+              />
+            )}
 
             <View style={styles.body}>
               <ProfileHeaderSection
@@ -139,6 +245,9 @@ export default function ProfileScreen() {
                 fonts={fonts}
                 onEditProfile={onEditProfile}
                 onPressChangeCover={() => setCoverModalVisible(true)}
+                identityActionLabel={identityActionVm.label}
+                identityActionVariant={identityActionVm.variant}
+                identityActionDisabled={identityActionVm.disabled}
               />
 
               <ProfileSegmentedTabs active={tab} onChange={setTab} fonts={fonts} />
@@ -156,12 +265,27 @@ export default function ProfileScreen() {
 
       <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
 
-      <CoverPhotoChangeModal
-        visible={coverModalVisible}
-        onClose={() => setCoverModalVisible(false)}
-        onChoosePhoto={onChooseCoverPhoto}
-        fonts={fonts}
-      />
+      {!isExternalProfile ? (
+        <>
+          <CoverPhotoChangeModal
+            visible={coverModalVisible}
+            onClose={() => setCoverModalVisible(false)}
+            onChoosePhoto={onChooseCoverPhoto}
+            fonts={fonts}
+          />
+          <ProfileAvatarActionSheet
+            visible={avatarSheetVisible}
+            onClose={() => setAvatarSheetVisible(false)}
+            onPickGallery={() => void onChooseAvatarFromGallery()}
+            fonts={fonts}
+          />
+        </>
+      ) : null}
+      {avatarBusy || coverBusy ? (
+        <View style={styles.avatarBusyOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -196,5 +320,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#C9A000',
+  },
+  avatarBusyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
