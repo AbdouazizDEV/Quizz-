@@ -6,8 +6,8 @@ import { NetworkTheme } from '@constants/networkTheme';
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
 
 const TABS: { id: ConnectionFilter; label: string }[] = [
-  { id: 'followers', label: 'Followers' },
-  { id: 'following', label: 'Following' },
+  { id: 'friends', label: 'Amis' },
+  { id: 'suggestions', label: "Suggestions d'amis" },
 ];
 
 interface NetworkFilterTabsProps {

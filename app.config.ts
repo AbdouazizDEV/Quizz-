@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Quizz+',
   slug: 'quizzplus',
+  icon: './assets/Logo2.png',
   /** Deep links : quizzplus://auth/callback — après confirmation e-mail (pont localhost:3000). */
   scheme: 'quizzplus',
   version: '1.0.0',
@@ -13,6 +14,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.quizzplus.app',
+    adaptiveIcon: {
+      foregroundImage: './assets/Logo2.png',
+      backgroundColor: '#FFFFFF',
+    },
   },
   extra: {
     env: process.env.EXPO_PUBLIC_ENV ?? 'local',

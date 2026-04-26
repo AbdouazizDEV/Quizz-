@@ -1,8 +1,8 @@
-import { StubConnectionFollowService } from './StubConnectionFollowService';
+import { ApiConnectionFollowService } from './ApiConnectionFollowService';
 
 import type { IConnectionFollowService } from './IConnectionFollowService';
 
-let instance: IConnectionFollowService = new StubConnectionFollowService();
+let instance: IConnectionFollowService = new ApiConnectionFollowService();
 
 export function getConnectionFollowService(): IConnectionFollowService {
   return instance;

@@ -26,6 +26,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  CLOUDINARY_URL: z.string().optional(),
+  CLOUDINARY_UPLOAD_FOLDER: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

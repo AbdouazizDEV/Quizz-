@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -17,6 +19,8 @@ import { HomeActionTiles } from '@components/ui/home/HomeActionTiles';
 import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { HomeDailyCategoriesSection } from '@components/ui/home/HomeDailyCategoriesSection';
 import { HomeHeaderCard } from '@components/ui/home/HomeHeaderCard';
+import { HomeFriendRequestsSheet } from '@components/ui/home/HomeFriendRequestsSheet';
+import { HomeSettingsDrawer } from '@components/ui/home/HomeSettingsDrawer';
 import { HomeInsightCarousel, type HomeInsightItem } from '@components/ui/home/HomeInsightCarousel';
 import {
   HomeLeaderboardSection,
@@ -24,12 +28,19 @@ import {
 } from '@components/ui/home/HomeLeaderboardSection';
 import { HomeRewardsSection } from '@components/ui/home/HomeRewardsSection';
 import { HomeSectionTitle } from '@components/ui/home/HomeSectionTitle';
-import { Routes } from '@constants/Routes';
+import { buildUserProfileHref, Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthMe } from '@hooks/useAuthMe';
-import { useHomeLeaderboard } from '@hooks/useHomeLeaderboard';
+import { useGlobalLeaderboard } from '@hooks/useGlobalLeaderboard';
 import { useAuthStore } from '@stores/authStore';
+import {
+  acceptFriendRequest,
+  fetchFriendRequests,
+  rejectFriendRequest,
+  type FriendRequestItem,
+} from '@services/network/friendRequestsApi';
+import { getUserAvatarUri } from '@utils/getUserAvatarUri';
 import {
   elapsedDaysSince,
   estimateLevelProgress,
@@ -77,15 +88,63 @@ export default function HomeRefactoredScreen() {
   const glowAnim = useRef(new Animated.Value(0.35)).current;
   const token = useAuthStore((s) => s.token);
   const { data: me, loading: meLoading, refetch: refetchAuthMe } = useAuthMe();
-  const { data: leaderboardRows, refetch: refetchLeaderboard } = useHomeLeaderboard(5);
+  const { items: leaderboardRows, refetch: refetchLeaderboard } = useGlobalLeaderboard(5);
   const { data: allCategories, loading: categoriesLoading } = useCategoriesExplore();
+  const [requestsVisible, setRequestsVisible] = useState(false);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [friendRequests, setFriendRequests] = useState<FriendRequestItem[]>([]);
+  const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       void refetchAuthMe();
       void refetchLeaderboard();
-    }, [refetchAuthMe, refetchLeaderboard]),
+      if (token?.trim()) {
+        void (async () => {
+          try {
+            const rows = await fetchFriendRequests(20);
+            setFriendRequests(rows);
+          } catch {
+            // Silent in home feed; modal retries on open.
+          }
+        })();
+      } else {
+        setFriendRequests([]);
+      }
+    }, [refetchAuthMe, refetchLeaderboard, token]),
   );
+
+  const openFriendRequests = useCallback(async () => {
+    setRequestsVisible(true);
+    if (!token?.trim()) return;
+    setRequestsLoading(true);
+    try {
+      const rows = await fetchFriendRequests(20);
+      setFriendRequests(rows);
+    } catch {
+      Alert.alert('Notifications', 'Impossible de charger les demandes pour le moment.');
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, [token]);
+
+  const onAcceptRequest = useCallback(async (notificationId: string) => {
+    try {
+      await acceptFriendRequest(notificationId);
+      setFriendRequests((prev) => prev.filter((r) => r.notificationId !== notificationId));
+    } catch {
+      Alert.alert('Erreur', "Impossible d'accepter la demande.");
+    }
+  }, []);
+
+  const onRejectRequest = useCallback(async (notificationId: string) => {
+    try {
+      await rejectFriendRequest(notificationId);
+      setFriendRequests((prev) => prev.filter((r) => r.notificationId !== notificationId));
+    } catch {
+      Alert.alert('Erreur', 'Impossible de refuser la demande.');
+    }
+  }, []);
 
   const topThreeCategories = useMemo(() => allCategories.slice(0, 3), [allCategories]);
 
@@ -99,6 +158,9 @@ export default function HomeRefactoredScreen() {
     },
     [router],
   );
+  const goToScoreboard = useCallback(() => {
+    router.push(Routes.PLAYERS);
+  }, [router]);
 
   useEffect(() => {
     const nativeDriver = Platform.OS !== 'web';
@@ -148,6 +210,10 @@ export default function HomeRefactoredScreen() {
 
     return {
       avatarInitial: initials,
+      avatarUri: getUserAvatarUri(
+        me?.user?.id ?? 'me',
+        profile?.avatar_url ?? (typeof meta?.avatar_url === 'string' ? meta.avatar_url : undefined),
+      ),
       displayNameWithEmoji: loadingPlaceholders ? '··· 👋' : `${first} 👋`,
       totalScoreDisplay: loadingPlaceholders ? '—' : String(score),
       levelLabel: formatLevelCodeLabel(levelCode),
@@ -164,9 +230,9 @@ export default function HomeRefactoredScreen() {
       leaderboardRows.map((row, idx) => ({
         id: row.id,
         name: row.displayName,
-        points: row.points,
-        avatar: row.avatar,
-        rank: idx + 1,
+        points: row.score,
+        avatar: row.avatarUrl,
+        rank: row.rank || idx + 1,
       })),
     [leaderboardRows],
   );
@@ -192,6 +258,7 @@ export default function HomeRefactoredScreen() {
             glowOpacity={glowAnim}
             progress={headerVm.progress}
             avatarInitial={headerVm.avatarInitial}
+            avatarUri={headerVm.avatarUri}
             displayNameWithEmoji={headerVm.displayNameWithEmoji}
             totalScoreDisplay={headerVm.totalScoreDisplay}
             levelLabel={headerVm.levelLabel}
@@ -199,10 +266,13 @@ export default function HomeRefactoredScreen() {
             streakOrDaysLabel={headerVm.streakOrDaysLabel}
             progressLabelLeft={headerVm.progressLabelLeft}
             progressLabelRight={headerVm.progressLabelRight}
+            notificationCount={friendRequests.length}
+            onPressNotifications={() => void openFriendRequests()}
+            onPressAvatar={() => setSettingsDrawerVisible(true)}
           />
 
           <View style={styles.section}>
-            <HomeSectionTitle title="Le savoir du jour" action="Voir tout" />
+            <HomeSectionTitle title="Le savoir du jour" />
             <HomeInsightCarousel
               insights={INSIGHTS}
               contentWidth={contentWidth}
@@ -223,10 +293,17 @@ export default function HomeRefactoredScreen() {
 
           <HomeActionTiles />
 
-          <View style={styles.section}>
-            <HomeSectionTitle title="Top classement" action="Voir complet" />
-            <HomeLeaderboardSection users={leaderboardUsers} />
-          </View>
+          <Pressable style={styles.section} onPress={goToScoreboard} accessibilityRole="button">
+            <HomeSectionTitle
+              title="Top classement"
+              action="Voir complet"
+              onActionPress={goToScoreboard}
+            />
+            <HomeLeaderboardSection
+              users={leaderboardUsers}
+              onPressAvatar={(userId) => router.push(buildUserProfileHref(userId))}
+            />
+          </Pressable>
 
           <View style={styles.section}>
             <HomeSectionTitle title="Voir mes récompenses" />
@@ -236,6 +313,19 @@ export default function HomeRefactoredScreen() {
       </ScrollView>
 
       <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
+
+      <HomeFriendRequestsSheet
+        visible={requestsVisible}
+        loading={requestsLoading}
+        requests={friendRequests}
+        onClose={() => setRequestsVisible(false)}
+        onAccept={(id) => void onAcceptRequest(id)}
+        onReject={(id) => void onRejectRequest(id)}
+      />
+      <HomeSettingsDrawer
+        visible={settingsDrawerVisible}
+        onClose={() => setSettingsDrawerVisible(false)}
+      />
     </View>
   );
 }

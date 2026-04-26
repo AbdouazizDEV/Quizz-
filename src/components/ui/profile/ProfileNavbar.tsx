@@ -34,7 +34,7 @@ export function ProfileNavbar({ title, fonts, actions }: ProfileNavbarProps) {
           onPress={actions?.onDirectMessages}
           style={styles.iconHit}
         >
-          <Feather name="send" size={22} color={ProfileTheme.grey900} />
+          <Feather name="users" size={22} color={ProfileTheme.grey900} />
         </Pressable>
         <Pressable
           accessibilityRole="button"

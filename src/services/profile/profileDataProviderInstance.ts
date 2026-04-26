@@ -1,9 +1,9 @@
-import { MockProfileDataProvider } from './MockProfileDataProvider';
+import { ApiProfileDataProvider } from './ApiProfileDataProvider';
 
 import type { IProfileDataProvider } from './IProfileDataProvider';
 
 /** Point d’injection unique : swap pour une implémentation API sans toucher aux écrans. */
-let instance: IProfileDataProvider = new MockProfileDataProvider();
+let instance: IProfileDataProvider = new ApiProfileDataProvider();
 
 export function getProfileDataProvider(): IProfileDataProvider {
   return instance;

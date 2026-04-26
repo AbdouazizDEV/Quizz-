@@ -25,10 +25,9 @@ import { NetworkFilterTabs } from '@components/ui/network/NetworkFilterTabs';
 import { NetworkSearchNavBar } from '@components/ui/network/NetworkSearchNavBar';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { NetworkTheme } from '@constants/networkTheme';
-import { Routes } from '@constants/Routes';
+import { buildUserProfileHref, Routes } from '@constants/Routes';
 import { useConnectionsScreenData } from '@hooks/useConnectionsScreenData';
 import { getConnectionFollowService } from '@services/network/connectionFollowServiceInstance';
-import { filterConnectionsByQuery } from '@utils/filterConnectionsByQuery';
 import { getNetworkHorizontalPadding } from '@utils/networkResponsiveLayout';
 
 function ListSeparator() {
@@ -60,11 +59,14 @@ export default function NetworkScreen() {
     [fontsLoaded],
   );
 
-  const { data, loading, error, refetch } = useConnectionsScreenData();
-  const [filter, setFilter] = useState<ConnectionFilter>('followers');
+  const [filter, setFilter] = useState<ConnectionFilter>('friends');
   const [relationshipOverrides, setRelationshipOverrides] = useState<Record<string, boolean>>({});
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const { data, loading, loadingMore, error, refetch, loadMore } = useConnectionsScreenData(
+    filter,
+    searchQuery,
+  );
 
   const onBack = useCallback(() => {
     if (searchMode) {
@@ -88,15 +90,12 @@ export default function NetworkScreen() {
     setSearchQuery('');
   }, []);
 
-  const list = useMemo(() => {
-    if (!data) return [];
-    return filter === 'followers' ? data.followers : data.following;
-  }, [data, filter]);
+  const onChangeFilter = useCallback((next: ConnectionFilter) => {
+    setRelationshipOverrides({});
+    setFilter(next);
+  }, []);
 
-  const filteredList = useMemo(
-    () => filterConnectionsByQuery(list, searchQuery),
-    [list, searchQuery],
-  );
+  const list = data?.items ?? [];
 
   const effectiveRelationship = useCallback(
     (user: ConnectionUser) => relationshipOverrides[user.id] ?? user.relationshipIsActive,
@@ -110,6 +109,7 @@ export default function NetworkScreen() {
       const follow = getConnectionFollowService();
       try {
         await follow.setFollowing(user.id, next);
+        void refetch();
       } catch {
         setRelationshipOverrides((prev) => {
           const nextMap = { ...prev };
@@ -119,7 +119,7 @@ export default function NetworkScreen() {
         Alert.alert('Erreur', 'Impossible de mettre à jour le suivi.');
       }
     },
-    [effectiveRelationship],
+    [effectiveRelationship, refetch],
   );
 
   const renderItem: ListRenderItem<ConnectionUser> = useCallback(
@@ -129,9 +129,10 @@ export default function NetworkScreen() {
         fonts={fonts}
         relationshipActive={effectiveRelationship(item)}
         onToggleFollow={() => void onToggleFollow(item)}
+        onPressAvatar={() => router.push(buildUserProfileHref(item.id))}
       />
     ),
-    [fonts, effectiveRelationship, onToggleFollow],
+    [fonts, effectiveRelationship, onToggleFollow, router],
   );
 
   const keyExtractor = useCallback((item: ConnectionUser) => item.id, []);
@@ -156,10 +157,20 @@ export default function NetworkScreen() {
               rightAction={{ type: 'search', onPress: openSearch }}
             />
           )}
-          <NetworkFilterTabs active={filter} onChange={setFilter} fonts={fonts} />
+          <NetworkFilterTabs active={filter} onChange={onChangeFilter} fonts={fonts} />
         </View>
       ) : null,
-    [data, fonts, onBack, openSearch, closeSearch, searchMode, searchQuery, filter],
+    [data, fonts, onBack, openSearch, closeSearch, searchMode, searchQuery, filter, onChangeFilter],
+  );
+
+  const ListFooter = useMemo(
+    () =>
+      loadingMore ? (
+        <View style={styles.footerLoader}>
+          <ActivityIndicator size="small" color="#212121" />
+        </View>
+      ) : null,
+    [loadingMore],
   );
 
   const listContentStyle = useMemo(
@@ -192,20 +203,27 @@ export default function NetworkScreen() {
       ) : data ? (
         <FlatList
           style={styles.flatList}
-          data={filteredList}
+          data={list}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
           ListEmptyComponent={
             searchQuery.trim().length > 0 ? (
               <Text style={[styles.emptyHint, fonts.medium && { fontFamily: fonts.medium }]}>
                 Aucun utilisateur ne correspond à « {searchQuery.trim()} ».
               </Text>
-            ) : null
+            ) : (
+              <Text style={[styles.emptyHint, fonts.medium && { fontFamily: fonts.medium }]}>
+                Aucun utilisateur trouvé.
+              </Text>
+            )
           }
           contentContainerStyle={listContentStyle}
           ItemSeparatorComponent={ListSeparator}
           showsVerticalScrollIndicator={false}
+          onEndReached={() => void loadMore()}
+          onEndReachedThreshold={0.4}
         />
       ) : null}
     </View>
@@ -251,5 +269,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#C9A000',
+  },
+  footerLoader: {
+    paddingVertical: 14,
   },
 });

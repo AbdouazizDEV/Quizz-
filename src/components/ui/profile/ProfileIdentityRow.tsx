@@ -10,6 +10,9 @@ interface ProfileIdentityRowProps {
   avatarUri: string;
   fonts: ProfileFontFamilies;
   onEditProfile: () => void;
+  actionLabel?: string;
+  actionVariant?: 'primary' | 'pending' | 'friend';
+  actionDisabled?: boolean;
 }
 
 export function ProfileIdentityRow({
@@ -18,6 +21,9 @@ export function ProfileIdentityRow({
   avatarUri,
   fonts,
   onEditProfile,
+  actionLabel = 'Edit Profile',
+  actionVariant = 'primary',
+  actionDisabled = false,
 }: ProfileIdentityRowProps) {
   return (
     <View style={styles.row}>
@@ -39,10 +45,26 @@ export function ProfileIdentityRow({
         accessibilityRole="button"
         accessibilityLabel="Modifier le profil"
         onPress={onEditProfile}
-        style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.88 }]}
+        disabled={actionDisabled}
+        style={({ pressed }) => [
+          styles.editBtn,
+          actionVariant === 'primary' && styles.editBtnPrimary,
+          actionVariant === 'pending' && styles.editBtnPending,
+          actionVariant === 'friend' && styles.editBtnFriend,
+          pressed && !actionDisabled && { opacity: 0.88 },
+          actionDisabled && styles.editBtnDisabled,
+        ]}
       >
-        <Text style={[styles.editLabel, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-          Edit Profile
+        <Text
+          style={[
+            styles.editLabel,
+            actionVariant === 'primary' && styles.editLabelPrimary,
+            actionVariant === 'pending' && styles.editLabelPending,
+            actionVariant === 'friend' && styles.editLabelFriend,
+            fonts.semiBold && { fontFamily: fonts.semiBold },
+          ]}
+        >
+          {actionLabel}
         </Text>
       </Pressable>
     </View>
@@ -92,15 +114,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: ProfileTheme.pillRadius,
-    backgroundColor: ProfileTheme.primary500,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editBtnPrimary: {
+    backgroundColor: ProfileTheme.primary500,
+  },
+  editBtnPending: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  editBtnFriend: {
+    backgroundColor: '#ECFDF3',
+    borderWidth: 1,
+    borderColor: '#34D399',
+  },
+  editBtnDisabled: {
+    opacity: 0.9,
   },
   editLabel: {
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '600',
     letterSpacing: 0.2,
+  },
+  editLabelPrimary: {
     color: ProfileTheme.white,
+  },
+  editLabelPending: {
+    color: '#374151',
+  },
+  editLabelFriend: {
+    color: '#047857',
   },
 });

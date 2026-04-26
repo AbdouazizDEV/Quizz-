@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export interface HomeLeaderboardUser {
   id: string;
@@ -12,9 +12,10 @@ export interface HomeLeaderboardUser {
 
 interface HomeLeaderboardSectionProps {
   users: HomeLeaderboardUser[];
+  onPressAvatar?: (userId: string) => void;
 }
 
-export function HomeLeaderboardSection({ users }: HomeLeaderboardSectionProps) {
+export function HomeLeaderboardSection({ users, onPressAvatar }: HomeLeaderboardSectionProps) {
   if (users.length === 0) {
     return (
       <View style={styles.rankCard}>
@@ -31,13 +32,17 @@ export function HomeLeaderboardSection({ users }: HomeLeaderboardSectionProps) {
           <View key={user.id} style={styles.rankRow}>
             <View style={styles.rankLeft}>
               <Text style={styles.rankIndex}>{position}</Text>
-              <View style={styles.rankAvatar}>
+              <Pressable
+                style={styles.rankAvatar}
+                onPress={() => onPressAvatar?.(user.id)}
+                accessibilityRole="button"
+              >
                 {user.avatar ? (
                   <Image source={{ uri: user.avatar }} style={styles.rankAvatarImage} />
                 ) : (
                   <Text style={styles.rankAvatarText}>{user.name[0]?.toUpperCase() ?? '?'}</Text>
                 )}
-              </View>
+              </Pressable>
               <Text style={styles.rankName} numberOfLines={1}>
                 {user.name}
               </Text>

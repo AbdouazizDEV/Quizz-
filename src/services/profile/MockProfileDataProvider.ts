@@ -25,6 +25,8 @@ export class MockProfileDataProvider implements IProfileDataProvider {
         handle: '@andrew_ainsley',
         avatarUri: AVATAR_PLACEHOLDER,
         coverUri: COVER_PLACEHOLDER,
+        gender: 'unknown',
+        viewerRelationship: _userId ? 'none' : 'self',
       },
       stats: [
         { id: 'quizzo', valueLabel: String(quizTotalCount), caption: 'Quizzo' },

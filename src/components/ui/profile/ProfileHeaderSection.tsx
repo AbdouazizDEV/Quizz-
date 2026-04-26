@@ -17,6 +17,9 @@ interface ProfileHeaderSectionProps {
   fonts: ProfileFontFamilies;
   onEditProfile: () => void;
   onPressChangeCover: () => void;
+  identityActionLabel?: string;
+  identityActionVariant?: 'primary' | 'pending' | 'friend';
+  identityActionDisabled?: boolean;
 }
 
 export function ProfileHeaderSection({
@@ -28,6 +31,9 @@ export function ProfileHeaderSection({
   fonts,
   onEditProfile,
   onPressChangeCover,
+  identityActionLabel,
+  identityActionVariant,
+  identityActionDisabled,
 }: ProfileHeaderSectionProps) {
   return (
     <View style={styles.headerBlock}>
@@ -39,6 +45,9 @@ export function ProfileHeaderSection({
           avatarUri={avatarUri}
           fonts={fonts}
           onEditProfile={onEditProfile}
+          actionLabel={identityActionLabel}
+          actionVariant={identityActionVariant}
+          actionDisabled={identityActionDisabled}
         />
         <View style={styles.divider} />
         <ProfileStatsGrid stats={stats} fonts={fonts} />

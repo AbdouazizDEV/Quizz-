@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
-import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 /** Largeur de référence (iPhone 11 / Pixel) — en dessous, les tailles diminuent. */
@@ -11,6 +11,8 @@ interface HomeHeaderCardProps {
   progress: number;
   /** Initiale(s) dans l’avatar. */
   avatarInitial?: string;
+  /** Photo réelle de l'utilisateur (fallback sur initiale si absente). */
+  avatarUri?: string;
   /** Deuxième ligne sous « Bonjour » (ex. « Prénom 👋 »). */
   displayNameWithEmoji?: string;
   /** Score affiché en grand (chaîne déjà formatée). */
@@ -23,12 +25,16 @@ interface HomeHeaderCardProps {
   streakOrDaysLabel?: string;
   progressLabelLeft?: string;
   progressLabelRight?: string;
+  notificationCount?: number;
+  onPressNotifications?: () => void;
+  onPressAvatar?: () => void;
 }
 
 export function HomeHeaderCard({
   glowOpacity,
   progress,
   avatarInitial = 'A',
+  avatarUri,
   displayNameWithEmoji = 'Joueur 👋',
   totalScoreDisplay = '0',
   levelLabel = '🌱 Niveau 1 · Débutant',
@@ -36,6 +42,9 @@ export function HomeHeaderCard({
   streakOrDaysLabel = '0 jour',
   progressLabelLeft = 'Niv. 1',
   progressLabelRight = 'Niv. 2',
+  notificationCount = 0,
+  onPressNotifications,
+  onPressAvatar,
 }: HomeHeaderCardProps) {
   const { width, fontScale: systemFontScale } = useWindowDimensions();
 
@@ -74,9 +83,17 @@ export function HomeHeaderCard({
     >
       <Animated.View style={[styles.glowCircle, { opacity: glowOpacity }]} />
       <View style={styles.headerTopRow}>
-        <View style={[styles.avatar, { width: sizes.avatarBox, height: sizes.avatarBox, borderRadius: sizes.avatarBox / 2 }]}>
-          <Text style={[styles.avatarText, { fontSize: sizes.avatar }]}>{avatarInitial}</Text>
-        </View>
+        <Pressable
+          style={[styles.avatar, { width: sizes.avatarBox, height: sizes.avatarBox, borderRadius: sizes.avatarBox / 2 }]}
+          onPress={onPressAvatar}
+          accessibilityRole="button"
+        >
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <Text style={[styles.avatarText, { fontSize: sizes.avatar }]}>{avatarInitial}</Text>
+          )}
+        </Pressable>
         <View style={styles.headerIdentity}>
           <Text style={[styles.headerGreeting, { fontSize: sizes.greeting }]}>Bonjour</Text>
           <Text
@@ -88,9 +105,18 @@ export function HomeHeaderCard({
             {displayNameWithEmoji}
           </Text>
         </View>
-        <Pressable style={[styles.bellBadge, { width: sizes.bellBox, height: sizes.bellBox, borderRadius: sizes.bellBox * 0.33 }]}>
+        <Pressable
+          style={[styles.bellBadge, { width: sizes.bellBox, height: sizes.bellBox, borderRadius: sizes.bellBox * 0.33 }]}
+          onPress={onPressNotifications}
+          accessibilityRole="button"
+        >
           <Feather name="bell" size={sizes.bellIcon} color="#FFFFFF" />
           <View style={[styles.bellDot, { width: sizes.bellDot, height: sizes.bellDot, borderRadius: sizes.bellDot / 2, top: sizes.bellDot * 1.2, right: sizes.bellDot * 1.4 }]} />
+          {notificationCount > 0 ? (
+            <View style={styles.notificationBadgeOnBell}>
+              <Text style={styles.notificationBadgeText}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
@@ -155,6 +181,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontWeight: '700',
@@ -211,6 +242,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  notificationBadgeOnBell: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: '#FF4D4F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   metaText: {
     color: '#FFFFFF',

@@ -13,6 +13,7 @@ interface ConnectionListItemProps {
   /** État effectif du bouton (peut différer du mock après action locale). */
   relationshipActive: boolean;
   onToggleFollow: () => void;
+  onPressAvatar?: () => void;
 }
 
 export function ConnectionListItem({
@@ -20,6 +21,7 @@ export function ConnectionListItem({
   fonts,
   relationshipActive,
   onToggleFollow,
+  onPressAvatar,
 }: ConnectionListItemProps) {
   const { width: screenWidth } = useWindowDimensions();
   const m = useMemo(() => getConnectionRowMetrics(screenWidth), [screenWidth]);
@@ -35,7 +37,9 @@ export function ConnectionListItem({
 
   return (
     <View style={[styles.row, { gap: m.rowGap, minHeight: m.rowMinHeight }]}>
-      <Image source={{ uri: user.avatarUri }} style={[styles.avatar, avatarStyle]} />
+      <Pressable onPress={onPressAvatar} accessibilityRole="button">
+        <Image source={{ uri: user.avatarUri }} style={[styles.avatar, avatarStyle]} />
+      </Pressable>
       <View style={styles.textCol}>
         <Text
           style={[
@@ -82,7 +86,7 @@ export function ConnectionListItem({
             fonts.semiBold && { fontFamily: fonts.semiBold },
           ]}
         >
-          {relationshipActive ? 'Following' : 'Follow'}
+          {relationshipActive ? 'Ami' : 'Suivre'}
         </Text>
       </Pressable>
     </View>
