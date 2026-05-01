@@ -151,11 +151,13 @@ export default function RegisterScreen() {
     setFormError(null);
     setSocialSubmitting(true);
     try {
-      if (provider === 'google') {
-        await socialAuthGateway.startGoogle();
-      } else {
-        await socialAuthGateway.startFacebook();
-      }
+      const accessToken =
+        provider === 'google'
+          ? await socialAuthGateway.startGoogle()
+          : await socialAuthGateway.startFacebook();
+      await persistLoginAndSyncStore(accessToken);
+      useOnboardingRegisterStore.getState().clear();
+      router.replace(Routes.HOME);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Connexion sociale impossible.');
     } finally {
