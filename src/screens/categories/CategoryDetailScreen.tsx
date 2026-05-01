@@ -27,6 +27,8 @@ import { buildQuizEntryHref, Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useCategoryDetail } from '@hooks/useCategoryDetail';
 import { getCategoryCoverUrl } from '@utils/categoryCoverUrl';
+import { useAuthStore } from '@stores/authStore';
+import { canVisitorAccessCategory, isVisitorSession, VISITOR_ACCESS_MESSAGE } from '@services/auth/visitorAccessPolicy';
 
 export default function CategoryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -56,6 +58,8 @@ export default function CategoryDetailScreen() {
   );
 
   const { data, loading, error, refetch } = useCategoryDetail(slug, sort);
+  const token = useAuthStore((s) => s.token);
+  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
 
   const coverUri = useMemo(() => (slug ? getCategoryCoverUrl(slug) : ''), [slug]);
 
@@ -74,6 +78,24 @@ export default function CategoryDetailScreen() {
   const onSort = useCallback(() => {
     setSort((prev) => (prev === 'default' ? 'newest' : 'default'));
   }, []);
+
+  const onPressQuiz = useCallback(
+    (quizId: string) => {
+      if (
+        data &&
+        isVisitorSession({ token, hasRegisteredAccount }) &&
+        !canVisitorAccessCategory({ slug: data.category.slug, name: data.category.name })
+      ) {
+        Alert.alert('Connexion requise', VISITOR_ACCESS_MESSAGE, [
+          { text: 'Plus tard', style: 'cancel' },
+          { text: 'Se connecter', onPress: () => router.push(Routes.LOGIN) },
+        ]);
+        return;
+      }
+      router.push(buildQuizEntryHref(quizId, slug));
+    },
+    [data, hasRegisteredAccount, router, slug, token],
+  );
 
   const title = data?.category.name ?? '';
 
@@ -146,7 +168,7 @@ export default function CategoryDetailScreen() {
                     item={q}
                     fallbackThumbnailUri={coverUri}
                     fonts={fonts}
-                    onPress={() => router.push(buildQuizEntryHref(q.id, slug))}
+                    onPress={() => onPressQuiz(q.id)}
                   />
                 ))
               )}

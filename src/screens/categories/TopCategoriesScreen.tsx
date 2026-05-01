@@ -23,6 +23,8 @@ import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
+import { useAuthStore } from '@stores/authStore';
+import { canVisitorAccessCategory, isVisitorSession, VISITOR_ACCESS_MESSAGE } from '@services/auth/visitorAccessPolicy';
 
 export default function TopCategoriesScreen() {
   const insets = useSafeAreaInsets();
@@ -46,6 +48,8 @@ export default function TopCategoriesScreen() {
   );
 
   const { data: categories, loading, error, refetch } = useCategoriesExplore();
+  const token = useAuthStore((s) => s.token);
+  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
 
   const { cardW, cardH, rowGap, colGap } = useMemo(() => {
     const gap = 16;
@@ -75,10 +79,20 @@ export default function TopCategoriesScreen() {
   }, []);
 
   const goCategory = useCallback(
-    (categorySlug: string) => {
+    (categorySlug: string, categoryName: string) => {
+      if (
+        isVisitorSession({ token, hasRegisteredAccount }) &&
+        !canVisitorAccessCategory({ slug: categorySlug, name: categoryName })
+      ) {
+        Alert.alert('Connexion requise', VISITOR_ACCESS_MESSAGE, [
+          { text: 'Plus tard', style: 'cancel' },
+          { text: 'Se connecter', onPress: () => router.push(Routes.LOGIN) },
+        ]);
+        return;
+      }
       router.push(`${Routes.CATEGORIES}/${categorySlug}`);
     },
-    [router],
+    [hasRegisteredAccount, router, token],
   );
 
   return (
@@ -128,7 +142,7 @@ export default function TopCategoriesScreen() {
                       slug={cat.slug}
                       width={cardW}
                       height={cardH}
-                      onPress={() => goCategory(cat.slug)}
+                      onPress={() => goCategory(cat.slug, cat.name)}
                     />
                   ))}
                 </View>

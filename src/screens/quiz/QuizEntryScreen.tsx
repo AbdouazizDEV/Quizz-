@@ -10,9 +10,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { QuizLogoMark } from '@components/ui/quiz/play/QuizLogoMark';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
+import { Routes } from '@constants/Routes';
 import { delay } from '@utils/delay';
 import { getQuizPlayRepository } from '@services/quiz/play/quizPlayRepositoryInstance';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
+import { useAuthStore } from '@stores/authStore';
+import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
 
 const LOADER_MS = 5000;
 
@@ -29,6 +32,8 @@ export default function QuizEntryScreen() {
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
   const bootstrap = useQuizPlaySessionStore((s) => s.bootstrap);
   const reset = useQuizPlaySessionStore((s) => s.reset);
+  const token = useAuthStore((s) => s.token);
+  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
 
   const [error, setError] = useState<string | null>(null);
   const progress = useRef(new Animated.Value(0)).current;
@@ -53,6 +58,15 @@ export default function QuizEntryScreen() {
       setError('Quiz introuvable.');
       return;
     }
+    if (
+      isVisitorSession({ token, hasRegisteredAccount }) &&
+      (!categorySlug || !canVisitorAccessCategory({ slug: categorySlug }))
+    ) {
+      Alert.alert('Connexion requise', "Connectez-vous pour acceder a ce quiz.", [
+        { text: 'OK', onPress: () => router.replace(Routes.LOGIN) },
+      ]);
+      return;
+    }
 
     let cancelled = false;
 
@@ -71,7 +85,7 @@ export default function QuizEntryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [quizId, categorySlug, bootstrap, router]);
+  }, [quizId, categorySlug, bootstrap, router, hasRegisteredAccount, token]);
 
   useEffect(() => {
     if (!error) return;
