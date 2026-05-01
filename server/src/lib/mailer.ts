@@ -4,7 +4,8 @@ import { getEnv } from './env.js';
 
 let cached: Transporter | null = null;
 
-function hasSmtpConfig(): boolean {
+/** Indique si toutes les variables SMTP requises sont présentes (avant envoi réel). */
+export function isSmtpConfigured(): boolean {
   const env = getEnv();
   return Boolean(
     env.SMTP_HOST?.trim() &&
@@ -79,7 +80,7 @@ function otpTemplate(code: string): { subject: string; text: string; html: strin
 }
 
 export async function sendPasswordResetOtpEmail(toEmail: string, code: string): Promise<void> {
-  if (!hasSmtpConfig()) {
+  if (!isSmtpConfigured()) {
     throw new Error('SMTP non configuré (SMTP_HOST/PORT/USER/PASS/FROM).');
   }
   const env = getEnv();

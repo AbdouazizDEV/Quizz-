@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 
 import { getEnv, hasServiceRoleKey } from '../lib/env.js';
-import { sendPasswordResetOtpEmail } from '../lib/mailer.js';
+import { isSmtpConfigured, sendPasswordResetOtpEmail } from '../lib/mailer.js';
 import { generateNumericOtp, hashOtp, safeEqualOtp } from '../lib/otp.js';
 import { signResetToken, verifyResetToken } from '../lib/resetToken.js';
 import {
@@ -121,6 +121,20 @@ async function resolveUserIdByEmail(email: string): Promise<string | null> {
     page += 1;
   }
   return null;
+}
+
+function fallbackUsernameFromUser(
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
+): string {
+  const meta = user.user_metadata ?? {};
+  const fromMeta =
+    (typeof meta.username === 'string' && meta.username.trim()) ||
+    (typeof meta.full_name === 'string' && meta.full_name.trim()) ||
+    '';
+  if (fromMeta) return fromMeta.slice(0, 50);
+  const fromEmail = typeof user.email === 'string' ? user.email.split('@')[0]?.trim() : '';
+  if (fromEmail) return fromEmail.slice(0, 50);
+  return `user-${user.id.slice(0, 8)}`;
 }
 
 export const authRoutes = new Hono()
@@ -354,6 +368,17 @@ export const authRoutes = new Hono()
       return c.json({ ok: true });
     }
 
+    if (!isSmtpConfigured()) {
+      return c.json(
+        {
+          error: 'Envoi e-mail non configuré sur ce serveur.',
+          hint:
+            'Définissez SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS et SMTP_FROM. Sur Render : Environment du service API. En local : fichier server/.env.',
+        },
+        503,
+      );
+    }
+
     const code = generateNumericOtp(4);
     const hashed = hashOtp(code, env.OTP_PEPPER);
     const { error: insError } = await admin.from('otp_codes').insert({
@@ -369,10 +394,14 @@ export const authRoutes = new Hono()
     try {
       await sendPasswordResetOtpEmail(id, code);
     } catch (mailErr) {
+      const detail = mailErr instanceof Error ? mailErr.message : String(mailErr);
+      console.error('[auth/forgot-password] SMTP send failed:', detail);
       return c.json(
         {
           error: 'OTP généré mais envoi e-mail impossible.',
-          details: mailErr instanceof Error ? mailErr.message : String(mailErr),
+          details: detail,
+          hint:
+            'Vérifiez les identifiants SMTP (mot de passe d’application Gmail sans espaces parasites), les quotas et les journaux du serveur.',
         },
         502,
       );
@@ -498,7 +527,7 @@ export const authRoutes = new Hono()
       return c.json({ error: userErr?.message ?? 'Jeton invalide.' }, 401);
     }
 
-    const { data: profile, error: profErr } = await supabase
+    let { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userData.user.id)
@@ -506,6 +535,59 @@ export const authRoutes = new Hono()
 
     if (profErr) {
       return c.json({ error: profErr.message }, 500);
+    }
+
+    if (!profile) {
+      const username = fallbackUsernameFromUser({
+        id: userData.user.id,
+        email: userData.user.email,
+        user_metadata: (userData.user.user_metadata as Record<string, unknown> | undefined) ?? {},
+      });
+      const fullName =
+        typeof userData.user.user_metadata?.full_name === 'string'
+          ? userData.user.user_metadata.full_name.trim()
+          : null;
+      const avatarUrl =
+        typeof userData.user.user_metadata?.avatar_url === 'string'
+          ? userData.user.user_metadata.avatar_url.trim()
+          : null;
+
+      let seedError: { message?: string } | null = null;
+      if (hasServiceRoleKey()) {
+        const admin = createServiceRoleClient();
+        const { error } = await admin.from('profiles').upsert(
+          {
+            id: userData.user.id,
+            username,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+          },
+          { onConflict: 'id' },
+        );
+        seedError = error;
+      } else {
+        const { error } = await supabase.from('profiles').upsert(
+          {
+            id: userData.user.id,
+            username,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+          },
+          { onConflict: 'id' },
+        );
+        seedError = error;
+      }
+
+      if (!seedError) {
+        const seeded = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userData.user.id)
+          .maybeSingle();
+        if (!seeded.error) {
+          profile = seeded.data ?? null;
+        }
+      }
     }
 
     return c.json({

@@ -24,7 +24,7 @@ import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthStore } from '@stores/authStore';
-import { canVisitorAccessCategory, isVisitorSession, VISITOR_ACCESS_MESSAGE } from '@services/auth/visitorAccessPolicy';
+import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
 
 export default function TopCategoriesScreen() {
   const insets = useSafeAreaInsets();
@@ -84,10 +84,7 @@ export default function TopCategoriesScreen() {
         isVisitorSession({ token, hasRegisteredAccount }) &&
         !canVisitorAccessCategory({ slug: categorySlug, name: categoryName })
       ) {
-        Alert.alert('Connexion requise', VISITOR_ACCESS_MESSAGE, [
-          { text: 'Plus tard', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => router.push(Routes.LOGIN) },
-        ]);
+        router.push(Routes.LOGIN);
         return;
       }
       router.push(`${Routes.CATEGORIES}/${categorySlug}`);

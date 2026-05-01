@@ -8,7 +8,23 @@ type ErrorBody = components['schemas']['ErrorBody'];
 export function parseQuizzApiError(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined;
   const e = error as Partial<ErrorBody> & { message?: string };
-  if (typeof e.error === 'string' && e.error.trim()) return e.error.trim();
-  if (typeof e.message === 'string' && e.message.trim()) return e.message.trim();
+  const parts: string[] = [];
+  if (typeof e.error === 'string' && e.error.trim()) parts.push(e.error.trim());
+  else if (typeof e.message === 'string' && e.message.trim()) parts.push(e.message.trim());
+
+  if (typeof e.hint === 'string' && e.hint.trim()) {
+    parts.push(e.hint.trim());
+  }
+  if (e.details != null) {
+    const d =
+      typeof e.details === 'string'
+        ? e.details
+        : typeof e.details === 'object'
+          ? JSON.stringify(e.details)
+          : String(e.details);
+    if (d) parts.push(d);
+  }
+
+  if (parts.length) return parts.join('\n\n');
   return undefined;
 }

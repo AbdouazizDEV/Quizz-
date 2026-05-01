@@ -45,7 +45,7 @@ export default function ForgotPasswordEmailScreen() {
   });
 
   const initialEmail = typeof params.email === 'string' ? params.email : '';
-  const [email, setEmail] = useState(initialEmail || 'awa.thiepp@gmail.com');
+  const [email, setEmail] = useState(initialEmail);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
