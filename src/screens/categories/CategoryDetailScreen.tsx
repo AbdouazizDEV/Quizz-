@@ -28,7 +28,7 @@ import { Spacing } from '@constants/Spacing';
 import { useCategoryDetail } from '@hooks/useCategoryDetail';
 import { getCategoryCoverUrl } from '@utils/categoryCoverUrl';
 import { useAuthStore } from '@stores/authStore';
-import { canVisitorAccessCategory, isVisitorSession, VISITOR_ACCESS_MESSAGE } from '@services/auth/visitorAccessPolicy';
+import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
 
 export default function CategoryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -86,10 +86,7 @@ export default function CategoryDetailScreen() {
         isVisitorSession({ token, hasRegisteredAccount }) &&
         !canVisitorAccessCategory({ slug: data.category.slug, name: data.category.name })
       ) {
-        Alert.alert('Connexion requise', VISITOR_ACCESS_MESSAGE, [
-          { text: 'Plus tard', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => router.push(Routes.LOGIN) },
-        ]);
+        router.push(Routes.LOGIN);
         return;
       }
       router.push(buildQuizEntryHref(quizId, slug));

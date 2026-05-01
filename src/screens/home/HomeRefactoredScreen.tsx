@@ -34,7 +34,7 @@ import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthMe } from '@hooks/useAuthMe';
 import { useGlobalLeaderboard } from '@hooks/useGlobalLeaderboard';
 import { useAuthStore } from '@stores/authStore';
-import { canVisitorAccessCategory, isVisitorSession, VISITOR_ACCESS_MESSAGE } from '@services/auth/visitorAccessPolicy';
+import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
 import {
   acceptFriendRequest,
   fetchFriendRequests,
@@ -160,10 +160,7 @@ export default function HomeRefactoredScreen() {
         isVisitorSession({ token, hasRegisteredAccount }) &&
         !canVisitorAccessCategory({ slug: categorySlug })
       ) {
-        Alert.alert('Connexion requise', VISITOR_ACCESS_MESSAGE, [
-          { text: 'Plus tard', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => router.push(Routes.LOGIN) },
-        ]);
+        router.push(Routes.LOGIN);
         return;
       }
       router.push(`${Routes.CATEGORIES}/${categorySlug}`);

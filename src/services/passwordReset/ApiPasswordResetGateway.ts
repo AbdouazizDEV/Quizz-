@@ -15,10 +15,11 @@ export class ApiPasswordResetGateway implements IPasswordResetGateway {
     });
 
     if (error) {
+      const parsed = parseQuizzApiError(error);
       throw new Error(
-        parseQuizzApiError(error) ??
+        parsed ??
           (response.status === 503
-            ? 'Le serveur n’est pas configuré pour le reset (service role manquante).'
+            ? 'Le serveur n’est pas configuré pour l’envoi d’e-mail (SMTP ou clé service manquante). Vérifiez l’API ciblée (local vs production).'
             : 'Impossible d’envoyer le code OTP.'),
       );
     }

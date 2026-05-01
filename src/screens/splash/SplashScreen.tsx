@@ -40,8 +40,12 @@ const MIN_SPLASH_MS = 900;
 
 function resolvePostSplashRoute(snapshot: AuthBootstrapSnapshot): string {
   // Règle produit:
-  // - premier lancement (visiteur): Home anonyme
-  // - compte deja cree sur cet appareil: passage Login au redemarrage
+  // - visiteur (aucun compte local): Home anonyme
+  // - session valide en stockage: Home directement
+  // - compte local sans session: Login
+  if (snapshot.token?.trim()) {
+    return Routes.HOME;
+  }
   if (snapshot.hasRegisteredAccount) {
     return Routes.LOGIN;
   }
