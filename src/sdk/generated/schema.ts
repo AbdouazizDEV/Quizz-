@@ -248,6 +248,10 @@ export interface components {
             email?: string;
             phone?: string;
         };
+        OAuthStartRequest: {
+            /** Format: uri */
+            redirect_to?: string;
+        };
         VerifyOtpRequest: {
             /** @enum {string} */
             channel: "email" | "sms";
@@ -401,7 +405,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OAuthStartRequest"];
+            };
+        };
         responses: {
             /** @description URL à ouvrir */
             200: {
@@ -425,7 +433,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OAuthStartRequest"];
+            };
+        };
         responses: {
             /** @description URL à ouvrir */
             200: {

@@ -6,7 +6,10 @@ export type SocialAuthProvider = 'google' | 'facebook';
 
 async function startSocialAuth(provider: SocialAuthProvider): Promise<void> {
   const endpoint = provider === 'google' ? '/auth/google' : '/auth/facebook';
-  const { data, error } = await getQuizzApiClient().POST(endpoint);
+  const redirectTo = Linking.createURL('/auth/callback');
+  const { data, error } = await getQuizzApiClient().POST(endpoint, {
+    body: { redirect_to: redirectTo },
+  });
   const url = data?.url;
   if (error || !url) {
     throw new Error(parseQuizzApiError(error) ?? `Connexion ${provider} indisponible.`);

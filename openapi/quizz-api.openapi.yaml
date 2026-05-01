@@ -93,6 +93,12 @@ paths:
       tags: [auth]
       operationId: authGoogleStart
       summary: URL OAuth Google (flow navigateur / WebBrowser)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthStartRequest'
       responses:
         '200':
           description: URL à ouvrir
@@ -113,6 +119,12 @@ paths:
       tags: [auth]
       operationId: authFacebookStart
       summary: URL OAuth Facebook (flow navigateur / WebBrowser)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthStartRequest'
       responses:
         '200':
           description: URL à ouvrir
@@ -431,6 +443,13 @@ components:
           format: email
         phone:
           type: string
+
+    OAuthStartRequest:
+      type: object
+      properties:
+        redirect_to:
+          type: string
+          format: uri
 
     VerifyOtpRequest:
       type: object
