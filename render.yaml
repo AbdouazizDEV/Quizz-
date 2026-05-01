@@ -1,0 +1,45 @@
+# Blueprint Render — API Node (Hono) dans `server/` (pas `src/services/`, qui est le client mobile).
+# Déploiement : Dashboard → Blueprints → Apply blueprint → repo AbdouazizDEV/Quizz-, branche master.
+# Au premier apply, Render demande les variables avec sync: false (secrets).
+#
+# URL publique prévue : https://quizzplus-api.onrender.com
+# Health : GET https://quizzplus-api.onrender.com/health
+# Google OAuth callback (à reporter dans Supabase Auth → Redirect URLs) :
+#   https://quizzplus-api.onrender.com/api/v1/auth/google/callback
+
+services:
+  - type: web
+    name: quizzplus-api
+    runtime: node
+    region: oregon
+    plan: free
+    branch: master
+    repo: https://github.com/AbdouazizDEV/Quizz-
+    rootDir: server
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_DEEP_LINK_TARGET
+        value: quizzplus://auth/callback
+      - key: INCLUDE_OTP_IN_RESPONSE
+        value: "false"
+      # Doit correspondre à l’URL réelle du service (nom → sous-domaine .onrender.com).
+      - key: GOOGLE_OAUTH_REDIRECT_URL
+        value: https://quizzplus-api.onrender.com/api/v1/auth/google/callback
+      # Secrets : saisir au premier déploiement Blueprint (ou plus tard dans Environment).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OTP_PEPPER
+        sync: false
+      - key: RESET_TOKEN_SECRET
+        sync: false
+      # Optionnel : origines autorisées (séparées par des virgules). Laisser vide = comportement CORS large côté API.
+      - key: CORS_ORIGINS
+        sync: false

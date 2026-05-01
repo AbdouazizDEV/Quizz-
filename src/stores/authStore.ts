@@ -24,5 +24,5 @@ export const useAuthStore = create<AuthState>((set) => ({
       hydrated: true,
     }),
   adoptAuthenticatedSession: (token) => set({ token, hasRegisteredAccount: true }),
-  clearSession: () => set({ token: null, hasRegisteredAccount: false }),
+  clearSession: () => set((state) => ({ token: null, hasRegisteredAccount: state.hasRegisteredAccount })),
 }));

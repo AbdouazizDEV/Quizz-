@@ -24,11 +24,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingContinueBar';
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
+import { socialAuthGateway } from '@services/auth/socialAuthGateway';
 import { Spacing } from '@constants/Spacing';
 import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
@@ -44,29 +46,6 @@ function formatRegisterApiError(raw: string | undefined): string {
     return 'Limite Supabase atteinte : trop d’e-mails ou de tentatives. Attendez ~1 h, ou testez avec une autre adresse (ex. alias +test@gmail.com). Vérifiez aussi Auth → Rate Limits dans le dashboard.';
   }
   return raw;
-}
-
-interface SocialActionButtonProps {
-  label: string;
-  icon: React.ComponentProps<typeof Feather>['name'];
-  iconColor: string;
-  fontFamily?: string;
-  onPress?: () => void;
-}
-
-function SocialActionButton({
-  label,
-  icon,
-  iconColor,
-  fontFamily,
-  onPress,
-}: SocialActionButtonProps) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.socialButton, pressed && styles.pressed]}>
-      <Feather name={icon} size={20} color={iconColor} />
-      <Text style={[styles.socialButtonText, fontFamily ? { fontFamily } : undefined]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 export default function RegisterScreen() {
@@ -88,6 +67,7 @@ export default function RegisterScreen() {
   const [secure, setSecure] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [socialSubmitting, setSocialSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -123,10 +103,6 @@ export default function RegisterScreen() {
     }
 
     const onboarding = useOnboardingRegisterStore.getState();
-    if (!onboarding.isComplete()) {
-      setFormError('Complétez d’abord le parcours : type de compte, lieu, puis profil (téléphone inclus).');
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -135,12 +111,12 @@ export default function RegisterScreen() {
           email: trimmedEmail,
           password,
           username: trimmedUsername,
-          account_type: onboarding.accountTypeId,
-          workplace: onboarding.workplaceId,
-          full_name: onboarding.fullName,
-          birth_date: onboarding.birthDateIso,
-          country_code: onboarding.countryCca2,
-          phone: onboarding.phoneE164,
+          account_type: onboarding.accountTypeId || undefined,
+          workplace: onboarding.workplaceId || undefined,
+          full_name: onboarding.fullName.trim() || undefined,
+          birth_date: onboarding.birthDateIso || undefined,
+          country_code: onboarding.countryCca2 || undefined,
+          phone: onboarding.phoneE164.trim() || undefined,
         },
       });
 
@@ -167,6 +143,23 @@ export default function RegisterScreen() {
       setFormError(formatRegisterApiError(parseQuizzApiError(error)));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSocialSignup = async (provider: 'google' | 'facebook') => {
+    if (submitting || socialSubmitting) return;
+    setFormError(null);
+    setSocialSubmitting(true);
+    try {
+      if (provider === 'google') {
+        await socialAuthGateway.startGoogle();
+      } else {
+        await socialAuthGateway.startFacebook();
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Connexion sociale impossible.');
+    } finally {
+      setSocialSubmitting(false);
     }
   };
 
@@ -430,17 +423,11 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.socialContainer}>
-              <SocialActionButton
-                label="Continuer avec Google"
-                icon="chrome"
-                iconColor="#4285F4"
+              <SocialAuthButtons
                 fontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
-              />
-              <SocialActionButton
-                label="Continuer avec Facebook"
-                icon="facebook"
-                iconColor="#1877F2"
-                fontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
+                loading={socialSubmitting}
+                onGooglePress={() => void handleSocialSignup('google')}
+                onFacebookPress={() => void handleSocialSignup('facebook')}
               />
             </View>
           </ScrollView>
@@ -653,27 +640,6 @@ const styles = StyleSheet.create({
   },
   socialContainer: {
     width: '100%',
-    gap: 16,
-  },
-  socialButton: {
-    width: '100%',
-    minHeight: 60,
-    borderWidth: 1,
-    borderBottomWidth: 4,
-    borderColor: '#EEEEEE',
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  socialButtonText: {
-    fontSize: 20,
-    lineHeight: 28,
-    color: '#212121',
   },
   pressed: {
     opacity: 0.9,

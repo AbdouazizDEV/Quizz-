@@ -108,6 +108,26 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /auth/facebook:
+    post:
+      tags: [auth]
+      operationId: authFacebookStart
+      summary: URL OAuth Facebook (flow navigateur / WebBrowser)
+      responses:
+        '200':
+          description: URL à ouvrir
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   /auth/google/callback:
     get:
       tags: [auth]
@@ -333,12 +353,6 @@ components:
         - email
         - password
         - username
-        - account_type
-        - workplace
-        - full_name
-        - birth_date
-        - country_code
-        - phone
       properties:
         email:
           type: string
