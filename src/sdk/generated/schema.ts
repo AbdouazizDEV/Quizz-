@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/facebook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** URL OAuth Facebook (flow navigateur / WebBrowser) */
+        post: operations["authFacebookStart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/google/callback": {
         parameters: {
             query?: never;
@@ -197,12 +214,12 @@ export interface components {
             email: string;
             password: string;
             username: string;
-            account_type: string;
-            workplace: string;
-            full_name: string;
-            birth_date: string;
-            country_code: string;
-            phone: string;
+            account_type?: string;
+            workplace?: string;
+            full_name?: string;
+            birth_date?: string;
+            country_code?: string;
+            phone?: string;
         };
         RegisterResponse: {
             user?: components["schemas"]["AuthUser"];
@@ -378,6 +395,30 @@ export interface operations {
         };
     };
     authGoogleStart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description URL à ouvrir */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        url: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    authFacebookStart: {
         parameters: {
             query?: never;
             header?: never;

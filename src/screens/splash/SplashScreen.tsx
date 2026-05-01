@@ -39,12 +39,13 @@ const RING_RADIUS = 22;
 const MIN_SPLASH_MS = 900;
 
 function resolvePostSplashRoute(snapshot: AuthBootstrapSnapshot): string {
-  // Règle produit: au redémarrage de l'app, forcer le passage par l'écran Login.
-  // On n'auto-redirige plus vers Home même si un token persistant existe.
+  // Règle produit:
+  // - premier lancement (visiteur): Home anonyme
+  // - compte deja cree sur cet appareil: passage Login au redemarrage
   if (snapshot.hasRegisteredAccount) {
     return Routes.LOGIN;
   }
-  return Routes.WALKTHROUGH;
+  return Routes.HOME;
 }
 
 function DotRingLoader() {
@@ -123,7 +124,7 @@ export default function SplashScreen() {
         router.replace(resolvePostSplashRoute(snapshot));
       } catch {
         if (cancelled) return;
-        router.replace(Routes.WALKTHROUGH);
+        router.replace(Routes.HOME);
       }
     };
     void run();

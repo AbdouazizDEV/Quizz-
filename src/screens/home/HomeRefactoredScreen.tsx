@@ -34,6 +34,7 @@ import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthMe } from '@hooks/useAuthMe';
 import { useGlobalLeaderboard } from '@hooks/useGlobalLeaderboard';
 import { useAuthStore } from '@stores/authStore';
+import { canVisitorAccessCategory, isVisitorSession, VISITOR_ACCESS_MESSAGE } from '@services/auth/visitorAccessPolicy';
 import {
   acceptFriendRequest,
   fetchFriendRequests,
@@ -87,6 +88,7 @@ export default function HomeRefactoredScreen() {
   const [activeInsight, setActiveInsight] = useState(0);
   const glowAnim = useRef(new Animated.Value(0.35)).current;
   const token = useAuthStore((s) => s.token);
+  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
   const { data: me, loading: meLoading, refetch: refetchAuthMe } = useAuthMe();
   const { items: leaderboardRows, refetch: refetchLeaderboard } = useGlobalLeaderboard(5);
   const { data: allCategories, loading: categoriesLoading } = useCategoriesExplore();
@@ -154,9 +156,19 @@ export default function HomeRefactoredScreen() {
 
   const goToCategory = useCallback(
     (categorySlug: string) => {
+      if (
+        isVisitorSession({ token, hasRegisteredAccount }) &&
+        !canVisitorAccessCategory({ slug: categorySlug })
+      ) {
+        Alert.alert('Connexion requise', VISITOR_ACCESS_MESSAGE, [
+          { text: 'Plus tard', style: 'cancel' },
+          { text: 'Se connecter', onPress: () => router.push(Routes.LOGIN) },
+        ]);
+        return;
+      }
       router.push(`${Routes.CATEGORIES}/${categorySlug}`);
     },
-    [router],
+    [hasRegisteredAccount, router, token],
   );
   const goToScoreboard = useCallback(() => {
     router.push(Routes.PLAYERS);

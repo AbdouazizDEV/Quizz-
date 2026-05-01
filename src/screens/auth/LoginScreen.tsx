@@ -5,6 +5,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Feather } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { UnderlineLabeledField } from '@components/ui/auth/UnderlineLabeledField';
 import { WalkthroughActionButton } from '@components/ui/walkthrough/WalkthroughActionButton';
 import { onboardingColumn } from '@constants/layout';
@@ -28,6 +30,8 @@ import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
 import { loginGateway } from '@services/auth/loginGatewayInstance';
+import { socialAuthGateway } from '@services/auth/socialAuthGateway';
+import { useAuthStore } from '@stores/authStore';
 
 const FOOTER_BAR_HEIGHT = 118;
 const CONTENT_GAP = 28;
@@ -49,7 +53,11 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(true);
   const [secure, setSecure] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [socialSubmitting, setSocialSubmitting] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const storedToken = useAuthStore((s) => s.token);
+  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
 
   const titleSize = windowWidth < 360 ? 28 : windowWidth < 400 ? 32 : 36;
 
@@ -91,6 +99,58 @@ export default function LoginScreen() {
       setSubmitting(false);
     }
   }, [email, password, router, submitting]);
+
+  const onSocialLogin = useCallback(
+    async (provider: 'google' | 'facebook') => {
+      if (socialSubmitting || submitting) return;
+      setFormError(null);
+      setSocialSubmitting(true);
+      try {
+        if (provider === 'google') {
+          await socialAuthGateway.startGoogle();
+        } else {
+          await socialAuthGateway.startFacebook();
+        }
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : 'Connexion sociale impossible.');
+      } finally {
+        setSocialSubmitting(false);
+      }
+    },
+    [socialSubmitting, submitting],
+  );
+
+  const onDeviceUnlock = useCallback(async () => {
+    if (unlocking || submitting || socialSubmitting) return;
+    if (!storedToken?.trim()) {
+      setFormError('Aucune session locale a deverrouiller. Connectez-vous avec votre mot de passe.');
+      return;
+    }
+    setFormError(null);
+    setUnlocking(true);
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!hasHardware || !enrolled) {
+        setFormError("Aucun verrouillage biométrique/code appareil n'est configure sur ce telephone.");
+        return;
+      }
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Deverrouiller Quizz+',
+        fallbackLabel: 'Utiliser le code du telephone',
+        disableDeviceFallback: false,
+      });
+      if (!result.success) {
+        setFormError('Deverrouillage annule ou echoue.');
+        return;
+      }
+      router.replace(Routes.HOME);
+    } catch {
+      setFormError('Deverrouillage impossible pour le moment.');
+    } finally {
+      setUnlocking(false);
+    }
+  }, [router, socialSubmitting, storedToken, submitting, unlocking]);
 
   return (
     <View style={styles.root}>
@@ -194,6 +254,23 @@ export default function LoginScreen() {
                   </Text>
                 </Pressable>
               </View>
+
+              <View style={styles.orDivider}>
+                <View style={styles.orDividerLine} />
+                <Text
+                  style={[styles.orLabel, fonts.regular ? { fontFamily: fonts.regular } : { fontWeight: '400' }]}
+                >
+                  ou
+                </Text>
+                <View style={styles.orDividerLine} />
+              </View>
+
+              <SocialAuthButtons
+                fontFamily={fonts.semi}
+                loading={socialSubmitting}
+                onGooglePress={() => void onSocialLogin('google')}
+                onFacebookPress={() => void onSocialLogin('facebook')}
+              />
             </View>
           </View>
         </ScrollView>
@@ -210,10 +287,18 @@ export default function LoginScreen() {
         ]}
       >
         <View style={[styles.footerInner, onboardingColumn]}>
-          {submitting ? (
+          {submitting || socialSubmitting || unlocking ? (
             <View style={styles.loaderRow}>
               <ActivityIndicator color="#543ACC" />
             </View>
+          ) : null}
+          {hasRegisteredAccount ? (
+            <WalkthroughActionButton
+              label="DEVERROUILLER AVEC LE TELEPHONE"
+              variant="secondary"
+              onPress={() => void onDeviceUnlock()}
+              fontFamily={fonts.bold}
+            />
           ) : null}
           <WalkthroughActionButton
             label="SE CONNECTER"
@@ -308,6 +393,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#FFD700',
     textAlign: 'center',
+  },
+  orDivider: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  orDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#EEEEEE',
+  },
+  orLabel: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: '#616161',
   },
   footerBar: {
     position: 'absolute',

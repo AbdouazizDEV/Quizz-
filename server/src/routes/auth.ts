@@ -16,12 +16,15 @@ const registerBody = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   username: z.string().min(1).max(50),
-  account_type: z.string().min(1).max(50),
-  workplace: z.string().min(1).max(50),
-  full_name: z.string().min(1).max(100),
-  birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  country_code: z.string().min(2).max(3),
-  phone: z.string().min(3).max(32),
+  account_type: z.string().min(1).max(50).optional(),
+  workplace: z.string().min(1).max(50).optional(),
+  full_name: z.string().min(1).max(100).optional(),
+  birth_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  country_code: z.string().min(2).max(3).optional(),
+  phone: z.string().min(3).max(32).optional(),
 });
 
 const loginBody = z.object({
@@ -73,6 +76,27 @@ function identifierForChannel(
   return p || null;
 }
 
+function pickDefinedMetadata(input: Record<string, string | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (typeof v === 'string' && v.trim()) out[k] = v.trim();
+  }
+  return out;
+}
+
+function buildOAuthAuthorizeUrl(params: {
+  supabaseUrl: string;
+  provider: 'google' | 'facebook';
+  redirectTo: string;
+}): string {
+  const url = new URL('/auth/v1/authorize', params.supabaseUrl);
+  url.searchParams.set('provider', params.provider);
+  url.searchParams.set('redirect_to', params.redirectTo);
+  // Mobile flow: on recoit access_token directement dans le deep-link (pas d'echange PKCE serveur).
+  url.searchParams.set('response_type', 'token');
+  return url.toString();
+}
+
 async function resolveUserIdByEmail(email: string): Promise<string | null> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
@@ -112,7 +136,7 @@ export const authRoutes = new Hono()
       phone,
     } = body;
 
-    const userMetadata = {
+    const userMetadata = pickDefinedMetadata({
       username,
       full_name,
       account_type,
@@ -120,7 +144,7 @@ export const authRoutes = new Hono()
       birth_date,
       country_code,
       phone,
-    };
+    });
 
     /** Session immédiate : création confirmée + sign-in (nécessite la clé service_role). */
     if (hasServiceRoleKey()) {
@@ -236,18 +260,24 @@ export const authRoutes = new Hono()
 
   .post('/google', async (c) => {
     const env = getEnv();
-    const supabase = createSupabaseServerClient(c);
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: env.GOOGLE_OAUTH_REDIRECT_URL,
-        skipBrowserRedirect: true,
-      },
+    return c.json({
+      url: buildOAuthAuthorizeUrl({
+        supabaseUrl: env.SUPABASE_URL,
+        provider: 'google',
+        redirectTo: env.AUTH_DEEP_LINK_TARGET,
+      }),
     });
-    if (error || !data.url) {
-      return c.json({ error: error?.message ?? 'Impossible de démarrer Google OAuth.' }, 400);
-    }
-    return c.json({ url: data.url });
+  })
+
+  .post('/facebook', async (c) => {
+    const env = getEnv();
+    return c.json({
+      url: buildOAuthAuthorizeUrl({
+        supabaseUrl: env.SUPABASE_URL,
+        provider: 'facebook',
+        redirectTo: env.AUTH_DEEP_LINK_TARGET,
+      }),
+    });
   })
 
   .get('/google/callback', async (c) => {
@@ -419,6 +449,27 @@ export const authRoutes = new Hono()
     }
 
     const admin = createServiceRoleClient();
+    const { data: userData, error: userErr } = await admin.auth.admin.getUserById(claims.sub);
+    if (userErr || !userData.user?.email) {
+      return c.json({ error: userErr?.message ?? 'Utilisateur introuvable pour réinitialisation.' }, 400);
+    }
+
+    // Empêche la réutilisation: comparaison implicite contre le hash Supabase via tentative d'auth.
+    const anon = createAnonAuthClient();
+    const { error: samePasswordErr } = await anon.auth.signInWithPassword({
+      email: userData.user.email,
+      password: new_password,
+    });
+    if (!samePasswordErr) {
+      await anon.auth.signOut();
+      return c.json(
+        {
+          error: 'Le nouveau mot de passe doit être différent de l’ancien.',
+        },
+        400,
+      );
+    }
+
     const { error } = await admin.auth.admin.updateUserById(claims.sub, { password: new_password });
     if (error) {
       return c.json({ error: error.message }, 400);
