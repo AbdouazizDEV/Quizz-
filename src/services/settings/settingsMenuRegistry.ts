@@ -8,7 +8,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'personal',
       kind: 'link',
-      label: 'Personal Info',
+      label: 'Informations personnelles',
       icon: 'user',
       iconBackground: '#FFF3E0',
       iconColor: '#F57C00',
@@ -17,7 +17,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'notifications',
       kind: 'link',
-      label: 'Notification',
+      label: 'Notifications',
       icon: 'bell',
       iconBackground: '#FCE4EC',
       iconColor: '#D81B60',
@@ -26,7 +26,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'music',
       kind: 'link',
-      label: 'Music & Effects',
+      label: 'Musique et effets',
       icon: 'volume-2',
       iconBackground: '#EDE7F6',
       iconColor: '#F9A825',
@@ -35,7 +35,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'security',
       kind: 'link',
-      label: 'Security',
+      label: 'Sécurité',
       icon: 'shield',
       iconBackground: '#E8F5E9',
       iconColor: '#43A047',
@@ -44,7 +44,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'dark',
       kind: 'toggle',
-      label: 'Dark Mode',
+      label: 'Mode sombre',
       icon: 'eye',
       iconBackground: '#E3F2FD',
       iconColor: '#FFB703',
@@ -53,7 +53,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'help',
       kind: 'link',
-      label: 'Help Center',
+      label: "Centre d'aide",
       icon: 'file-text',
       iconBackground: '#FFF8E1',
       iconColor: '#FB8C00',
@@ -62,7 +62,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'about',
       kind: 'link',
-      label: 'About Quizzo',
+      label: 'À propos de Quizzo',
       icon: 'info',
       iconBackground: '#F3E5F5',
       iconColor: '#8E24AA',
@@ -71,7 +71,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'logout',
       kind: 'logout',
-      label: 'Logout',
+      label: 'Se déconnecter',
       icon: 'log-out',
       iconBackground: '#FFEBEE',
       iconColor: '#E53935',

@@ -20,7 +20,10 @@ export const QuizPlayTheme = {
   contentMaxWidth: 382,
   questionImageHeight: 230,
   optionCardWidth: 185,
+  /** Ancienne grille 2 colonnes ; conservé pour référence. */
   optionCardHeight: 160,
+  /** Hauteur minimale des cartes réponse (pleine largeur, contenu extensible). */
+  optionCardMinHeight: 88,
   resultBannerHeight: 183,
 } as const;
 

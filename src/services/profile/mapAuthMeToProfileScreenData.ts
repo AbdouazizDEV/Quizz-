@@ -46,7 +46,7 @@ export function mapAuthMeToProfileScreenData(me: AuthMeResponse): ProfileScreenD
       viewerRelationship: 'self',
     },
     stats: [
-      { id: 'quizzo', valueLabel: String(quizzesDone), caption: 'Quizzo' },
+      { id: 'quizzo', valueLabel: String(quizzesDone), caption: 'Quiz' },
       { id: 'points', valueLabel: formatCompactNumber(totalScore), caption: 'Points' },
       { id: 'days', valueLabel: String(daysActive), caption: 'Jours actifs' },
       { id: 'streak', valueLabel: String(streak), caption: 'Série' },

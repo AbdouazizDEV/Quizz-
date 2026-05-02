@@ -4,8 +4,13 @@ import { getEnv } from './env.js';
 
 let cached: Transporter | null = null;
 
-/** Indique si toutes les variables SMTP requises sont présentes (avant envoi réel). */
-export function isSmtpConfigured(): boolean {
+/** Resend (API HTTPS) : suffisant avec une adresse d’expéditeur (réutilise SMTP_FROM). */
+function hasResendConfig(): boolean {
+  const env = getEnv();
+  return Boolean(env.RESEND_API_KEY?.trim() && env.SMTP_FROM?.trim());
+}
+
+function hasFullSmtpConfig(): boolean {
   const env = getEnv();
   return Boolean(
     env.SMTP_HOST?.trim() &&
@@ -16,6 +21,11 @@ export function isSmtpConfigured(): boolean {
   );
 }
 
+/** Expédition possible : API Resend ou transport SMTP classique. */
+export function isEmailDeliveryConfigured(): boolean {
+  return hasResendConfig() || hasFullSmtpConfig();
+}
+
 function getTransporter(): Transporter {
   if (cached) return cached;
   const env = getEnv();
@@ -23,12 +33,46 @@ function getTransporter(): Transporter {
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: Boolean(env.SMTP_SECURE),
+    /** Évite des blocages prolongés si le réseau ou le pare-feu refuse la connexion SMTP. */
+    connectionTimeout: 25_000,
+    greetingTimeout: 25_000,
+    socketTimeout: 25_000,
     auth: {
       user: env.SMTP_USER,
       pass: env.SMTP_PASS,
     },
   });
   return cached;
+}
+
+async function sendViaResend(toEmail: string, subject: string, text: string, html: string): Promise<void> {
+  const env = getEnv();
+  const apiKey = env.RESEND_API_KEY?.trim();
+  const from = env.SMTP_FROM?.trim();
+  if (!apiKey || !from) {
+    throw new Error('RESEND_API_KEY et SMTP_FROM (expéditeur) sont requis pour Resend.');
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [toEmail],
+      subject,
+      text,
+      html,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  const raw = await res.text();
+  if (!res.ok) {
+    throw new Error(`Resend ${res.status}: ${raw.slice(0, 800)}`);
+  }
 }
 
 function otpTemplate(code: string): { subject: string; text: string; html: string } {
@@ -80,11 +124,19 @@ function otpTemplate(code: string): { subject: string; text: string; html: strin
 }
 
 export async function sendPasswordResetOtpEmail(toEmail: string, code: string): Promise<void> {
-  if (!isSmtpConfigured()) {
-    throw new Error('SMTP non configuré (SMTP_HOST/PORT/USER/PASS/FROM).');
+  if (!isEmailDeliveryConfigured()) {
+    throw new Error(
+      'Expédition non configurée : définissez RESEND_API_KEY + SMTP_FROM, ou SMTP complet (HOST/PORT/USER/PASS/FROM).',
+    );
   }
   const env = getEnv();
   const message = otpTemplate(code);
+
+  if (env.RESEND_API_KEY?.trim()) {
+    await sendViaResend(toEmail, message.subject, message.text, message.html);
+    return;
+  }
+
   await getTransporter().sendMail({
     from: env.SMTP_FROM,
     to: toEmail,

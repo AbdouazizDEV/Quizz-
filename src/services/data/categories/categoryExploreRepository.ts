@@ -92,12 +92,17 @@ function mapQuizRow(row: {
   play_count: number;
   created_at: string;
   difficulty_level: string;
+  questions?: { count: number }[] | null;
 }): CategoryQuizListItem {
+  const fromRelation =
+    Array.isArray(row.questions) && row.questions.length > 0 && typeof row.questions[0]?.count === 'number'
+      ? row.questions[0].count
+      : null;
   return {
     id: row.id,
     title: row.title,
     thumbnailUrl: row.thumbnail_url,
-    questionCount: row.total_questions,
+    questionCount: fromRelation ?? row.total_questions,
     playCount: row.play_count,
     createdAt: row.created_at,
     difficultyLevel: row.difficulty_level,
@@ -153,7 +158,7 @@ export async function fetchCategoryDetailBySlug(
 
   const { data: quizRows, error: qErr } = await client
     .from('quizzes')
-    .select('id, title, thumbnail_url, total_questions, play_count, created_at, difficulty_level')
+    .select('id, title, thumbnail_url, total_questions, play_count, created_at, difficulty_level, questions(count)')
     .eq('category_id', category.id)
     .eq('is_published', true);
 

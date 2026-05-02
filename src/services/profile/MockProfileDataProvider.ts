@@ -29,12 +29,12 @@ export class MockProfileDataProvider implements IProfileDataProvider {
         viewerRelationship: _userId ? 'none' : 'self',
       },
       stats: [
-        { id: 'quizzo', valueLabel: String(quizTotalCount), caption: 'Quizzo' },
-        { id: 'plays', valueLabel: formatCompactNumber(plays), caption: 'Plays' },
-        { id: 'players', valueLabel: formatCompactNumber(players), caption: 'Players' },
+        { id: 'quizzo', valueLabel: String(quizTotalCount), caption: 'Quiz' },
+        { id: 'plays', valueLabel: formatCompactNumber(plays), caption: 'Parties' },
+        { id: 'players', valueLabel: formatCompactNumber(players), caption: 'Joueurs' },
         { id: 'collections', valueLabel: String(collections), caption: 'Collections' },
-        { id: 'followers', valueLabel: formatCompactNumber(followers), caption: 'followers' },
-        { id: 'following', valueLabel: String(following), caption: 'following' },
+        { id: 'followers', valueLabel: formatCompactNumber(followers), caption: 'Abonnés' },
+        { id: 'following', valueLabel: String(following), caption: 'Abonnements' },
       ],
       quizTotalCount,
       quizzes: [

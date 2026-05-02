@@ -10,6 +10,8 @@ interface QuizPlayNavbarProps {
   total: number;
   /** Score courant (points cumulés sur les bonnes réponses). */
   sessionPoints: number;
+  /** Maximum atteignable sur cette session (questions × pts par question). */
+  maxSessionPoints?: number;
   timerSeconds: number;
   timerMax: number;
   fonts: ProfileFontFamilies;
@@ -20,6 +22,7 @@ export function QuizPlayNavbar({
   current,
   total,
   sessionPoints,
+  maxSessionPoints,
   timerSeconds,
   timerMax,
   fonts,
@@ -35,7 +38,11 @@ export function QuizPlayNavbar({
         </Text>
         <View style={styles.centerBlock}>
           <Text style={[styles.title, fonts.bold && { fontFamily: fonts.bold }]}>Quiz</Text>
-          <Text style={[styles.score, fonts.bold && { fontFamily: fonts.bold }]}>{sessionPoints} pts</Text>
+          <Text style={[styles.score, fonts.bold && { fontFamily: fonts.bold }]}>
+            {maxSessionPoints !== undefined
+              ? `${sessionPoints} / ${maxSessionPoints} pts`
+              : `${sessionPoints} pts`}
+          </Text>
         </View>
         <Pressable accessibilityRole="button" onPress={onMenuPress} style={styles.iconBtn}>
           <Feather name="more-horizontal" size={22} color={QuizPlayTheme.grey900} />

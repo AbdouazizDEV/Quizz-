@@ -94,12 +94,12 @@ export class ApiProfileDataProvider implements IProfileDataProvider {
         viewerRelationship: identity?.viewer_relationship ?? (userId ? 'none' : 'self'),
       },
       stats: [
-        { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quizzo' },
-        { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Plays' },
-        { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Players' },
+        { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quiz' },
+        { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Parties' },
+        { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Joueurs' },
         { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Collections' },
-        { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'followers' },
-        { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'following' },
+        { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'Abonnés' },
+        { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
       ],
       quizTotalCount: stats?.quiz_count ?? 0,
       quizzes: quizzes.map((q) => ({

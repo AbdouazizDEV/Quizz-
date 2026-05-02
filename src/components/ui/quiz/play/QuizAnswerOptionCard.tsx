@@ -11,8 +11,7 @@ interface QuizAnswerOptionCardProps {
   label: string;
   backgroundColor: string;
   borderBottomColor: string;
-  width: number;
-  height: number;
+  minHeight: number;
   state: AnswerVisualState;
   disabled: boolean;
   fonts: ProfileFontFamilies;
@@ -23,8 +22,7 @@ export function QuizAnswerOptionCard({
   label,
   backgroundColor,
   borderBottomColor,
-  width,
-  height,
+  minHeight,
   state,
   disabled,
   fonts,
@@ -41,8 +39,7 @@ export function QuizAnswerOptionCard({
       style={({ pressed }) => [
         styles.card,
         {
-          width,
-          height,
+          minHeight,
           backgroundColor: bg,
           borderBottomColor: state === 'default' ? borderBottomColor : 'transparent',
         },
@@ -55,25 +52,25 @@ export function QuizAnswerOptionCard({
           <Feather name={state === 'correct' ? 'check' : 'x'} size={16} color="#FFF" />
         </View>
       ) : null}
-      <Text style={[styles.label, fonts.bold && { fontFamily: fonts.bold }]} numberOfLines={3}>
-        {label}
-      </Text>
+      <Text style={[styles.label, fonts.bold && { fontFamily: fonts.bold }]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    width: '100%',
+    alignSelf: 'stretch',
     borderRadius: 16,
     borderBottomWidth: 6,
-    padding: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
   },
   pressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.98 }],
+    transform: [{ scale: 0.99 }],
   },
   disabled: {
     opacity: 0.95,
@@ -83,6 +80,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
+    flexShrink: 1,
   },
   badge: {
     position: 'absolute',

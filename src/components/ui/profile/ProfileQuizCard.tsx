@@ -13,7 +13,7 @@ interface ProfileQuizCardProps {
 
 export function ProfileQuizCard({ item, fonts }: ProfileQuizCardProps) {
   const isPublic = item.visibility === 'public';
-  const meta = `${item.relativeTimeLabel} • ${item.playCount} plays`;
+  const meta = `${item.relativeTimeLabel} • ${item.playCount} partie${item.playCount > 1 ? 's' : ''}`;
 
   return (
     <View style={styles.card}>
@@ -21,7 +21,7 @@ export function ProfileQuizCard({ item, fonts }: ProfileQuizCardProps) {
         <Image source={{ uri: item.thumbnailUri }} style={styles.thumb} />
         <View style={styles.badge}>
           <Text style={[styles.badgeText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-            {item.questionCount} Qs
+            {item.questionCount} Q
           </Text>
         </View>
       </View>
@@ -33,7 +33,7 @@ export function ProfileQuizCard({ item, fonts }: ProfileQuizCardProps) {
         <View style={styles.privacyRow}>
           <Feather name={isPublic ? 'users' : 'lock'} size={14} color={ProfileTheme.grey700} />
           <Text style={[styles.privacy, fonts.medium && { fontFamily: fonts.medium }]}>
-            {isPublic ? 'Public' : 'Only Me'}
+            {isPublic ? 'Public' : 'Privé'}
           </Text>
         </View>
       </View>
