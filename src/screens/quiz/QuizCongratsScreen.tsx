@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   Nunito_500Medium,
   Nunito_600SemiBold,
@@ -75,11 +67,10 @@ export default function QuizCongratsScreen() {
   const goCategory = useCallback(() => {
     reset();
     if (categorySlug) {
-      router.replace(`${Routes.CATEGORIES}/${categorySlug}`);
+      router.dismissTo(`${Routes.CATEGORIES}/${encodeURIComponent(categorySlug)}`);
       return;
     }
-    if (router.canGoBack()) router.back();
-    else router.replace(Routes.HOME);
+    router.dismissTo(Routes.HOME);
   }, [categorySlug, reset, router]);
 
   const onShare = useCallback(async () => {

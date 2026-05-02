@@ -43,7 +43,7 @@ export function QuizResultBanner({ phase, title, chipLabel, fonts }: QuizResultB
               fonts.bold && { fontFamily: fonts.bold },
               { color: phase === 'correct' ? QuizPlayTheme.success : QuizPlayTheme.error },
             ]}
-            numberOfLines={2}
+            numberOfLines={6}
           >
             {chipLabel}
           </Text>

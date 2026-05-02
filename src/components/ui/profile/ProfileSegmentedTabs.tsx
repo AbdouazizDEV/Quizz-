@@ -6,9 +6,9 @@ import { ProfileTheme } from '@constants/profileTheme';
 import type { ProfileFontFamilies } from './ProfileFonts';
 
 const TABS: { id: ProfileTabId; label: string }[] = [
-  { id: 'quizzo', label: 'Quizzo' },
+  { id: 'quizzo', label: 'Mes quiz' },
   { id: 'collections', label: 'Collections' },
-  { id: 'about', label: 'About' },
+  { id: 'about', label: 'À propos' },
 ];
 
 interface ProfileSegmentedTabsProps {

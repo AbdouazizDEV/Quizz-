@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   FlatList,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -96,6 +97,25 @@ export default function HomeRefactoredScreen() {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [friendRequests, setFriendRequests] = useState<FriendRequestItem[]>([]);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
+
+  const isVisitor = useMemo(
+    () => isVisitorSession({ token, hasRegisteredAccount }),
+    [token, hasRegisteredAccount],
+  );
+
+  const edgeSwipeOpenDrawer = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+          g.dx > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+        onPanResponderRelease: (_, g) => {
+          if (g.dx > 40 || (g.vx > 0.35 && g.dx > 18)) {
+            setSettingsDrawerVisible(true);
+          }
+        },
+      }),
+    [],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -321,6 +341,18 @@ export default function HomeRefactoredScreen() {
         </View>
       </ScrollView>
 
+      <View
+        style={[
+          styles.edgeSwipeZone,
+          {
+            top: insets.top,
+            bottom: BOTTOM_NAV_HEIGHT + insets.bottom,
+          },
+        ]}
+        {...edgeSwipeOpenDrawer.panHandlers}
+        collapsable={false}
+      />
+
       <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
 
       <HomeFriendRequestsSheet
@@ -334,6 +366,7 @@ export default function HomeRefactoredScreen() {
       <HomeSettingsDrawer
         visible={settingsDrawerVisible}
         onClose={() => setSettingsDrawerVisible(false)}
+        isVisitor={isVisitor}
       />
     </View>
   );
@@ -342,6 +375,13 @@ export default function HomeRefactoredScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
   bgGradient: { ...StyleSheet.absoluteFillObject },
+  /** Zone fine sur le bord gauche : glissement vers la droite ouvre le panneau paramètres (comme l’avatar). */
+  edgeSwipeZone: {
+    position: 'absolute',
+    left: 0,
+    width: 32,
+    zIndex: 6,
+  },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center' },
   column: { width: '100%', gap: 22 },

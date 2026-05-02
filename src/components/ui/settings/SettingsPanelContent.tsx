@@ -29,6 +29,8 @@ interface SettingsPanelContentProps {
   title?: string;
   onBack: () => void;
   onAfterLogout?: () => void;
+  /** Session invité (pas de compte / non connecté) : affiche « Se connecter » à la place de la déconnexion. */
+  isVisitor?: boolean;
   /** Si true, pas de max-width (utile pour drawer). */
   fullWidth?: boolean;
   /** Override padding top (sinon safe-area + thème). */
@@ -36,9 +38,10 @@ interface SettingsPanelContentProps {
 }
 
 export function SettingsPanelContent({
-  title = 'Settings',
+  title = 'Paramètres',
   onBack,
   onAfterLogout,
+  isVisitor = false,
   fullWidth = false,
   topPaddingOverride,
 }: SettingsPanelContentProps) {
@@ -104,6 +107,24 @@ export function SettingsPanelContent({
       }
 
       if (entry.kind === 'logout') {
+        if (isVisitor) {
+          return (
+            <SettingsMenuRow
+              key={entry.id}
+              variant="nav"
+              label="Se connecter"
+              icon="log-in"
+              iconBackground="#E8F5E9"
+              iconColor="#2E7D32"
+              onPress={() => {
+                onBack();
+                router.push(Routes.LOGIN);
+              }}
+              fonts={fonts}
+              showChevron
+            />
+          );
+        }
         return (
           <SettingsMenuRow
             key={entry.id}
@@ -133,7 +154,7 @@ export function SettingsPanelContent({
         />
       );
     },
-    [darkMode, fonts, openLogoutModal, router, setDarkMode],
+    [darkMode, fonts, isVisitor, onBack, openLogoutModal, router, setDarkMode],
   );
 
   return (

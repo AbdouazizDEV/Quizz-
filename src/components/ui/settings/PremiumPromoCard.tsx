@@ -36,16 +36,16 @@ export function PremiumPromoCard({ fonts }: PremiumPromoCardProps) {
           </View>
         </View>
         <Text style={[styles.headline, fonts.bold && { fontFamily: fonts.bold }]}>
-          Play quizzes without ads and restrictions
+          Jouez sans publicité ni restriction.
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Passer Premium"
+          accessibilityLabel="Découvrir Premium"
           onPress={() => router.push(Routes.PREMIUM_PLANS)}
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.92 }]}
         >
           <Text style={[styles.ctaText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-            GO PREMIUM
+            PASSER EN PREMIUM
           </Text>
         </Pressable>
       </LinearGradient>

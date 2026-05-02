@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 
 import { getEnv, hasServiceRoleKey } from '../lib/env.js';
-import { isSmtpConfigured, sendPasswordResetOtpEmail } from '../lib/mailer.js';
+import { isEmailDeliveryConfigured, sendPasswordResetOtpEmail } from '../lib/mailer.js';
 import { generateNumericOtp, hashOtp, safeEqualOtp } from '../lib/otp.js';
 import { signResetToken, verifyResetToken } from '../lib/resetToken.js';
 import {
@@ -358,12 +358,12 @@ export const authRoutes = new Hono()
       return c.json({ ok: true });
     }
 
-    if (!isSmtpConfigured()) {
+    if (!isEmailDeliveryConfigured()) {
       return c.json(
         {
           error: 'Envoi e-mail non configuré sur ce serveur.',
           hint:
-            'Définissez SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS et SMTP_FROM. Sur Render : Environment du service API. En local : fichier server/.env.',
+            'Sur Render (plan gratuit), les ports SMTP sortants sont bloqués : utilisez RESEND_API_KEY + SMTP_FROM (domaine vérifié chez Resend), ou passez à une instance payante pour SMTP classique. En local : SMTP ou Resend dans server/.env.',
         },
         503,
       );
@@ -385,13 +385,13 @@ export const authRoutes = new Hono()
       await sendPasswordResetOtpEmail(id, code);
     } catch (mailErr) {
       const detail = mailErr instanceof Error ? mailErr.message : String(mailErr);
-      console.error('[auth/forgot-password] SMTP send failed:', detail);
+      console.error('[auth/forgot-password] email send failed:', detail);
       return c.json(
         {
           error: 'OTP généré mais envoi e-mail impossible.',
           details: detail,
           hint:
-            'Vérifiez les identifiants SMTP (mot de passe d’application Gmail sans espaces parasites), les quotas et les journaux du serveur.',
+            'Si le détail contient « Connection timeout » sur Render Free : le SMTP sortant est bloqué — configurez l’API Resend (RESEND_API_KEY + SMTP_FROM avec domaine vérifié). Sinon : identifiants SMTP, quotas, journaux serveur.',
         },
         502,
       );

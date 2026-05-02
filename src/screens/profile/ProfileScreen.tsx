@@ -78,7 +78,7 @@ export default function ProfileScreen() {
   const identityActionVm = useMemo(() => {
     if (!isExternalProfile) {
       return {
-        label: 'Edit Profile',
+        label: 'Modifier le profil',
         variant: 'primary' as const,
         disabled: false,
       };
@@ -225,7 +225,7 @@ export default function ProfileScreen() {
               />
             ) : (
               <ProfileNavbar
-                title="Profile"
+                title="Profil"
                 fonts={fonts}
                 actions={{
                   onSettings,

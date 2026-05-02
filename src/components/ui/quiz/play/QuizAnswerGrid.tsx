@@ -24,12 +24,17 @@ function visualState(
   correctId: string,
   revealed: boolean,
 ): AnswerVisualState {
-  if (!revealed || !selectedId) return 'default';
+  if (!revealed) return 'default';
+  if (selectedId === '__timeout__') {
+    return optId === correctId ? 'correct' : 'default';
+  }
+  if (!selectedId) return 'default';
   if (optId === correctId) return 'correct';
-  if (optId !== correctId) return 'wrong';
+  if (optId === selectedId) return 'wrong';
   return 'default';
 }
 
+/** Réponses empilées en pleine largeur ; hauteur minimale par carte, contenu extensible pour textes longs. */
 export function QuizAnswerGrid({
   options,
   columnWidth,
@@ -40,48 +45,35 @@ export function QuizAnswerGrid({
   revealed,
   onSelect,
 }: QuizAnswerGridProps) {
-  const cardW = (columnWidth - gap) / 2;
-  const cardH = QuizPlayTheme.optionCardHeight;
-
-  const rows: QuizPlayOption[][] = [];
-  for (let i = 0; i < options.length; i += 2) {
-    rows.push(options.slice(i, i + 2));
-  }
+  const minH = QuizPlayTheme.optionCardMinHeight;
 
   return (
-    <View style={[styles.grid, { width: columnWidth, gap }]}>
-      {rows.map((row, ri) => (
-        <View key={`r-${ri}`} style={[styles.row, { gap }]}>
-          {row.map((opt, ci) => {
-            const styleIdx = (ri * 2 + ci) % QUIZ_OPTION_CARD_STYLES.length;
-            const palette = QUIZ_OPTION_CARD_STYLES[styleIdx]!;
-            const state = visualState(opt.id, selectedId, correctId, revealed);
-            return (
-              <QuizAnswerOptionCard
-                key={opt.id}
-                label={opt.label}
-                backgroundColor={palette.bg}
-                borderBottomColor={palette.border}
-                width={cardW}
-                height={cardH}
-                state={state}
-                disabled={revealed}
-                fonts={fonts}
-                onPress={() => onSelect(opt.id)}
-              />
-            );
-          })}
-        </View>
-      ))}
+    <View style={[styles.stack, { width: columnWidth, gap }]}>
+      {options.map((opt, i) => {
+        const styleIdx = i % QUIZ_OPTION_CARD_STYLES.length;
+        const palette = QUIZ_OPTION_CARD_STYLES[styleIdx]!;
+        const state = visualState(opt.id, selectedId, correctId, revealed);
+        return (
+          <QuizAnswerOptionCard
+            key={opt.id}
+            label={opt.label}
+            backgroundColor={palette.bg}
+            borderBottomColor={palette.border}
+            minHeight={minH}
+            state={state}
+            disabled={revealed}
+            fonts={fonts}
+            onPress={() => onSelect(opt.id)}
+          />
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    alignItems: 'flex-start',
-  },
-  row: {
-    flexDirection: 'row',
+  stack: {
+    alignSelf: 'stretch',
+    alignItems: 'stretch',
   },
 });

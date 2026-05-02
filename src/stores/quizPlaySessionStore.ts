@@ -2,7 +2,9 @@ import { create } from 'zustand';
 
 import type { QuizAnswerRecord, QuizPlayPayload, QuizPlayQuestion } from '@app-types/quizPlay.types';
 
-export type QuizFeedbackPhase = 'idle' | 'correct' | 'incorrect';
+export type QuizFeedbackPhase = 'idle' | 'correct' | 'incorrect' | 'timeout';
+
+const TIMEOUT_OPTION_ID = '__timeout__';
 
 const clearFeedbackFields = {
   selectedOptionId: null as string | null,
@@ -30,6 +32,8 @@ interface QuizPlaySessionState {
   /** Après « Suivant » : enregistre la réponse courante et passe à la suite ou termine. */
   advanceFromFeedback: () => 'continue' | 'finished';
   getCurrentQuestion: () => QuizPlayQuestion | null;
+  /** Fin du chrono : 0 pt ; l’anecdote est affichée dans le modal de feedback. */
+  expireQuestion: (correctLabel: string) => void;
 }
 
 const initial = {
@@ -70,10 +74,10 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
     const q = p?.questions[idx];
     const sel = get().selectedOptionId;
     if (!p || !q || !sel) return 'continue';
-    const isCorrect = sel === q.correctOptionId;
+    const isCorrect = sel !== TIMEOUT_OPTION_ID && sel === q.correctOptionId;
     const record: QuizAnswerRecord = {
       questionId: q.id,
-      selectedOptionId: sel,
+      selectedOptionId: sel === TIMEOUT_OPTION_ID ? '' : sel,
       correctOptionId: q.correctOptionId,
       isCorrect,
     };
@@ -97,5 +101,15 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
     const { payload, currentIndex } = get();
     if (!payload?.questions.length) return null;
     return payload.questions[currentIndex] ?? null;
+  },
+  expireQuestion: (correctLabel) => {
+    if (!get().getCurrentQuestion()) return;
+    set({
+      selectedOptionId: TIMEOUT_OPTION_ID,
+      feedbackPhase: 'timeout',
+      lastPointsEarned: 0,
+      feedbackChipLabel: correctLabel,
+      correctAnswerLabel: correctLabel,
+    });
   },
 }));

@@ -21,7 +21,7 @@ export function ProfileIdentityRow({
   avatarUri,
   fonts,
   onEditProfile,
-  actionLabel = 'Edit Profile',
+  actionLabel = 'Modifier le profil',
   actionVariant = 'primary',
   actionDisabled = false,
 }: ProfileIdentityRowProps) {

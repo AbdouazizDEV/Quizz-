@@ -35,11 +35,11 @@ export function ProfileTabContent({ tab, quizTotalCount, quizzes, fonts }: Profi
     );
   }
 
-  const title = `${quizTotalCount} Quizz`;
+  const title = `${quizTotalCount} quiz`;
 
   return (
     <View style={styles.quizzPanel}>
-      <ProfileQuizzListHeader title={title} sortLabel="Newest" fonts={fonts} />
+      <ProfileQuizzListHeader title={title} sortLabel="Plus récents" fonts={fonts} />
       <View style={styles.list}>
         {quizzes.map((q) => (
           <ProfileQuizCard key={q.id} item={q} fonts={fonts} />

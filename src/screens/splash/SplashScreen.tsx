@@ -10,6 +10,7 @@ import {
   Platform,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -18,16 +19,12 @@ import { Routes } from '@constants/Routes';
 import type { AuthBootstrapSnapshot } from '@services/auth/IAuthSessionService';
 import { runAuthBootstrapAndSyncStore } from '@services/auth/authSessionController';
 
-const CENTER_BLOCK = {
-  width: 264,
-  height: 340,
-} as const;
-
-const LOGO_SIZE = 200;
-const TITLE_WIDTH = 264;
-const TITLE_HEIGHT = 120;
-const TITLE_FONT_SIZE = 75;
-const TITLE_LINE_HEIGHT = 120;
+/** Base historique (200) ; le rendu est désormais dimensionné par écran pour une meilleure lisibilité. */
+const REF_LOGO_SIZE = 200;
+const REF_TITLE_FONT = 75;
+const REF_TITLE_LINE = 120;
+const REF_TITLE_WIDTH = 264;
+const REF_TITLE_HEIGHT = 120;
 const TITLE_COLOR = '#212121';
 
 const LOADER_SIZE = 60;
@@ -112,9 +109,33 @@ function DotRingLoader() {
   );
 }
 
+function useSplashBrandMetrics() {
+  const { width: windowWidth } = useWindowDimensions();
+  /** ~62 % de la largeur utile, borné pour tablettes / grands écrans */
+  const logoSize = Math.round(Math.min(340, Math.max(236, windowWidth * 0.62)));
+  const scale = logoSize / REF_LOGO_SIZE;
+  const titleFontSize = Math.round(REF_TITLE_FONT * scale);
+  const titleLineHeight = Math.round(REF_TITLE_LINE * scale);
+  const titleWidth = Math.round(REF_TITLE_WIDTH * scale);
+  const titleHeight = Math.round(REF_TITLE_HEIGHT * scale);
+  const centerBlockWidth = Math.max(titleWidth, logoSize + 8);
+  const centerBlockMinHeight = Math.round(340 * scale);
+
+  return {
+    logoSize,
+    titleFontSize,
+    titleLineHeight,
+    titleWidth,
+    titleHeight,
+    centerBlockWidth,
+    centerBlockMinHeight,
+  };
+}
+
 export default function SplashScreen() {
   const router = useRouter();
   const [fontsLoaded] = useFonts({ Nunito_700Bold });
+  const brand = useSplashBrandMetrics();
 
   useEffect(() => {
     let cancelled = false;
@@ -144,22 +165,37 @@ export default function SplashScreen() {
         <View
           style={[
             styles.centerBlock,
-            { width: CENTER_BLOCK.width, minHeight: CENTER_BLOCK.height },
+            {
+              width: brand.centerBlockWidth,
+              minHeight: brand.centerBlockMinHeight,
+            },
           ]}
         >
-          <View style={styles.logoShell}>
+          <View style={[styles.logoShell, { width: brand.logoSize, height: brand.logoSize }]}>
             <Image
               source={require('../../../assets/icons/logo.png')}
-              style={styles.logoImage}
+              style={{ width: brand.logoSize, height: brand.logoSize }}
               resizeMode="contain"
               accessibilityIgnoresInvertColors
             />
           </View>
 
-          <View style={styles.titleShell}>
+          <View
+            style={[
+              styles.titleShell,
+              {
+                width: brand.titleWidth,
+                height: brand.titleHeight,
+              },
+            ]}
+          >
             <Text
               style={[
                 styles.title,
+                {
+                  fontSize: brand.titleFontSize,
+                  lineHeight: brand.titleLineHeight,
+                },
                 fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
               ]}
               accessibilityRole="header"
@@ -198,26 +234,16 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   logoShell: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
     borderRadius: 1000,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoImage: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-  },
   titleShell: {
-    width: TITLE_WIDTH,
-    height: TITLE_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: TITLE_FONT_SIZE,
-    lineHeight: TITLE_LINE_HEIGHT,
     color: TITLE_COLOR,
     textAlign: 'center',
     includeFontPadding: false,

@@ -43,7 +43,10 @@ services:
       # Optionnel : origines autorisées (séparées par des virgules). Laisser vide = comportement CORS large côté API.
       - key: CORS_ORIGINS
         sync: false
-      # Mot de passe oublié (Nodemailer) — requis pour l’envoi des OTP par e-mail.
+      # OTP par e-mail : sur plan gratuit, SMTP sortant est bloqué — préférez RESEND_API_KEY (HTTPS).
+      - key: RESEND_API_KEY
+        sync: false
+      # Mot de passe oublié (Nodemailer, si instance autorisant SMTP sortant).
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

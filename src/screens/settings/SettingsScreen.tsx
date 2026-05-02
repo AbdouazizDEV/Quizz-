@@ -19,7 +19,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient colors={['#FFFFFF', '#F8F8F8']} style={StyleSheet.absoluteFillObject} />
-      <SettingsPanelContent title="Settings" onBack={onBack} />
+      <SettingsPanelContent title="Paramètres" onBack={onBack} />
     </View>
   );
 }

@@ -11,8 +11,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { QuizLogoMark } from '@components/ui/quiz/play/QuizLogoMark';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import { Routes } from '@constants/Routes';
+import type { QuizPlayPayload } from '@app-types/quizPlay.types';
 import { delay } from '@utils/delay';
+import { shuffleArray } from '@utils/shuffleArray';
 import { getQuizPlayRepository } from '@services/quiz/play/quizPlayRepositoryInstance';
+import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAuthStore } from '@stores/authStore';
 import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
@@ -72,12 +75,42 @@ export default function QuizEntryScreen() {
 
     (async () => {
       const repo = getQuizPlayRepository();
-      const [payload] = await Promise.all([repo.loadPlayPayload(quizId), delay(LOADER_MS)]);
+      const [raw] = await Promise.all([repo.loadPlayPayload(quizId), delay(LOADER_MS)]);
       if (cancelled) return;
-      if (!payload?.questions.length) {
+      if (!raw?.questions.length) {
         setError('Impossible de charger ce quiz.');
         return;
       }
+
+      const maxPts = raw.questions.length * (raw.quiz.pointsPerQuestion ?? 1);
+      const tok = token?.trim();
+      if (maxPts > 0 && tok) {
+        const client = getSupabaseClient();
+        if (client) {
+          const { data: authData } = await client.auth.getUser(tok);
+          const uid = authData.user?.id;
+          if (uid) {
+            const { data: bestRows } = await client
+              .from('quiz_sessions')
+              .select('score')
+              .eq('quiz_id', quizId)
+              .eq('user_id', uid)
+              .eq('is_completed', true)
+              .order('score', { ascending: false })
+              .limit(1);
+            const best = bestRows?.[0]?.score ?? 0;
+            if (best >= maxPts) {
+              setError('Score maximum déjà atteint sur ce quiz. Rejeu indisponible.');
+              return;
+            }
+          }
+        }
+      }
+
+      const payload: QuizPlayPayload = {
+        ...raw,
+        questions: shuffleArray(raw.questions),
+      };
       bootstrap(payload, categorySlug ?? null);
       router.replace(`/quiz/${quizId}/play`);
     })();

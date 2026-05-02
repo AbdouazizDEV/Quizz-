@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   Nunito_500Medium,
@@ -12,13 +12,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizAnswerGrid } from '@components/ui/quiz/play/QuizAnswerGrid';
-import { QuizNextActionBar } from '@components/ui/quiz/play/QuizNextActionBar';
+import { QuizFeedbackFunFactModal } from '@components/ui/quiz/play/QuizFeedbackFunFactModal';
 import { QuizPlayNavbar } from '@components/ui/quiz/play/QuizPlayNavbar';
 import { QuizQuestionHeader } from '@components/ui/quiz/play/QuizQuestionHeader';
-import { QuizResultBanner } from '@components/ui/quiz/play/QuizResultBanner';
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
+import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 
 export default function QuizPlayScreen() {
@@ -34,13 +34,19 @@ export default function QuizPlayScreen() {
   const sessionPoints = useQuizPlaySessionStore((s) => s.sessionPoints);
   const feedbackPhase = useQuizPlaySessionStore((s) => s.feedbackPhase);
   const selectedOptionId = useQuizPlaySessionStore((s) => s.selectedOptionId);
-  const feedbackChipLabel = useQuizPlaySessionStore((s) => s.feedbackChipLabel);
+  const lastPointsEarned = useQuizPlaySessionStore((s) => s.lastPointsEarned);
+  const correctAnswerLabel = useQuizPlaySessionStore((s) => s.correctAnswerLabel);
   const selectOption = useQuizPlaySessionStore((s) => s.selectOption);
   const advanceFromFeedback = useQuizPlaySessionStore((s) => s.advanceFromFeedback);
   const reset = useQuizPlaySessionStore((s) => s.reset);
   const secondsPerQuestion = useQuizPlaySessionStore((s) => s.secondsPerQuestion);
+  const expireQuestion = useQuizPlaySessionStore((s) => s.expireQuestion);
 
   const [timer, setTimer] = useState(secondsPerQuestion);
+  const timerRef = useRef(timer);
+  timerRef.current = timer;
+  const expiredForQuestionRef = useRef(false);
+  const wrongFeedbackKeyRef = useRef<string | null>(null);
 
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -71,6 +77,10 @@ export default function QuizPlayScreen() {
   }, [payload, quizId, router]);
 
   useEffect(() => {
+    expiredForQuestionRef.current = false;
+  }, [currentIndex]);
+
+  useEffect(() => {
     if (feedbackPhase !== 'idle') return;
     setTimer(secondsPerQuestion);
     const t = setInterval(() => {
@@ -78,6 +88,27 @@ export default function QuizPlayScreen() {
     }, 1000);
     return () => clearInterval(t);
   }, [currentIndex, feedbackPhase, secondsPerQuestion]);
+
+  useEffect(() => {
+    if (feedbackPhase !== 'idle' || !question) return;
+    if (timer > 0) return;
+    if (expiredForQuestionRef.current) return;
+    expiredForQuestionRef.current = true;
+    const correctLabel =
+      question.options.find((o) => o.id === question.correctOptionId)?.label ?? '—';
+    expireQuestion(correctLabel);
+  }, [timer, feedbackPhase, question, expireQuestion]);
+
+  useEffect(() => {
+    if (feedbackPhase !== 'incorrect' && feedbackPhase !== 'timeout') {
+      wrongFeedbackKeyRef.current = null;
+      return;
+    }
+    const key = `${currentIndex}-${feedbackPhase}`;
+    if (wrongFeedbackKeyRef.current === key) return;
+    wrongFeedbackKeyRef.current = key;
+    void triggerQuizWrongFeedback();
+  }, [feedbackPhase, currentIndex]);
 
   const onMenu = useCallback(() => {
     Alert.alert('Quitter le quiz ?', 'Ta progression sur cette question sera perdue.', [
@@ -95,18 +126,18 @@ export default function QuizPlayScreen() {
 
   const onPick = useCallback(
     (optionId: string) => {
-      if (!question || !payload) return;
+      if (timerRef.current <= 0 || !question || !payload) return;
+      if (useQuizPlaySessionStore.getState().feedbackPhase !== 'idle') return;
       const isCorrect = optionId === question.correctOptionId;
       const pts = payload.quiz.pointsPerQuestion;
       const correctLabel =
         question.options.find((o) => o.id === question.correctOptionId)?.label ?? '—';
-      const chipWrong = `Réponse : ${correctLabel}`;
-      selectOption(optionId, isCorrect, pts, chipWrong);
+      selectOption(optionId, isCorrect, pts, correctLabel);
     },
     [question, payload, selectOption],
   );
 
-  const onNext = useCallback(async () => {
+  const onContinueAfterFeedback = useCallback(async () => {
     if (!quizId || !payload) return;
     const next = advanceFromFeedback();
     if (next === 'continue') return;
@@ -133,6 +164,7 @@ export default function QuizPlayScreen() {
   }
 
   const total = payload.questions.length;
+  const maxSessionPoints = total * (payload.quiz.pointsPerQuestion ?? 1);
   const revealed = feedbackPhase !== 'idle';
   const imageUri = payload.quiz.thumbnailUrl;
 
@@ -140,13 +172,6 @@ export default function QuizPlayScreen() {
     <View style={styles.root}>
       <StatusBar style="dark" />
       <LinearGradient colors={['#FFFFFF', '#FAFAFA']} style={StyleSheet.absoluteFillObject} />
-
-      {feedbackPhase === 'correct' ? (
-        <QuizResultBanner phase="correct" title="Correct!" chipLabel={feedbackChipLabel} fonts={fonts} />
-      ) : null}
-      {feedbackPhase === 'incorrect' ? (
-        <QuizResultBanner phase="incorrect" title="Incorrect!" chipLabel={feedbackChipLabel} fonts={fonts} />
-      ) : null}
 
       <ScrollView
         contentContainerStyle={[
@@ -166,6 +191,7 @@ export default function QuizPlayScreen() {
             current={currentIndex + 1}
             total={total}
             sessionPoints={sessionPoints}
+            maxSessionPoints={maxSessionPoints}
             timerSeconds={timer}
             timerMax={secondsPerQuestion}
             fonts={fonts}
@@ -192,12 +218,23 @@ export default function QuizPlayScreen() {
         </View>
       </ScrollView>
 
-      <QuizNextActionBar
-        visible={revealed}
-        label="Suivant"
-        fonts={fonts}
-        onPress={onNext}
-      />
+      {feedbackPhase !== 'idle' && question ? (
+        <QuizFeedbackFunFactModal
+          visible={revealed}
+          phase={feedbackPhase}
+          pointsEarnedLabel={
+            feedbackPhase === 'correct'
+              ? `+${lastPointsEarned} point${lastPointsEarned > 1 ? 's' : ''}`
+              : ''
+          }
+          funFact={question.explanation?.trim() ?? ''}
+          correctAnswerLabel={
+            feedbackPhase === 'incorrect' || feedbackPhase === 'timeout' ? correctAnswerLabel : undefined
+          }
+          onContinue={onContinueAfterFeedback}
+          fonts={fonts}
+        />
+      ) : null}
     </View>
   );
 }

@@ -7,9 +7,11 @@ import { SettingsPanelContent } from '@components/ui/settings/SettingsPanelConte
 interface HomeSettingsDrawerProps {
   visible: boolean;
   onClose: () => void;
+  /** Invité : bouton « Se connecter » au lieu de « Se déconnecter ». */
+  isVisitor?: boolean;
 }
 
-export function HomeSettingsDrawer({ visible, onClose }: HomeSettingsDrawerProps) {
+export function HomeSettingsDrawer({ visible, onClose, isVisitor = false }: HomeSettingsDrawerProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const drawerWidth = useMemo(() => Math.min(width * 0.92, 420), [width]);
@@ -51,7 +53,14 @@ export function HomeSettingsDrawer({ visible, onClose }: HomeSettingsDrawerProps
             },
           ]}
         >
-          <SettingsPanelContent title="Settings" onBack={onClose} fullWidth topPaddingOverride={16} />
+          <SettingsPanelContent
+            title="Paramètres"
+            onBack={onClose}
+            isVisitor={isVisitor}
+            onAfterLogout={onClose}
+            fullWidth
+            topPaddingOverride={16}
+          />
         </Animated.View>
       </View>
     </Modal>
