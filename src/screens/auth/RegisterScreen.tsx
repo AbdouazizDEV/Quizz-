@@ -29,7 +29,8 @@ import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingConti
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
-import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
+import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
+import { fetchAuthMe } from '@services/auth/fetchAuthMe';
 import { socialAuthGateway } from '@services/auth/socialAuthGateway';
 import { Spacing } from '@constants/Spacing';
 import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
@@ -156,6 +157,13 @@ export default function RegisterScreen() {
           ? await socialAuthGateway.startGoogle()
           : await socialAuthGateway.startFacebook();
       await persistLoginAndSyncStore(accessToken);
+      const me = await fetchAuthMe();
+      if (!me) {
+        await signOutAndSyncStore();
+        throw new Error(
+          'La session Google n’a pas été acceptée par le serveur. Réessayez ou inscrivez-vous par e-mail.',
+        );
+      }
       useOnboardingRegisterStore.getState().clear();
       router.replace(Routes.HOME);
     } catch (error) {

@@ -28,7 +28,8 @@ import { WalkthroughActionButton } from '@components/ui/walkthrough/WalkthroughA
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
-import { persistLoginAndSyncStore } from '@services/auth/authSessionController';
+import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
+import { fetchAuthMe } from '@services/auth/fetchAuthMe';
 import { loginGateway } from '@services/auth/loginGatewayInstance';
 import { socialAuthGateway } from '@services/auth/socialAuthGateway';
 import { useAuthStore } from '@stores/authStore';
@@ -111,6 +112,13 @@ export default function LoginScreen() {
             ? await socialAuthGateway.startGoogle()
             : await socialAuthGateway.startFacebook();
         await persistLoginAndSyncStore(accessToken);
+        const me = await fetchAuthMe();
+        if (!me) {
+          await signOutAndSyncStore();
+          throw new Error(
+            'La session Google n’a pas été acceptée par le serveur. Vérifiez la connexion ou utilisez e-mail / mot de passe.',
+          );
+        }
         router.replace(Routes.HOME);
       } catch (error) {
         setFormError(error instanceof Error ? error.message : 'Connexion sociale impossible.');
