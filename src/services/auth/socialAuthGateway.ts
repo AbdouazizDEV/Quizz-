@@ -1,9 +1,29 @@
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 
 export type SocialAuthProvider = 'google' | 'facebook';
+
+function getAppLinkScheme(): string {
+  const raw = Constants.expoConfig?.scheme;
+  if (typeof raw === 'string' && raw.length > 0) return raw;
+  if (Array.isArray(raw) && typeof raw[0] === 'string' && raw[0].length > 0) return raw[0];
+  return 'quizzplus';
+}
+
+/**
+ * URL de retour Supabase → doit figurer dans Supabase Auth → Redirect URLs (`quizzplus://auth/callback`).
+ * Sur mobile, ne pas utiliser seul `Linking.createURL` en dev : il produit `localhost`, invalide sur un vrai téléphone.
+ */
+export function getOAuthRedirectUri(): string {
+  if (Platform.OS === 'web') {
+    return Linking.createURL('/auth/callback');
+  }
+  return `${getAppLinkScheme()}://auth/callback`;
+}
 
 function extractAccessTokenFromUrl(url: string): string | null {
   try {
@@ -21,7 +41,7 @@ function extractAccessTokenFromUrl(url: string): string | null {
 
 async function startSocialAuth(provider: SocialAuthProvider): Promise<string> {
   const endpoint = provider === 'google' ? '/auth/google' : '/auth/facebook';
-  const redirectTo = Linking.createURL('/auth/callback');
+  const redirectTo = getOAuthRedirectUri();
   const { data, error } = await getQuizzApiClient().POST(endpoint, {
     body: { redirect_to: redirectTo },
   });
@@ -30,7 +50,14 @@ async function startSocialAuth(provider: SocialAuthProvider): Promise<string> {
     throw new Error(parseQuizzApiError(error) ?? `Connexion ${provider} indisponible.`);
   }
 
-  await WebBrowser.warmUpAsync();
+  if (Platform.OS === 'android') {
+    try {
+      await WebBrowser.warmUpAsync();
+    } catch {
+      // indisponible sur certaines plateformes
+    }
+  }
+
   try {
     const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
     if (result.type !== 'success' || !result.url) {
@@ -42,7 +69,13 @@ async function startSocialAuth(provider: SocialAuthProvider): Promise<string> {
     }
     return accessToken;
   } finally {
-    await WebBrowser.coolDownAsync();
+    if (Platform.OS === 'android') {
+      try {
+        await WebBrowser.coolDownAsync();
+      } catch {
+        // idem
+      }
+    }
   }
 }
 

@@ -248,10 +248,6 @@ export interface components {
             email?: string;
             phone?: string;
         };
-        OAuthStartRequest: {
-            /** Format: uri */
-            redirect_to?: string;
-        };
         VerifyOtpRequest: {
             /** @enum {string} */
             channel: "email" | "sms";
@@ -407,7 +403,13 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["OAuthStartRequest"];
+                "application/json": {
+                    /**
+                     * Format: uri
+                     * @description URL de retour (deep link app), ex. quizzplus://auth/callback
+                     */
+                    redirect_to?: string;
+                };
             };
         };
         responses: {
@@ -435,7 +437,10 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["OAuthStartRequest"];
+                "application/json": {
+                    /** Format: uri */
+                    redirect_to?: string;
+                };
             };
         };
         responses: {

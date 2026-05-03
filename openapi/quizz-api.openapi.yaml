@@ -98,7 +98,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OAuthStartRequest'
+              type: object
+              properties:
+                redirect_to:
+                  type: string
+                  format: uri
+                  description: URL de retour (deep link app), ex. quizzplus://auth/callback
       responses:
         '200':
           description: URL à ouvrir
@@ -124,7 +129,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OAuthStartRequest'
+              type: object
+              properties:
+                redirect_to:
+                  type: string
+                  format: uri
       responses:
         '200':
           description: URL à ouvrir
@@ -443,13 +452,6 @@ components:
           format: email
         phone:
           type: string
-
-    OAuthStartRequest:
-      type: object
-      properties:
-        redirect_to:
-          type: string
-          format: uri
 
     VerifyOtpRequest:
       type: object
