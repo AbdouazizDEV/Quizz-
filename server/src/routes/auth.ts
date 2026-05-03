@@ -51,6 +51,20 @@ const resetPasswordBody = z.object({
   new_password: z.string().min(6),
 });
 
+const oauthStartBody = z
+  .object({
+    redirect_to: z.string().url().optional(),
+  })
+  .optional();
+
+/** Sur téléphone, `http://localhost:8081/...` pointe vers l’appareil : OAuth ne peut pas y revenir. On force le fallback serveur. */
+function sanitizeOAuthRedirectTo(input: string | undefined, fallback: string): string {
+  if (!input?.trim()) return fallback;
+  const t = input.trim();
+  if (/\blocalhost\b|127\.0\.0\.1/i.test(t)) return fallback;
+  return t;
+}
+
 function bearerToken(c: { req: { header: (n: string) => string | undefined } }): string | null {
   const h = c.req.header('Authorization');
   if (!h?.startsWith('Bearer ')) return null;
@@ -274,22 +288,28 @@ export const authRoutes = new Hono()
 
   .post('/google', async (c) => {
     const env = getEnv();
+    const parsed = oauthStartBody.safeParse(await c.req.json().catch(() => ({})));
+    const requested = parsed.success ? parsed.data?.redirect_to : undefined;
+    const redirectTo = sanitizeOAuthRedirectTo(requested, env.AUTH_DEEP_LINK_TARGET);
     return c.json({
       url: buildOAuthAuthorizeUrl({
         supabaseUrl: env.SUPABASE_URL,
         provider: 'google',
-        redirectTo: env.AUTH_DEEP_LINK_TARGET,
+        redirectTo,
       }),
     });
   })
 
   .post('/facebook', async (c) => {
     const env = getEnv();
+    const parsed = oauthStartBody.safeParse(await c.req.json().catch(() => ({})));
+    const requested = parsed.success ? parsed.data?.redirect_to : undefined;
+    const redirectTo = sanitizeOAuthRedirectTo(requested, env.AUTH_DEEP_LINK_TARGET);
     return c.json({
       url: buildOAuthAuthorizeUrl({
         supabaseUrl: env.SUPABASE_URL,
         provider: 'facebook',
-        redirectTo: env.AUTH_DEEP_LINK_TARGET,
+        redirectTo,
       }),
     });
   })

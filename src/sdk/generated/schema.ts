@@ -401,7 +401,17 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uri
+                     * @description URL de retour (deep link app), ex. quizzplus://auth/callback
+                     */
+                    redirect_to?: string;
+                };
+            };
+        };
         responses: {
             /** @description URL à ouvrir */
             200: {
@@ -425,7 +435,14 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    redirect_to?: string;
+                };
+            };
+        };
         responses: {
             /** @description URL à ouvrir */
             200: {

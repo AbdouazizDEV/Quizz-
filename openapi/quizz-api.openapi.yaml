@@ -93,6 +93,17 @@ paths:
       tags: [auth]
       operationId: authGoogleStart
       summary: URL OAuth Google (flow navigateur / WebBrowser)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect_to:
+                  type: string
+                  format: uri
+                  description: URL de retour (deep link app), ex. quizzplus://auth/callback
       responses:
         '200':
           description: URL à ouvrir
@@ -113,6 +124,16 @@ paths:
       tags: [auth]
       operationId: authFacebookStart
       summary: URL OAuth Facebook (flow navigateur / WebBrowser)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redirect_to:
+                  type: string
+                  format: uri
       responses:
         '200':
           description: URL à ouvrir
