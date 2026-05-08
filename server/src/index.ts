@@ -6,6 +6,7 @@ import { buildAuthEmailBridgeHtml } from './authEmailBridgeHtml.js';
 import { getEnv, hasServiceRoleKey } from './lib/env.js';
 import { loadEnvFiles } from './loadEnv.js';
 import { authRoutes } from './routes/auth.js';
+import { backofficeRoutes } from './routes/backoffice.js';
 import { leaderboardRoutes } from './routes/leaderboard.js';
 import { networkRoutes } from './routes/network.js';
 import { usersRoutes } from './routes/users.js';
@@ -41,12 +42,13 @@ app.use(
       return corsOrigins[0] ?? '';
     },
     allowHeaders: ['Content-Type', 'Authorization'],
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: Boolean(corsOrigins?.length),
   }),
 );
 
 app.route('/api/v1/auth', authRoutes);
+app.route('/api/v1/backoffice', backofficeRoutes);
 app.route('/api/v1/leaderboard', leaderboardRoutes);
 app.route('/api/v1/network', networkRoutes);
 app.route('/api/v1/users', usersRoutes);

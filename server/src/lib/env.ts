@@ -32,6 +32,8 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   CLOUDINARY_URL: z.string().optional(),
   CLOUDINARY_UPLOAD_FOLDER: z.string().optional(),
+  /** Clé partagée pour sécuriser les endpoints backoffice. */
+  BACKOFFICE_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

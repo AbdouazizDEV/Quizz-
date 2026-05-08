@@ -32,7 +32,7 @@
   INSERT INTO quizzes (id, title, description, category_id, difficulty_level, theme, total_questions, points_per_question, completion_bonus, play_count, is_published)
   VALUES
     -- Culture générale
-    ('b2222222-2222-4222-8222-222222222201', 'Quiz du jour — Culture',      'Questions courtes pour valider le flux inscription + lecture des quiz.',   'a1111111-1111-4111-8111-111111111101', 'Z0', 'Quotidien',         10, 1, 10, 340, true),
+    ('b2222222-2222-4222-8222-222222222201', 'Quiz du jour — Culture',      'Questions courtes pour valider le flux inscription + lecture des quiz.',   'a1111111-1111-4111-8111-111111111101', NULL, 'Quotidien',         10, 1, 10, 340, true),
     ('b2222222-2222-4222-8222-222222222202', 'Savoirs du monde',            'Testez vos connaissances générales sur le monde contemporain.',             'a1111111-1111-4111-8111-111111111101', 'Z1', 'Monde',             10, 1, 10, 210, true),
 
     -- Sciences
