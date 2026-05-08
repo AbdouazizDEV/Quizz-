@@ -16,7 +16,8 @@ export interface CategoryQuizListItem {
   questionCount: number;
   playCount: number;
   createdAt: string;
-  difficultyLevel: string;
+  /** `null` = pas de palier (visiteurs autorisés côté app). */
+  difficultyLevel: string | null;
 }
 
 export type QuizSortMode = 'default' | 'newest';

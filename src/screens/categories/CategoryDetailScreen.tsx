@@ -28,7 +28,7 @@ import { Spacing } from '@constants/Spacing';
 import { useCategoryDetail } from '@hooks/useCategoryDetail';
 import { getCategoryCoverUrl } from '@utils/categoryCoverUrl';
 import { useAuthStore } from '@stores/authStore';
-import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
+import { isQuizDifficultyDefined, lacksAuthToken } from '@services/auth/visitorAccessPolicy';
 
 export default function CategoryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -59,7 +59,6 @@ export default function CategoryDetailScreen() {
 
   const { data, loading, error, refetch } = useCategoryDetail(slug, sort);
   const token = useAuthStore((s) => s.token);
-  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
 
   const coverUri = useMemo(() => (slug ? getCategoryCoverUrl(slug) : ''), [slug]);
 
@@ -80,18 +79,14 @@ export default function CategoryDetailScreen() {
   }, []);
 
   const onPressQuiz = useCallback(
-    (quizId: string) => {
-      if (
-        data &&
-        isVisitorSession({ token, hasRegisteredAccount }) &&
-        !canVisitorAccessCategory({ slug: data.category.slug, name: data.category.name })
-      ) {
+    (quizId: string, difficultyLevel: string | null) => {
+      if (lacksAuthToken(token) && isQuizDifficultyDefined(difficultyLevel)) {
         router.push(Routes.LOGIN);
         return;
       }
       router.push(buildQuizEntryHref(quizId, slug));
     },
-    [data, hasRegisteredAccount, router, slug, token],
+    [router, slug, token],
   );
 
   const title = data?.category.name ?? '';
@@ -165,7 +160,10 @@ export default function CategoryDetailScreen() {
                     item={q}
                     fallbackThumbnailUri={coverUri}
                     fonts={fonts}
-                    onPress={() => onPressQuiz(q.id)}
+                    lockedForVisitor={
+                      lacksAuthToken(token) && isQuizDifficultyDefined(q.difficultyLevel)
+                    }
+                    onPress={() => onPressQuiz(q.id, q.difficultyLevel)}
                   />
                 ))
               )}

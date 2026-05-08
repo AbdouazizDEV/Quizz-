@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CategoryQuizListItem } from '@app-types/categoryExplore.types';
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
@@ -11,15 +12,23 @@ interface CategoryQuizRowProps {
   /** Image de secours si `thumbnailUrl` est vide (ex. couverture de catégorie). */
   fallbackThumbnailUri: string;
   fonts: ProfileFontFamilies;
+  /** Quiz avec difficulté définie : cadenas pour les visiteurs (connexion requise). */
+  lockedForVisitor?: boolean;
   onPress?: () => void;
 }
 
-export function CategoryQuizRow({ item, fallbackThumbnailUri, fonts, onPress }: CategoryQuizRowProps) {
+export function CategoryQuizRow({
+  item,
+  fallbackThumbnailUri,
+  fonts,
+  lockedForVisitor,
+  onPress,
+}: CategoryQuizRowProps) {
   const uri = item.thumbnailUrl?.trim() || fallbackThumbnailUri;
   const meta = `${formatRelativeTimeFr(item.createdAt)} • ${formatCompactNumber(item.playCount)} joueurs`;
 
-  const body = (
-    <>
+  const rowContent = (
+    <View style={styles.cardRow} collapsable={false}>
       <View style={styles.thumbWrap}>
         <Image source={{ uri }} style={styles.thumb} />
         <View style={styles.badge}>
@@ -40,26 +49,67 @@ export function CategoryQuizRow({ item, fallbackThumbnailUri, fonts, onPress }: 
           <Text style={[styles.authorName, fonts.medium && { fontFamily: fonts.medium }]}>Quizz+</Text>
         </View>
       </View>
-    </>
+    </View>
   );
 
   if (onPress) {
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={
+          lockedForVisitor
+            ? `${item.title}, quiz réservé aux comptes connectés`
+            : item.title
+        }
+        accessibilityHint={lockedForVisitor ? 'Ouvre la connexion pour débloquer ce quiz' : undefined}
         onPress={onPress}
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.card,
+          lockedForVisitor && styles.cardLocked,
+          pressed && styles.pressed,
+        ]}
       >
-        {body}
+        {rowContent}
+        {lockedForVisitor ? (
+          <View
+            style={[styles.lockedVeil, Platform.OS === 'android' ? styles.lockedVeilAndroid : null]}
+            pointerEvents="none"
+            collapsable={false}
+            importantForAccessibility="no-hide-descendants"
+          >
+            <View style={[styles.filigranStripe, styles.filigranStripe1]} />
+            <View style={[styles.filigranStripe, styles.filigranStripe2]} />
+            <View style={[styles.filigranStripe, styles.filigranStripe3]} />
+            <View style={styles.lockedCenter}>
+              <View style={styles.lockCircle}>
+                <Feather name="lock" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.lockedTitle, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+                Connexion requise
+              </Text>
+              <Text style={[styles.lockedSubtitle, fonts.medium && { fontFamily: fonts.medium }]}>
+                Connectez-vous pour jouer à ce quiz
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </Pressable>
     );
   }
 
-  return <View style={styles.card}>{body}</View>;
+  return <View style={styles.card}>{rowContent}</View>;
 }
 
 const styles = StyleSheet.create({
   card: {
+    position: 'relative',
+    overflow: 'hidden',
+    width: '100%',
+    minHeight: 98,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -68,6 +118,74 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.92,
+  },
+  cardLocked: {
+    borderWidth: 1,
+    borderColor: 'rgba(33, 33, 33, 0.08)',
+  },
+  lockedVeil: {
+    ...StyleSheet.absoluteFillObject,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 14,
+  },
+  lockedVeilAndroid: {
+    elevation: 12,
+  },
+  filigranStripe: {
+    position: 'absolute',
+    width: 220,
+    height: 20,
+    backgroundColor: 'rgba(201, 160, 0, 0.09)',
+    transform: [{ rotate: '-32deg' }],
+  },
+  filigranStripe1: {
+    top: '8%',
+    left: '-25%',
+  },
+  filigranStripe2: {
+    top: '42%',
+    left: '-15%',
+    opacity: 0.85,
+  },
+  filigranStripe3: {
+    top: '72%',
+    left: '-30%',
+    opacity: 0.7,
+  },
+  lockedCenter: {
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    maxWidth: '88%',
+  },
+  lockCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(33, 33, 33, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  lockedTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#212121',
+    textAlign: 'center',
+  },
+  lockedSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: '#616161',
+    textAlign: 'center',
   },
   thumbWrap: {
     width: 98,

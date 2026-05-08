@@ -20,30 +20,225 @@ function aggregateQuizCountsByCategory(
 
 const MOCK_CATEGORIES: CategoryExploreItem[] = [
   {
-    id: 'mock-1',
-    name: 'Éducation',
-    slug: 'education',
+    id: 'main-culture-generale',
+    name: 'Culture générale',
+    slug: 'culture-generale',
     icon: 'book',
     color: '#F5B200',
     quizCount: 12,
   },
   {
-    id: 'mock-2',
-    name: 'Jeux',
-    slug: 'games',
+    id: 'main-histoire-societe',
+    name: 'Histoire & Société',
+    slug: 'histoire-societe',
+    icon: 'globe',
+    color: '#4CAF50',
+    quizCount: 10,
+  },
+  {
+    id: 'main-geographie',
+    name: 'Géographie',
+    slug: 'geography',
+    icon: 'map',
+    color: '#E91E63',
+    quizCount: 9,
+  },
+  {
+    id: 'main-sciences-technologie',
+    name: 'Sciences & Technologie',
+    slug: 'sciences-technologie',
     icon: 'cpu',
-    color: '#FFB703',
+    color: '#4CAF50',
+    quizCount: 14,
+  },
+  {
+    id: 'main-sport',
+    name: 'Sport',
+    slug: 'sports',
+    icon: 'football',
+    color: '#F5B200',
+    quizCount: 11,
+  },
+  {
+    id: 'main-divertissement',
+    name: 'Divertissement',
+    slug: 'entertainment',
+    icon: 'music',
+    color: '#E91E63',
     quizCount: 8,
   },
   {
-    id: 'mock-3',
-    name: 'Business',
-    slug: 'business',
+    id: 'main-business-vie-pratique',
+    name: 'Business & Vie pratique',
+    slug: 'business-vie-pratique',
     icon: 'briefcase',
     color: '#4CAF50',
     quizCount: 15,
   },
 ];
+
+type RawCategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  color: string | null;
+};
+
+type MainCategoryDefinition = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  color: string;
+  sourceSlugs: string[];
+};
+
+const MAIN_CATEGORY_DEFINITIONS: MainCategoryDefinition[] = [
+  {
+    id: 'main-culture-generale',
+    name: 'Culture générale',
+    slug: 'culture-generale',
+    icon: 'book-open',
+    color: '#F5B200',
+    sourceSlugs: ['culture-generale', 'culture-generale-fr', 'general-knowledge', 'education', 'games'],
+  },
+  {
+    id: 'main-histoire-societe',
+    name: 'Histoire & Société',
+    slug: 'histoire-societe',
+    icon: 'globe',
+    color: '#4CAF50',
+    sourceSlugs: ['history', 'histoire', 'politics', 'politique', 'societe', 'society'],
+  },
+  {
+    id: 'main-geographie',
+    name: 'Géographie',
+    slug: 'geography',
+    icon: 'map',
+    color: '#E91E63',
+    sourceSlugs: ['geography', 'geographie'],
+  },
+  {
+    id: 'main-sciences-technologie',
+    name: 'Sciences & Technologie',
+    slug: 'sciences-technologie',
+    icon: 'cpu',
+    color: '#4CAF50',
+    sourceSlugs: ['sciences', 'science', 'technology', 'technologie'],
+  },
+  {
+    id: 'main-sport',
+    name: 'Sport',
+    slug: 'sports',
+    icon: 'football',
+    color: '#F5B200',
+    sourceSlugs: ['sports', 'sport'],
+  },
+  {
+    id: 'main-divertissement',
+    name: 'Divertissement',
+    slug: 'entertainment',
+    icon: 'music',
+    color: '#E91E63',
+    sourceSlugs: ['entertainment', 'music', 'musique', 'arts', 'art'],
+  },
+  {
+    id: 'main-business-vie-pratique',
+    name: 'Business & Vie pratique',
+    slug: 'business-vie-pratique',
+    icon: 'briefcase',
+    color: '#4CAF50',
+    sourceSlugs: ['business', 'daily-life', 'vie-quotidienne', 'lifestyle'],
+  },
+];
+
+function normalize(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function resolveMainCategoryDefinition(row: RawCategoryRow): MainCategoryDefinition | null {
+  const slug = normalize(row.slug);
+  const name = normalize(row.name).replace(/\s*&\s*/g, ' ').replace(/\s+/g, ' ');
+  for (const def of MAIN_CATEGORY_DEFINITIONS) {
+    if (def.sourceSlugs.some((source) => slug === source || slug.includes(source))) {
+      return def;
+    }
+  }
+  if (name.includes('histoire') || name.includes('societe') || name.includes('politique')) {
+    return MAIN_CATEGORY_DEFINITIONS[1];
+  }
+  if (name.includes('geographie')) {
+    return MAIN_CATEGORY_DEFINITIONS[2];
+  }
+  if (name.includes('science') || name.includes('technologie')) {
+    return MAIN_CATEGORY_DEFINITIONS[3];
+  }
+  if (name.includes('sport')) {
+    return MAIN_CATEGORY_DEFINITIONS[4];
+  }
+  if (name.includes('divertissement') || name.includes('musique') || name.includes('art')) {
+    return MAIN_CATEGORY_DEFINITIONS[5];
+  }
+  if (name.includes('business') || name.includes('economie') || name.includes('vie') || name.includes('education')) {
+    return MAIN_CATEGORY_DEFINITIONS[6];
+  }
+  if (name.includes('culture')) {
+    return MAIN_CATEGORY_DEFINITIONS[0];
+  }
+  return null;
+}
+
+function buildMainCategoryItems(
+  rawCategories: RawCategoryRow[],
+  countsByRawCategoryId: Map<string, number>,
+): { items: CategoryExploreItem[]; rawCategoryIdsByMainSlug: Map<string, string[]> } {
+  const byMainSlug = new Map<string, CategoryExploreItem>();
+  const rawCategoryIdsByMainSlug = new Map<string, string[]>();
+  for (const row of rawCategories) {
+    const def = resolveMainCategoryDefinition(row);
+    if (!def) continue;
+    const existing = byMainSlug.get(def.slug);
+    const currentCount = countsByRawCategoryId.get(row.id) ?? 0;
+    if (!existing) {
+      byMainSlug.set(def.slug, {
+        id: def.id,
+        name: def.name,
+        slug: def.slug,
+        icon: def.icon,
+        color: def.color,
+        quizCount: currentCount,
+      });
+    } else {
+      existing.quizCount += currentCount;
+    }
+    const ids = rawCategoryIdsByMainSlug.get(def.slug) ?? [];
+    ids.push(row.id);
+    rawCategoryIdsByMainSlug.set(def.slug, ids);
+  }
+  const items: CategoryExploreItem[] = MAIN_CATEGORY_DEFINITIONS.map((def) => {
+    const fromDb = byMainSlug.get(def.slug);
+    return (
+      fromDb ?? {
+        id: def.id,
+        name: def.name,
+        slug: def.slug,
+        icon: def.icon,
+        color: def.color,
+        quizCount: 0,
+      }
+    );
+  });
+  items.sort((a, b) => {
+    if (b.quizCount !== a.quizCount) return b.quizCount - a.quizCount;
+    return a.name.localeCompare(b.name, 'fr');
+  });
+  return { items, rawCategoryIdsByMainSlug };
+}
 
 export async function fetchCategoriesWithQuizCounts(): Promise<CategoryExploreItem[]> {
   const client = getSupabaseClient();
@@ -67,21 +262,8 @@ export async function fetchCategoriesWithQuizCounts(): Promise<CategoryExploreIt
 
   const counts = aggregateQuizCountsByCategory(quizRows);
 
-  const merged: CategoryExploreItem[] = categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    slug: c.slug,
-    icon: c.icon,
-    color: c.color,
-    quizCount: counts.get(c.id) ?? 0,
-  }));
-
-  merged.sort((a, b) => {
-    if (b.quizCount !== a.quizCount) return b.quizCount - a.quizCount;
-    return a.name.localeCompare(b.name, 'fr');
-  });
-
-  return merged;
+  const { items } = buildMainCategoryItems(categories, counts);
+  return items;
 }
 
 function mapQuizRow(row: {
@@ -91,7 +273,7 @@ function mapQuizRow(row: {
   total_questions: number;
   play_count: number;
   created_at: string;
-  difficulty_level: string;
+  difficulty_level: string | null;
   questions?: { count: number }[] | null;
 }): CategoryQuizListItem {
   const fromRelation =
@@ -105,7 +287,7 @@ function mapQuizRow(row: {
     questionCount: fromRelation ?? row.total_questions,
     playCount: row.play_count,
     createdAt: row.created_at,
-    difficultyLevel: row.difficulty_level,
+    difficultyLevel: row.difficulty_level ?? null,
   };
 }
 
@@ -146,44 +328,40 @@ export async function fetchCategoryDetailBySlug(
     };
   }
 
-  const { data: category, error: cErr } = await client
+  const { data: categories, error: cErr } = await client
     .from('categories')
-    .select('id, name, slug, icon, color')
-    .eq('slug', slug)
-    .maybeSingle();
+    .select('id, name, slug, icon, color');
 
-  if (cErr || !category) {
+  if (cErr || !categories?.length) {
     return null;
+  }
+
+  const { items, rawCategoryIdsByMainSlug } = buildMainCategoryItems(categories, new Map());
+  const mainCategory = items.find((item) => item.slug === slug);
+  if (!mainCategory) {
+    return null;
+  }
+  const categoryIds = rawCategoryIdsByMainSlug.get(slug) ?? [];
+  if (categoryIds.length === 0) {
+    return {
+      category: { ...mainCategory, quizCount: 0 },
+      quizzes: [],
+    };
   }
 
   const { data: quizRows, error: qErr } = await client
     .from('quizzes')
     .select('id, title, thumbnail_url, total_questions, play_count, created_at, difficulty_level, questions(count)')
-    .eq('category_id', category.id)
+    .in('category_id', categoryIds)
     .eq('is_published', true);
 
   if (qErr) {
-    const empty: CategoryExploreItem = {
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      icon: category.icon,
-      color: category.color,
-      quizCount: 0,
-    };
-    return { category: empty, quizzes: [] };
+    return { category: { ...mainCategory, quizCount: 0 }, quizzes: [] };
   }
 
   const quizzes = sortQuizzes((quizRows ?? []).map(mapQuizRow), sort);
 
-  const header: CategoryExploreItem = {
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
-    icon: category.icon,
-    color: category.color,
-    quizCount: quizzes.length,
-  };
+  const header: CategoryExploreItem = { ...mainCategory, quizCount: quizzes.length };
 
   return {
     category: header,
