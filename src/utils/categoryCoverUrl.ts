@@ -6,6 +6,8 @@ const SLUG_TO_COVER: Record<string, string> = {
   'culture-generale':
     'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&q=80',
   sciences: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&q=80',
+  'sciences-technologie':
+    'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&q=80',
   education: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&q=80',
   games: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=800&q=80',
   business: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
@@ -17,6 +19,11 @@ const SLUG_TO_COVER: Record<string, string> = {
   health: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&q=80',
   kids: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=800&q=80',
   sports: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&q=80',
+  'histoire-societe':
+    'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=800&q=80',
+  geography: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80',
+  'business-vie-pratique':
+    'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
   lifestyle: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80',
 };
 

@@ -205,6 +205,7 @@ export default function QuizPlayScreen() {
               fonts={fonts}
             />
             <QuizAnswerGrid
+              questionId={question.id}
               options={question.options}
               columnWidth={contentWidth}
               gap={12}

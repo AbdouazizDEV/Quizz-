@@ -71,7 +71,7 @@ export interface Database {
           title: string;
           description: string | null;
           category_id: string | null;
-          difficulty_level: LevelCode;
+          difficulty_level: LevelCode | null;
           theme: string | null;
           thumbnail_url: string | null;
           total_questions: number;
@@ -87,7 +87,7 @@ export interface Database {
           title: string;
           description?: string | null;
           category_id?: string | null;
-          difficulty_level?: LevelCode;
+          difficulty_level?: LevelCode | null;
           theme?: string | null;
           thumbnail_url?: string | null;
           total_questions?: number;

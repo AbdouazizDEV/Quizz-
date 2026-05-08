@@ -18,7 +18,7 @@ import { getQuizPlayRepository } from '@services/quiz/play/quizPlayRepositoryIns
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAuthStore } from '@stores/authStore';
-import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
+import { canVisitorPlayQuiz, lacksAuthToken } from '@services/auth/visitorAccessPolicy';
 
 const LOADER_MS = 5000;
 
@@ -61,19 +61,27 @@ export default function QuizEntryScreen() {
       setError('Quiz introuvable.');
       return;
     }
-    if (
-      isVisitorSession({ token, hasRegisteredAccount }) &&
-      (!categorySlug || !canVisitorAccessCategory({ slug: categorySlug }))
-    ) {
-      Alert.alert('Connexion requise', "Connectez-vous pour acceder a ce quiz.", [
-        { text: 'OK', onPress: () => router.replace(Routes.LOGIN) },
-      ]);
-      return;
-    }
-
     let cancelled = false;
 
     (async () => {
+      if (lacksAuthToken(token)) {
+        const client = getSupabaseClient();
+        if (client) {
+          const { data: quizMeta } = await client
+            .from('quizzes')
+            .select('difficulty_level')
+            .eq('id', quizId)
+            .maybeSingle();
+          if (cancelled) return;
+          if (!canVisitorPlayQuiz(quizMeta?.difficulty_level)) {
+            Alert.alert('Connexion requise', "Connectez-vous pour accéder à ce quiz.", [
+              { text: 'OK', onPress: () => router.replace(Routes.LOGIN) },
+            ]);
+            return;
+          }
+        }
+      }
+
       const repo = getQuizPlayRepository();
       const [raw] = await Promise.all([repo.loadPlayPayload(quizId), delay(LOADER_MS)]);
       if (cancelled) return;
@@ -118,7 +126,7 @@ export default function QuizEntryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [quizId, categorySlug, bootstrap, router, hasRegisteredAccount, token]);
+  }, [quizId, bootstrap, router, token]);
 
   useEffect(() => {
     if (!error) return;

@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -58,7 +58,8 @@ export default function LoginScreen() {
   const [unlocking, setUnlocking] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const storedToken = useAuthStore((s) => s.token);
-  const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
+
+  const autoUnlockStartedRef = useRef(false);
 
   const titleSize = windowWidth < 360 ? 28 : windowWidth < 400 ? 32 : 36;
 
@@ -160,6 +161,14 @@ export default function LoginScreen() {
       setUnlocking(false);
     }
   }, [router, socialSubmitting, storedToken, submitting, unlocking]);
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    if (!storedToken?.trim()) return;
+    if (autoUnlockStartedRef.current) return;
+    autoUnlockStartedRef.current = true;
+    void onDeviceUnlock();
+  }, [fontsLoaded, onDeviceUnlock, storedToken]);
 
   return (
     <View style={styles.root}>
@@ -274,12 +283,12 @@ export default function LoginScreen() {
                 <View style={styles.orDividerLine} />
               </View>
 
-              <SocialAuthButtons
+              {/* <SocialAuthButtons
                 fontFamily={fonts.semi}
                 loading={socialSubmitting}
                 onGooglePress={() => void onSocialLogin('google')}
                 onFacebookPress={() => void onSocialLogin('facebook')}
-              />
+              /> */}
             </View>
           </View>
         </ScrollView>
@@ -300,14 +309,6 @@ export default function LoginScreen() {
             <View style={styles.loaderRow}>
               <ActivityIndicator color="#543ACC" />
             </View>
-          ) : null}
-          {hasRegisteredAccount ? (
-            <WalkthroughActionButton
-              label="DEVERROUILLER AVEC LE TELEPHONE"
-              variant="secondary"
-              onPress={() => void onDeviceUnlock()}
-              fontFamily={fonts.bold}
-            />
           ) : null}
           <WalkthroughActionButton
             label="SE CONNECTER"

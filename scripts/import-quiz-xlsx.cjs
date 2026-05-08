@@ -27,7 +27,10 @@
  * Feuille 1 : colonnes question, answer_1..answer_4, correct_answer (1-4 ou A-D),
  *             fun_fact, difficulty (Z0–Z3 / A1–A3 ou libellé), subcategory, tags.
  *
- * Un quiz est créé par couple (catégorie du fichier, difficulty).
+ * Un ou plusieurs quiz sont créés par couple (catégorie du fichier, difficulty) :
+ *   Z0 (Facile) → max 10 questions par quiz (découpage automatique si plus),
+ *   Z1 (Moyen) → max 15,
+ *   Z2–Z3 / A1–A3 (Difficile) → max 20.
  */
 'use strict';
 
@@ -147,6 +150,24 @@ function mapDifficulty(cell) {
     DEBUTANT: 'Z0',
   };
   return map[s] ?? 'Z0';
+}
+
+/** Taille max d’un quiz publié par palier (Facile 10, Moyen 15, Difficile 20). */
+function maxQuestionsPerDifficultyLevel(levelCode) {
+  switch (levelCode) {
+    case 'Z0':
+      return 10;
+    case 'Z1':
+      return 15;
+    case 'Z2':
+    case 'Z3':
+    case 'A1':
+    case 'A2':
+    case 'A3':
+      return 20;
+    default:
+      return 15;
+  }
 }
 
 function normalizeCorrect(raw) {
@@ -288,45 +309,55 @@ async function main() {
     for (const bundle of byQuiz.values()) {
       if (!bundle.questions.length) continue;
 
-      const title = `${categorySlug.replace(/-/g, ' ')} — ${bundle.difficulty}`;
-      const { data: quizRow, error: quizErr } = await admin
-        .from('quizzes')
-        .insert({
-          title,
-          category_id: cat.id,
-          difficulty_level: bundle.difficulty,
-          total_questions: bundle.questions.length,
-          points_per_question: 1,
-          completion_bonus: 10,
-          is_published: true,
-        })
-        .select('id')
-        .single();
-
-      if (quizErr || !quizRow) {
-        console.error('[quiz]', quizErr?.message ?? quizErr);
-        continue;
+      const chunkSize = maxQuestionsPerDifficultyLevel(bundle.difficulty);
+      const parts = [];
+      for (let i = 0; i < bundle.questions.length; i += chunkSize) {
+        parts.push(bundle.questions.slice(i, i + chunkSize));
       }
+      const baseTitle = `${categorySlug.replace(/-/g, ' ')} — ${bundle.difficulty}`;
+      let partIndex = 0;
+      for (const questionsChunk of parts) {
+        partIndex += 1;
+        const title = parts.length > 1 ? `${baseTitle} — partie ${partIndex}/${parts.length}` : baseTitle;
+        const { data: quizRow, error: quizErr } = await admin
+          .from('quizzes')
+          .insert({
+            title,
+            category_id: cat.id,
+            difficulty_level: bundle.difficulty,
+            total_questions: questionsChunk.length,
+            points_per_question: 1,
+            completion_bonus: 10,
+            is_published: true,
+          })
+          .select('id')
+          .single();
 
-      let order = 1;
-      for (const q of bundle.questions) {
-        const { error: insQ } = await admin.from('questions').insert({
-          quiz_id: quizRow.id,
-          question_text: q.question_text,
-          options: q.options,
-          correct_option_id: q.correct_option_id,
-          explanation: q.explanation,
-          order_index: order++,
-          subcategory: q.subcategory,
-          tags: q.tags,
-          difficulty_label: q.difficulty_label,
-        });
-        if (insQ) {
-          console.error('[question]', insQ.message);
-          break;
+        if (quizErr || !quizRow) {
+          console.error('[quiz]', quizErr?.message ?? quizErr);
+          continue;
         }
+
+        let order = 1;
+        for (const q of questionsChunk) {
+          const { error: insQ } = await admin.from('questions').insert({
+            quiz_id: quizRow.id,
+            question_text: q.question_text,
+            options: q.options,
+            correct_option_id: q.correct_option_id,
+            explanation: q.explanation,
+            order_index: order++,
+            subcategory: q.subcategory,
+            tags: q.tags,
+            difficulty_label: q.difficulty_label,
+          });
+          if (insQ) {
+            console.error('[question]', insQ.message);
+            break;
+          }
+        }
+        console.log(`OK  ${title}  (${questionsChunk.length} questions)`);
       }
-      console.log(`OK  ${title}  (${bundle.questions.length} questions)`);
     }
   }
 }
