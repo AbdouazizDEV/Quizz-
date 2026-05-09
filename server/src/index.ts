@@ -41,7 +41,8 @@ app.use(
       if (origin && corsOrigins.includes(origin)) return origin;
       return corsOrigins[0] ?? '';
     },
-    allowHeaders: ['Content-Type', 'Authorization'],
+    // Backoffice envoie x-api-key depuis le navigateur : obligatoire pour le preflight CORS.
+    allowHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-API-Key'],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: Boolean(corsOrigins?.length),
   }),
