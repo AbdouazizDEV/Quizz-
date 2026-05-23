@@ -19,6 +19,7 @@ interface TimeRemaining {
   days: number;
   hours: number;
   minutes: number;
+  seconds: number;
   isUrgent: boolean;
   expired: boolean;
 }
@@ -31,21 +32,28 @@ function getTimeRemaining(endsAt: string): TimeRemaining {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  const underOneHour = diff > 0 && diff < 60 * 60 * 1000;
 
   return {
     days,
     hours,
     minutes,
-    isUrgent: diff > 0 && diff < 2 * 60 * 60 * 1000,
+    seconds,
+    isUrgent: underOneHour,
     expired: diff === 0,
   };
 }
 
 function formatLabel(time: TimeRemaining): string {
-  if (time.expired) return 'Terminé';
+  if (time.expired) return 'Expiré';
   if (time.days > 0) return `Se termine dans ${time.days}j ${time.hours}h`;
   if (time.hours > 0) return `Se termine dans ${time.hours}h ${time.minutes}m`;
-  return `Se termine dans ${time.minutes} min`;
+  if (time.minutes > 0) {
+    return `Se termine dans ${time.minutes}m ${String(time.seconds).padStart(2, '0')}s`;
+  }
+  return `Se termine dans ${time.seconds}s`;
 }
 
 export function CountdownTimer({ endsAt, style }: CountdownTimerProps) {
@@ -53,13 +61,14 @@ export function CountdownTimer({ endsAt, style }: CountdownTimerProps) {
   const opacity = useSharedValue(1);
 
   useEffect(() => {
-    setTime(getTimeRemaining(endsAt));
-    const interval = setInterval(() => setTime(getTimeRemaining(endsAt)), 60_000);
+    const tick = () => setTime(getTimeRemaining(endsAt));
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [endsAt]);
 
   useEffect(() => {
-    if (time.isUrgent) {
+    if (time.isUrgent && !time.expired) {
       opacity.value = withRepeat(
         withSequence(withTiming(0.4, { duration: 800 }), withTiming(1, { duration: 800 })),
         -1,
@@ -68,7 +77,7 @@ export function CountdownTimer({ endsAt, style }: CountdownTimerProps) {
       return;
     }
     opacity.value = withTiming(1, { duration: 200 });
-  }, [time.isUrgent, opacity]);
+  }, [time.isUrgent, time.expired, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -78,12 +87,13 @@ export function CountdownTimer({ endsAt, style }: CountdownTimerProps) {
     <Animated.Text
       style={[
         styles.text,
-        time.isUrgent && styles.urgent,
+        time.isUrgent && !time.expired && styles.urgent,
+        time.expired && styles.expired,
         style,
         animatedStyle,
       ]}
     >
-      📅 {formatLabel(time)}
+      {time.expired ? '⏱' : '📅'} {formatLabel(time)}
     </Animated.Text>
   );
 }
@@ -96,5 +106,9 @@ const styles = StyleSheet.create({
   },
   urgent: {
     color: COLORS.error,
+  },
+  expired: {
+    color: COLORS.error,
+    fontFamily: 'Nunito_800ExtraBold',
   },
 });

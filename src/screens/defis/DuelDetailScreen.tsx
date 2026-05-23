@@ -17,19 +17,33 @@ import { SectionTitle } from '@components/ui/common/SectionTitle';
 import { COLORS } from '@constants/Colors';
 import { buildQuizEntryHref } from '@constants/Routes';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useAppError } from '@providers/AppErrorProvider';
 import { fetchDuelById } from '@services/defis/duelRepository';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function getDuelUiState(params: {
   status: string;
+  isExpired: boolean;
   isChallenger: boolean;
   isChallenged: boolean;
   myScore: number | null;
   opponentScore: number | null;
   opponentName: string;
 }): { statusLabel: string; motivationalLine: string; tips: string[] } {
-  const { status, isChallenger, isChallenged, myScore, opponentScore, opponentName } = params;
+  const { status, isExpired, isChallenger, isChallenged, myScore, opponentScore, opponentName } =
+    params;
+
+  if (isExpired || status === 'expired') {
+    return {
+      statusLabel: 'Expiré',
+      motivationalLine: 'Le délai de 30 minutes est dépassé ⏱',
+      tips: [
+        'Ce duel figure dans « Mes duels récents ».',
+        myScore === null ? 'Vous n\'avez pas joué avant l\'expiration.' : 'Votre score quiz a été enregistré.',
+      ],
+    };
+  }
 
   if (status === 'declined') {
     return {
@@ -44,7 +58,7 @@ function getDuelUiState(params: {
       statusLabel: 'Invitation',
       motivationalLine: `${opponentName} vous défie — entrez dans l'arène ! 🎯`,
       tips: [
-        'Acceptez le défi depuis l\'onglet Duel si ce n\'est pas déjà fait.',
+        'Acceptez ou refusez depuis « Duels en attente » (30 min max).',
         'Une seule partie : donnez le meilleur de vous-même !',
       ],
     };
@@ -56,7 +70,7 @@ function getDuelUiState(params: {
       motivationalLine: 'Montrez votre niveau avant qu\'il ne réponde ! 🔥',
       tips: [
         'Jouez maintenant : votre score reste secret jusqu\'à la fin.',
-        'Votre adversaire a 48 h pour accepter et jouer.',
+        'Votre adversaire a 30 minutes pour accepter et jouer.',
       ],
     };
   }
@@ -99,18 +113,41 @@ export default function DuelDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const duelId = typeof id === 'string' ? id : '';
   const router = useRouter();
+  const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
   const ctaPulse = useSharedValue(1);
 
-  const { data: duel, isLoading } = useQuery({
+  const { data: duel, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['duel', duelId],
     queryFn: () => fetchDuelById(duelId),
     enabled: Boolean(duelId),
   });
 
+  useEffect(() => {
+    if (!isError) return;
+    showAppError(error instanceof Error ? error.message : 'Impossible de charger le duel.', {
+      title: 'Duel',
+      onRetry: () => void refetch(),
+    });
+  }, [error, isError, refetch, showAppError]);
+
+  const isChallenger = duel?.challengerId === userId;
+  const isChallenged = duel?.challengedId === userId;
+  const myQuizScore = duel
+    ? isChallenger
+      ? duel.challengerScore
+      : duel.challengedScore
+    : null;
+  const opponentQuizScore = duel
+    ? isChallenger
+      ? duel.challengedScore
+      : duel.challengerScore
+    : null;
+
   const canPlay =
     duel &&
+    !duel.isExpired &&
     duel.quizId &&
     ((duel.challengerId === userId &&
       (duel.status === 'pending' || duel.status === 'accepted') &&
@@ -141,23 +178,24 @@ export default function DuelDetailScreen() {
     );
   }
 
-  const isChallenger = duel.challengerId === userId;
-  const isChallenged = duel.challengedId === userId;
-  const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
-  const opponentScore = isChallenger ? duel.challengedScore : duel.challengerScore;
   const opponentName = isChallenger ? duel.challengedName : duel.challengerName;
   const opponentUserId = isChallenger ? duel.challengedId : duel.challengerId;
   const myName =
     authMe?.profile?.full_name?.trim() ||
     authMe?.profile?.username?.trim() ||
     'Vous';
+  const myTotalScore = isChallenger ? duel.challengerTotalScore : duel.challengedTotalScore;
+  const opponentTotalScore = isChallenger ? duel.challengedTotalScore : duel.challengerTotalScore;
+  const myAvatar = isChallenger ? duel.challengerAvatarUrl : duel.challengedAvatarUrl;
+  const opponentAvatar = isChallenger ? duel.challengedAvatarUrl : duel.challengerAvatarUrl;
 
   const ui = getDuelUiState({
     status: duel.status,
+    isExpired: duel.isExpired,
     isChallenger,
     isChallenged,
-    myScore,
-    opponentScore,
+    myScore: myQuizScore,
+    opponentScore: opponentQuizScore,
     opponentName,
   });
 
@@ -166,14 +204,18 @@ export default function DuelDetailScreen() {
       <DuelMatchHero
         myName={myName}
         myUserId={userId}
-        myAvatarUrl={authMe?.profile?.avatar_url}
+        myAvatarUrl={myAvatar ?? authMe?.profile?.avatar_url}
+        myTotalScore={myTotalScore}
         opponentName={opponentName}
         opponentUserId={opponentUserId}
-        myScore={myScore}
-        showOpponentScore={duel.status === 'completed' && opponentScore !== null}
-        opponentScore={opponentScore}
+        opponentAvatarUrl={opponentAvatar}
+        opponentTotalScore={opponentTotalScore}
+        myQuizScore={myQuizScore}
+        showOpponentQuizScore={duel.status === 'completed' && opponentQuizScore !== null}
+        opponentQuizScore={opponentQuizScore}
         questionsCount={duel.questionsCount}
         expiresAt={duel.expiresAt}
+        isExpired={duel.isExpired}
         statusLabel={ui.statusLabel}
         motivationalLine={ui.motivationalLine}
       />
@@ -187,12 +229,6 @@ export default function DuelDetailScreen() {
               <Text style={styles.tipText}>{tip}</Text>
             </View>
           ))}
-          <View style={styles.tipRow}>
-            <Text style={styles.tipBullet}>🔒</Text>
-            <Text style={styles.tipText}>
-              Le score de l&apos;adversaire reste secret jusqu&apos;à la fin de la partie.
-            </Text>
-          </View>
         </View>
       </Animated.View>
 
@@ -217,7 +253,15 @@ export default function DuelDetailScreen() {
         </View>
       ) : null}
 
-      {isChallenged && duel.status === 'pending' ? (
+      {duel.isExpired ? (
+        <View style={styles.expiredBanner}>
+          <Text style={styles.expiredText}>
+            Ce duel a expiré. Retrouvez-le dans « Mes duels récents ».
+          </Text>
+        </View>
+      ) : null}
+
+      {isChallenged && duel.status === 'pending' && !duel.isExpired ? (
         <View style={styles.waitBanner}>
           <Text style={styles.waitBannerText}>
             Acceptez d&apos;abord le défi depuis la section « Duels en attente » pour jouer.
@@ -307,6 +351,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.error,
     textAlign: 'center',
+  },
+  expiredBanner: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  expiredText: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 14,
+    color: COLORS.error,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   waitBanner: {
     backgroundColor: COLORS.primaryLight,

@@ -24,7 +24,14 @@ export function AppErrorModal({
   onRetry,
 }: AppErrorModalProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+      onRequestClose={onClose}
+    >
       <View style={styles.root}>
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={styles.dimOverlay} pointerEvents="none" />
