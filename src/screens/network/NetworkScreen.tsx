@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   ListRenderItem,
   StyleSheet,
@@ -27,6 +26,7 @@ import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { NetworkTheme } from '@constants/networkTheme';
 import { buildUserProfileHref, Routes } from '@constants/Routes';
 import { useConnectionsScreenData } from '@hooks/useConnectionsScreenData';
+import { useAppError } from '@providers/AppErrorProvider';
 import { getConnectionFollowService } from '@services/network/connectionFollowServiceInstance';
 import { getNetworkHorizontalPadding } from '@utils/networkResponsiveLayout';
 
@@ -41,6 +41,7 @@ const separatorStyles = StyleSheet.create({
 export default function NetworkScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAppError } = useAppError();
   const { width: screenWidth } = useWindowDimensions();
   const pagePaddingX = useMemo(() => getNetworkHorizontalPadding(screenWidth), [screenWidth]);
 
@@ -67,6 +68,14 @@ export default function NetworkScreen() {
     filter,
     searchQuery,
   );
+
+  useEffect(() => {
+    if (!error) return;
+    showAppError('Impossible de charger vos connexions. Vérifiez votre connexion.', {
+      title: 'Réseau',
+      onRetry: () => void refetch(),
+    });
+  }, [error, refetch, showAppError]);
 
   const onBack = useCallback(() => {
     if (searchMode) {
@@ -116,10 +125,10 @@ export default function NetworkScreen() {
           delete nextMap[user.id];
           return nextMap;
         });
-        Alert.alert('Erreur', 'Impossible de mettre à jour le suivi.');
+        showAppError('Impossible de mettre à jour le suivi.', { title: 'Réseau' });
       }
     },
-    [effectiveRelationship, refetch],
+    [effectiveRelationship, refetch, showAppError],
   );
 
   const renderItem: ListRenderItem<ConnectionUser> = useCallback(

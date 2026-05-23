@@ -35,12 +35,14 @@ import { getCoverPhotoPickerService } from '@services/profile/coverPhotoPickerIn
 import { ApiConnectionFollowService } from '@services/network/ApiConnectionFollowService';
 import { uploadMyAvatar } from '@services/profile/profileAvatarApi';
 import { uploadMyCover } from '@services/profile/profileCoverApi';
+import { useAppError } from '@providers/AppErrorProvider';
 
 const BOTTOM_NAV_HEIGHT = 86;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAppError } = useAppError();
   const params = useLocalSearchParams<{ userId?: string }>();
   const viewedUserId = typeof params.userId === 'string' ? params.userId : undefined;
   const isExternalProfile = Boolean(viewedUserId);
@@ -114,7 +116,7 @@ export default function ProfileScreen() {
           setRelationshipOverride('pending');
           Alert.alert('Demande envoyée', "La demande d'ami a été envoyée.");
         } catch {
-          Alert.alert('Erreur', "Impossible d'envoyer la demande d'ami.");
+          showAppError("Impossible d'envoyer la demande d'ami.", { title: 'Demande d\'ami' });
         } finally {
           setFollowBusy(false);
         }
@@ -122,7 +124,7 @@ export default function ProfileScreen() {
       return;
     }
     setAvatarSheetVisible(true);
-  }, [isExternalProfile, viewedUserId]);
+  }, [isExternalProfile, viewedUserId, showAppError]);
 
   const onSettings = useCallback(() => {
     router.push(Routes.SETTINGS);
@@ -152,18 +154,21 @@ export default function ProfileScreen() {
       setCoverModalVisible(false);
       if (result.cancelled) return;
       if (!result.base64) {
-        Alert.alert('Image', "Impossible de lire l'image sélectionnée.");
+        showAppError("Impossible de lire l'image sélectionnée.", { title: 'Image' });
         return;
       }
       await uploadMyCover(result.base64);
       void refetch();
       Alert.alert('Profil', 'Photo de couverture mise à jour.');
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : "Mise à jour de la couverture impossible.");
+      showAppError(
+        e instanceof Error ? e.message : 'Mise à jour de la couverture impossible.',
+        { title: 'Profil' },
+      );
     } finally {
       setCoverBusy(false);
     }
-  }, [refetch]);
+  }, [refetch, showAppError]);
 
   const onChooseAvatarFromGallery = useCallback(async () => {
     try {
@@ -172,7 +177,7 @@ export default function ProfileScreen() {
       const result = await picker.openPicker();
       if (result.cancelled) return;
       if (!result.base64) {
-        Alert.alert('Image', "Impossible de lire l'image sélectionnée.");
+        showAppError("Impossible de lire l'image sélectionnée.", { title: 'Image' });
         return;
       }
       await uploadMyAvatar(result.base64);
@@ -180,11 +185,14 @@ export default function ProfileScreen() {
       void refetch();
       Alert.alert('Profil', 'Avatar mis à jour avec succès.');
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : "Mise à jour de l'avatar impossible.");
+      showAppError(
+        e instanceof Error ? e.message : "Mise à jour de l'avatar impossible.",
+        { title: 'Profil' },
+      );
     } finally {
       setAvatarBusy(false);
     }
-  }, [refetch]);
+  }, [refetch, showAppError]);
 
   return (
     <View style={styles.root}>

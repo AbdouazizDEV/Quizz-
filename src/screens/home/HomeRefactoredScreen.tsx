@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   FlatList,
   PanResponder,
@@ -53,6 +52,7 @@ import {
   levelCodeFromScore,
   levelProgressEndpoints,
 } from '@utils/levelDisplay';
+import { useAppError } from '@providers/AppErrorProvider';
 
 const BOTTOM_NAV_HEIGHT = 86;
 
@@ -82,6 +82,7 @@ const INSIGHTS: HomeInsightItem[] = [
 
 export default function HomeRefactoredScreen() {
   const router = useRouter();
+  const { showAppError } = useAppError();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, Spacing.onboardingMaxWidth);
@@ -144,29 +145,32 @@ export default function HomeRefactoredScreen() {
       const rows = await fetchFriendRequests(20);
       setFriendRequests(rows);
     } catch {
-      Alert.alert('Notifications', 'Impossible de charger les demandes pour le moment.');
+      showAppError('Impossible de charger les demandes pour le moment.', {
+        title: 'Notifications',
+        onRetry: () => void openFriendRequests(),
+      });
     } finally {
       setRequestsLoading(false);
     }
-  }, [token]);
+  }, [token, showAppError]);
 
   const onAcceptRequest = useCallback(async (notificationId: string) => {
     try {
       await acceptFriendRequest(notificationId);
       setFriendRequests((prev) => prev.filter((r) => r.notificationId !== notificationId));
     } catch {
-      Alert.alert('Erreur', "Impossible d'accepter la demande.");
+      showAppError("Impossible d'accepter la demande.", { title: 'Demande d\'ami' });
     }
-  }, []);
+  }, [showAppError]);
 
   const onRejectRequest = useCallback(async (notificationId: string) => {
     try {
       await rejectFriendRequest(notificationId);
       setFriendRequests((prev) => prev.filter((r) => r.notificationId !== notificationId));
     } catch {
-      Alert.alert('Erreur', 'Impossible de refuser la demande.');
+      showAppError('Impossible de refuser la demande.', { title: 'Demande d\'ami' });
     }
-  }, []);
+  }, [showAppError]);
 
   const topThreeCategories = useMemo(() => allCategories.slice(0, 3), [allCategories]);
 

@@ -12,6 +12,10 @@ const duelIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
+const submitDuelScoreSchema = z.object({
+  score: z.coerce.number().int().min(0),
+});
+
 function bearerToken(c: { req: { header: (n: string) => string | undefined } }): string | null {
   const h = c.req.header('Authorization');
   if (!h?.startsWith('Bearer ')) return null;
@@ -94,6 +98,7 @@ function mapDuelRow(
     quiz_id: string;
   },
   names: Map<string, string>,
+  viewerId: string,
 ) {
   return {
     id: row.id,
@@ -108,7 +113,81 @@ function mapDuelRow(
     expires_at: row.expires_at,
     quiz_id: row.quiz_id,
     questions_count: 15,
+    phase: computeDuelPhase(row, viewerId),
   };
+}
+
+function bothScoresSet(row: {
+  challenger_score: number | null;
+  challenged_score: number | null;
+}): boolean {
+  return row.challenger_score !== null && row.challenged_score !== null;
+}
+
+function isDuelFinished(row: { status: string; challenger_score: number | null; challenged_score: number | null }): boolean {
+  if (row.status === 'completed' || row.status === 'declined') return true;
+  return bothScoresSet(row);
+}
+
+function isDuelActive(row: { status: string; challenger_score: number | null; challenged_score: number | null }): boolean {
+  if (row.status !== 'pending' && row.status !== 'accepted') return false;
+  return !bothScoresSet(row);
+}
+
+type DuelPhase =
+  | 'needs_your_acceptance'
+  | 'waiting_opponent_acceptance'
+  | 'your_turn'
+  | 'waiting_opponent_play'
+  | 'finished';
+
+function computeDuelPhase(
+  row: {
+    challenger_id: string;
+    challenged_id: string;
+    challenger_score: number | null;
+    challenged_score: number | null;
+    status: string;
+  },
+  viewerId: string,
+): DuelPhase {
+  if (row.status === 'declined' || row.status === 'completed' || bothScoresSet(row)) {
+    return 'finished';
+  }
+
+  const isChallenger = row.challenger_id === viewerId;
+
+  if (row.status === 'pending') {
+    if (isChallenger) return 'waiting_opponent_acceptance';
+    return 'needs_your_acceptance';
+  }
+
+  if (row.status === 'accepted') {
+    const myScore = isChallenger ? row.challenger_score : row.challenged_score;
+    const oppScore = isChallenger ? row.challenged_score : row.challenger_score;
+    if (myScore === null) return 'your_turn';
+    if (oppScore === null) return 'waiting_opponent_play';
+  }
+
+  return 'finished';
+}
+
+async function fetchUserDuels(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  viewerId: string,
+  limit = 40,
+) {
+  const { data: rows, error } = await admin
+    .from('challenges')
+    .select(
+      'id, challenger_id, challenged_id, challenger_score, challenged_score, status, winner_id, expires_at, quiz_id, updated_at, created_at',
+    )
+    .or(`challenger_id.eq.${viewerId},challenged_id.eq.${viewerId}`)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return rows ?? [];
 }
 
 async function loadNames(
@@ -136,20 +215,16 @@ export const defisRoutes = new Hono()
     if (meErr || !viewerId) return c.json({ error: meErr?.message ?? 'Jeton invalide.' }, 401);
 
     const admin = createServiceRoleClient();
-    const { data: rows, error } = await admin
-      .from('challenges')
-      .select(
-        'id, challenger_id, challenged_id, challenger_score, challenged_score, status, winner_id, expires_at, quiz_id',
-      )
-      .eq('challenged_id', viewerId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (error) return c.json({ error: error.message }, 500);
-
-    const ids = [...new Set((rows ?? []).flatMap((r) => [r.challenger_id, r.challenged_id]))];
-    const names = await loadNames(admin, ids);
-    return c.json({ items: (rows ?? []).map((r) => mapDuelRow(r, names)) });
+    try {
+      const rows = await fetchUserDuels(admin, viewerId);
+      const activeRows = rows.filter(isDuelActive);
+      const ids = [...new Set(activeRows.flatMap((r) => [r.challenger_id, r.challenged_id]))];
+      const names = await loadNames(admin, ids);
+      return c.json({ items: activeRows.map((r) => mapDuelRow(r, names, viewerId)) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur serveur';
+      return c.json({ error: message }, 500);
+    }
   })
   .get('/duels/recent', async (c) => {
     const token = bearerToken(c);
@@ -162,21 +237,18 @@ export const defisRoutes = new Hono()
     if (meErr || !viewerId) return c.json({ error: meErr?.message ?? 'Jeton invalide.' }, 401);
 
     const admin = createServiceRoleClient();
-    const { data: rows, error } = await admin
-      .from('challenges')
-      .select(
-        'id, challenger_id, challenged_id, challenger_score, challenged_score, status, winner_id, expires_at, quiz_id',
-      )
-      .or(`challenger_id.eq.${viewerId},challenged_id.eq.${viewerId}`)
-      .eq('status', 'completed')
-      .order('updated_at', { ascending: false })
-      .limit(10);
-
-    if (error) return c.json({ error: error.message }, 500);
-
-    const ids = [...new Set((rows ?? []).flatMap((r) => [r.challenger_id, r.challenged_id]))];
-    const names = await loadNames(admin, ids);
-    return c.json({ items: (rows ?? []).map((r) => mapDuelRow(r, names)) });
+    try {
+      const rows = await fetchUserDuels(admin, viewerId);
+      const finishedRows = rows.filter(isDuelFinished);
+      const ids = [...new Set(finishedRows.flatMap((r) => [r.challenger_id, r.challenged_id]))];
+      const names = await loadNames(admin, ids);
+      return c.json({
+        items: finishedRows.slice(0, 15).map((r) => mapDuelRow(r, names, viewerId)),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur serveur';
+      return c.json({ error: message }, 500);
+    }
   })
   .get('/duels/:id', async (c) => {
     const token = bearerToken(c);
@@ -207,7 +279,7 @@ export const defisRoutes = new Hono()
     }
 
     const names = await loadNames(admin, [row.challenger_id, row.challenged_id]);
-    return c.json({ item: mapDuelRow(row, names) });
+    return c.json({ item: mapDuelRow(row, names, viewerId) });
   })
   .post('/duels', async (c) => {
     const token = bearerToken(c);
@@ -315,7 +387,7 @@ export const defisRoutes = new Hono()
     }
 
     const names = await loadNames(admin, [challengerId, challengedId]);
-    return c.json({ item: mapDuelRow(duel, names) }, 201);
+    return c.json({ item: mapDuelRow(duel, names, challengerId) }, 201);
   })
   .post('/duels/:id/accept', async (c) => {
     const token = bearerToken(c);
