@@ -320,7 +320,7 @@ export default function HomeRefactoredScreen() {
             />
           </View>
 
-          <HomeActionTiles />
+          <HomeActionTiles onTilePress={() => router.push(Routes.DEFIS)} />
 
           <Pressable style={styles.section} onPress={goToScoreboard} accessibilityRole="button">
             <HomeSectionTitle

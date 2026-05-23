@@ -15,6 +15,8 @@ export interface UnderlineLabeledFieldProps extends Pick<
   rightSlot?: ReactNode;
   labelFontFamily?: string;
   inputFontFamily?: string;
+  /** Message d’erreur affiché sous le champ. */
+  errorText?: string | null;
 }
 
 export function UnderlineLabeledField({
@@ -29,6 +31,7 @@ export function UnderlineLabeledField({
   rightSlot,
   labelFontFamily,
   inputFontFamily,
+  errorText,
 }: UnderlineLabeledFieldProps) {
   return (
     <View style={styles.block}>
@@ -56,6 +59,7 @@ export function UnderlineLabeledField({
         {rightSlot ? <View style={styles.slot}>{rightSlot}</View> : null}
       </View>
       <View style={styles.underline} />
+      {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
     </View>
   );
 }
@@ -95,5 +99,11 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: ACCENT,
     borderRadius: 1,
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#C62828',
+    marginTop: 4,
   },
 });

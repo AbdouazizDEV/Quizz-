@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   Nunito_500Medium,
@@ -17,6 +17,7 @@ import { QuizPlayNavbar } from '@components/ui/quiz/play/QuizPlayNavbar';
 import { QuizQuestionHeader } from '@components/ui/quiz/play/QuizQuestionHeader';
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
+import { useQuestionTimer } from '@hooks/useQuestionTimer';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
@@ -42,9 +43,6 @@ export default function QuizPlayScreen() {
   const secondsPerQuestion = useQuizPlaySessionStore((s) => s.secondsPerQuestion);
   const expireQuestion = useQuizPlaySessionStore((s) => s.expireQuestion);
 
-  const [timer, setTimer] = useState(secondsPerQuestion);
-  const timerRef = useRef(timer);
-  timerRef.current = timer;
   const expiredForQuestionRef = useRef(false);
   const wrongFeedbackKeyRef = useRef<string | null>(null);
 
@@ -68,6 +66,23 @@ export default function QuizPlayScreen() {
     return payload.questions[currentIndex] ?? null;
   }, [payload, currentIndex]);
 
+  const handleTimerExpire = useCallback(() => {
+    if (expiredForQuestionRef.current) return;
+    expiredForQuestionRef.current = true;
+    const q = useQuizPlaySessionStore.getState().getCurrentQuestion();
+    if (!q) return;
+    const correctLabel =
+      q.options.find((o) => o.id === q.correctOptionId)?.label ?? '—';
+    expireQuestion(correctLabel);
+  }, [expireQuestion]);
+
+  const { timeLeft, progress, pause, resume } = useQuestionTimer({
+    duration: secondsPerQuestion,
+    onExpire: handleTimerExpire,
+    resetKey: currentIndex,
+    autoStart: feedbackPhase === 'idle',
+  });
+
   useEffect(() => {
     if (!payload || !quizId) {
       Alert.alert('Session', 'Données du quiz absentes.', [
@@ -81,23 +96,9 @@ export default function QuizPlayScreen() {
   }, [currentIndex]);
 
   useEffect(() => {
-    if (feedbackPhase !== 'idle') return;
-    setTimer(secondsPerQuestion);
-    const t = setInterval(() => {
-      setTimer((v) => (v > 0 ? v - 1 : 0));
-    }, 1000);
-    return () => clearInterval(t);
-  }, [currentIndex, feedbackPhase, secondsPerQuestion]);
-
-  useEffect(() => {
-    if (feedbackPhase !== 'idle' || !question) return;
-    if (timer > 0) return;
-    if (expiredForQuestionRef.current) return;
-    expiredForQuestionRef.current = true;
-    const correctLabel =
-      question.options.find((o) => o.id === question.correctOptionId)?.label ?? '—';
-    expireQuestion(correctLabel);
-  }, [timer, feedbackPhase, question, expireQuestion]);
+    if (feedbackPhase === 'idle') resume();
+    else pause();
+  }, [feedbackPhase, pause, resume]);
 
   useEffect(() => {
     if (feedbackPhase !== 'incorrect' && feedbackPhase !== 'timeout') {
@@ -126,7 +127,7 @@ export default function QuizPlayScreen() {
 
   const onPick = useCallback(
     (optionId: string) => {
-      if (timerRef.current <= 0 || !question || !payload) return;
+      if (timeLeft <= 0 || !question || !payload) return;
       if (useQuizPlaySessionStore.getState().feedbackPhase !== 'idle') return;
       const isCorrect = optionId === question.correctOptionId;
       const pts = payload.quiz.pointsPerQuestion;
@@ -134,7 +135,7 @@ export default function QuizPlayScreen() {
         question.options.find((o) => o.id === question.correctOptionId)?.label ?? '—';
       selectOption(optionId, isCorrect, pts, correctLabel);
     },
-    [question, payload, selectOption],
+    [question, payload, selectOption, timeLeft],
   );
 
   const onContinueAfterFeedback = useCallback(async () => {
@@ -192,7 +193,7 @@ export default function QuizPlayScreen() {
             total={total}
             sessionPoints={sessionPoints}
             maxSessionPoints={maxSessionPoints}
-            timerSeconds={timer}
+            timerSeconds={timeLeft}
             timerMax={secondsPerQuestion}
             fonts={fonts}
             onMenuPress={onMenu}

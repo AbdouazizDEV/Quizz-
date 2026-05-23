@@ -19,6 +19,7 @@ import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import type { QuizLeaderboardEntry } from '@app-types/quizPlay.types';
 import { getQuizLeaderboardPort } from '@services/quiz/leaderboard/quizLeaderboardInstance';
 import { getQuizScoreSharePort } from '@services/quiz/share/quizScoreShareInstance';
+import { triggerQuizMaxScoreCelebration } from '@services/quiz/play/triggerQuizMaxScoreCelebration';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 
 export default function QuizCongratsScreen() {
@@ -54,7 +55,17 @@ export default function QuizCongratsScreen() {
 
   const total = answers.length;
   const correctCount = useMemo(() => answers.filter((a) => a.isCorrect).length, [answers]);
+  const maxSessionPoints = useMemo(() => {
+    if (!payload?.questions.length) return 0;
+    return payload.questions.length * (payload.quiz.pointsPerQuestion ?? 1);
+  }, [payload]);
+  const isMaxScore = maxSessionPoints > 0 && sessionPoints >= maxSessionPoints;
   const isGreatScore = total > 0 && correctCount > total / 2;
+
+  useEffect(() => {
+    if (!isMaxScore) return;
+    void triggerQuizMaxScoreCelebration();
+  }, [isMaxScore]);
 
   useEffect(() => {
     if (!quizId) return;
@@ -83,13 +94,17 @@ export default function QuizCongratsScreen() {
     });
   }, [payload, sessionPoints, correctCount, total]);
 
-  const title = isGreatScore ? 'Félicitations !' : 'Quiz terminé';
+  const title = isMaxScore
+    ? 'Score parfait !'
+    : isGreatScore
+      ? 'Félicitations !'
+      : 'Quiz terminé';
 
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
       <LinearGradient colors={['#FFD54A', '#FFB703']} style={StyleSheet.absoluteFillObject} />
-      <QuizCongratsFlowers active={isGreatScore} />
+      <QuizCongratsFlowers active={isMaxScore || isGreatScore} />
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={goCategory} style={styles.closeBtn} accessibilityRole="button">

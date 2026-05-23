@@ -48,7 +48,7 @@ const verifyOtpBody = z.object({
 
 const resetPasswordBody = z.object({
   reset_token: z.string().min(10),
-  new_password: z.string().min(6),
+  new_password: z.string().min(8),
 });
 
 const oauthStartBody = z
@@ -513,7 +513,8 @@ export const authRoutes = new Hono()
       await anon.auth.signOut();
       return c.json(
         {
-          error: 'Le nouveau mot de passe doit être différent de l’ancien.',
+          error: 'Vous ne pouvez pas réutiliser votre ancien mot de passe.',
+          code: 'PASSWORD_REUSE',
         },
         400,
       );

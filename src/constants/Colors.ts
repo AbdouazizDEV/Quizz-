@@ -1,3 +1,23 @@
+/** Palette design system Défis / nouveaux écrans (spec produit). */
+export const COLORS = {
+  primary: '#F5A623',
+  primaryLight: '#FFF3D6',
+  primaryDark: '#E8431A',
+  background: '#F8F8F8',
+  cardBackground: '#FFFFFF',
+  surface: '#FFFFFF',
+  textPrimary: '#1A1A2E',
+  textSecondary: '#6B6B7B',
+  textLight: '#FFFFFF',
+  success: '#2ECC71',
+  warning: '#F5A623',
+  error: '#E8431A',
+  info: '#3498DB',
+  border: '#EEEEEE',
+  separator: '#F0F0F0',
+  overlay: 'rgba(0,0,0,0.5)',
+} as const;
+
 export const Colors = {
   primary: '#E8431A',
   secondary: '#F5A623',
@@ -27,3 +47,4 @@ export const Colors = {
 } as const;
 
 export type ColorKey = keyof typeof Colors;
+export type AppColorKey = keyof typeof COLORS;

@@ -149,6 +149,28 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['quiz_sessions']['Insert']>;
         Relationships: [];
       };
+      user_quiz_scores: {
+        Row: {
+          id: string;
+          user_id: string;
+          quiz_id: string;
+          best_score: number;
+          max_score: number;
+          attempts: number;
+          completed_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          quiz_id: string;
+          best_score?: number;
+          max_score: number;
+          attempts?: number;
+          completed_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['user_quiz_scores']['Insert']>;
+        Relationships: [];
+      };
       friendships: {
         Row: {
           id: string;
@@ -241,6 +263,118 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['otp_codes']['Insert']>;
+        Relationships: [];
+      };
+      weekly_challenges: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          type: string;
+          status: 'draft' | 'actif' | 'termine';
+          starts_at: string;
+          ends_at: string;
+          reward_text: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          type?: string;
+          status?: 'draft' | 'actif' | 'termine';
+          starts_at: string;
+          ends_at: string;
+          reward_text?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['weekly_challenges']['Insert']>;
+        Relationships: [];
+      };
+      weekly_challenge_quizzes: {
+        Row: {
+          id: string;
+          challenge_id: string;
+          quiz_id: string;
+          scheduled_day: string;
+          day_order: number;
+        };
+        Insert: {
+          id?: string;
+          challenge_id: string;
+          quiz_id: string;
+          scheduled_day: string;
+          day_order?: number;
+        };
+        Update: Partial<Database['public']['Tables']['weekly_challenge_quizzes']['Insert']>;
+        Relationships: [];
+      };
+      challenge_participations: {
+        Row: {
+          id: string;
+          user_id: string;
+          challenge_id: string;
+          quiz_id: string;
+          score: number;
+          played_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          challenge_id: string;
+          quiz_id: string;
+          score?: number;
+          played_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['challenge_participations']['Insert']>;
+        Relationships: [];
+      };
+      competitions: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          quiz_id: string | null;
+          category_id: string | null;
+          status: 'draft' | 'scheduled' | 'live' | 'completed' | 'cancelled';
+          starts_at: string | null;
+          ends_at: string | null;
+          reward_text: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          quiz_id?: string | null;
+          category_id?: string | null;
+          status?: 'draft' | 'scheduled' | 'live' | 'completed' | 'cancelled';
+          starts_at?: string | null;
+          ends_at?: string | null;
+          reward_text?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['competitions']['Insert']>;
+        Relationships: [];
+      };
+      competition_registrations: {
+        Row: {
+          id: string;
+          user_id: string;
+          competition_id: string;
+          registered_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          competition_id: string;
+          registered_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['competition_registrations']['Insert']>;
         Relationships: [];
       };
     };

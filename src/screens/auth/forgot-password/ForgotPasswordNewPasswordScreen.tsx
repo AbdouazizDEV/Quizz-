@@ -24,10 +24,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UnderlineLabeledField } from '@components/ui/auth/UnderlineLabeledField';
 import { PasswordResetSuccessModal } from '@components/ui/auth/forgot-password/PasswordResetSuccessModal';
 import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingContinueBar';
+import { AUTH_MESSAGES } from '@constants/auth.messages';
 import { ForgotPasswordFlowTheme } from '@constants/forgotPasswordFlowTheme';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
+import { useResetPasswordForm } from '@hooks/auth/useResetPasswordForm';
 import { passwordResetGateway } from '@services/passwordReset/passwordResetGatewayInstance';
 
 const FOOTER_RESERVE = 132;
@@ -46,13 +48,19 @@ export default function ForgotPasswordNewPasswordScreen() {
     Nunito_400Regular,
   });
 
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const {
+    form,
+    setNewPassword,
+    setConfirmPassword,
+    validateForm,
+    setSubmitError,
+    submitError,
+  } = useResetPasswordForm();
+
   const [secureA, setSecureA] = useState(true);
   const [secureB, setSecureB] = useState(true);
   const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [successVisible, setSuccessVisible] = useState(false);
 
   const titleSize = windowWidth < 360 ? 24 : windowWidth < 400 ? 26 : 28;
@@ -77,25 +85,23 @@ export default function ForgotPasswordNewPasswordScreen() {
   }, [router]);
 
   const onContinue = useCallback(async () => {
-    if (!password || password !== confirm) {
-      setError('Les mots de passe ne correspondent pas ou sont trop courts.');
+    if (!validateForm()) {
       return;
     }
-    if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
-      return;
-    }
-    setError(null);
+
+    setSubmitError(null);
     setBusy(true);
     try {
-      await passwordResetGateway.completePendingReset(password);
+      await passwordResetGateway.completePendingReset(form.newPassword, form.confirmPassword);
       setSuccessVisible(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Impossible d’enregistrer le mot de passe. Réessayez.');
+      const message =
+        e instanceof Error ? e.message : AUTH_MESSAGES.password.changeError;
+      setSubmitError(message);
     } finally {
       setBusy(false);
     }
-  }, [password, confirm]);
+  }, [form.confirmPassword, form.newPassword, setSubmitError, validateForm]);
 
   const onGoHome = useCallback(() => {
     setSuccessVisible(false);
@@ -156,12 +162,13 @@ export default function ForgotPasswordNewPasswordScreen() {
             <View style={[styles.formBlock, { gap: 24 }]}>
               <UnderlineLabeledField
                 label="Créer un nouveau mot de passe"
-                value={password}
-                onChangeText={setPassword}
+                value={form.newPassword}
+                onChangeText={setNewPassword}
                 secureTextEntry={secureA}
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}
                 inputFontFamily={fonts.bold}
+                errorText={form.newPasswordError}
                 rightSlot={
                   <Pressable
                     onPress={() => setSecureA((v) => !v)}
@@ -176,12 +183,13 @@ export default function ForgotPasswordNewPasswordScreen() {
 
               <UnderlineLabeledField
                 label="Confirmer un nouveau mot de passe"
-                value={confirm}
-                onChangeText={setConfirm}
+                value={form.confirmPassword}
+                onChangeText={setConfirmPassword}
                 secureTextEntry={secureB}
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}
                 inputFontFamily={fonts.bold}
+                errorText={form.confirmPasswordError}
                 rightSlot={
                   <Pressable
                     onPress={() => setSecureB((v) => !v)}
@@ -209,9 +217,9 @@ export default function ForgotPasswordNewPasswordScreen() {
               </Text>
             </Pressable>
 
-            {error ? (
+            {submitError ? (
               <Text style={[styles.error, fonts.regular ? { fontFamily: fonts.regular } : undefined]}>
-                {error}
+                {submitError}
               </Text>
             ) : null}
 

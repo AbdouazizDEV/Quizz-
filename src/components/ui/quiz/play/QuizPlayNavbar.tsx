@@ -3,6 +3,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
 
+import { QuizTimerBar } from '@components/ui/quiz/play/QuizTimerBar';
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
 
 interface QuizPlayNavbarProps {
@@ -48,12 +49,12 @@ export function QuizPlayNavbar({
           <Feather name="more-horizontal" size={22} color={QuizPlayTheme.grey900} />
         </Pressable>
       </View>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${progress * 100}%` }]} />
-        <View style={styles.pill}>
-          <Text style={[styles.pillText, fonts.bold && { fontFamily: fonts.bold }]}>{timerSeconds}</Text>
-        </View>
-      </View>
+      <QuizTimerBar
+        progress={progress}
+        timeLeft={timerSeconds}
+        duration={timerMax}
+        fontFamily={fonts.bold}
+      />
     </View>
   );
 }
@@ -100,39 +101,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  track: {
-    height: 14,
-    borderRadius: 100,
-    backgroundColor: '#E8E8E8',
-    overflow: 'visible',
-    justifyContent: 'center',
-  },
-  fill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#FFD700',
-    borderRadius: 100,
-  },
-  pill: {
-    position: 'absolute',
-    right: 4,
-    top: -6,
-    minWidth: 28,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 100,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: QuizPlayTheme.grey900,
   },
 });
