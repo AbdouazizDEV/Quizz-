@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import {
   Nunito_600SemiBold,
   Nunito_700Bold,
@@ -25,6 +25,7 @@ import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAuthStore } from '@stores/authStore';
 import { canVisitorPlayQuiz, lacksAuthToken } from '@services/auth/visitorAccessPolicy';
+import { useAppError } from '@providers/AppErrorProvider';
 
 const LOADER_MS = 5000;
 
@@ -35,6 +36,7 @@ interface PendingReplayStart {
 
 export default function QuizEntryScreen() {
   const router = useRouter();
+  const { showAppError } = useAppError();
   const { quizId: idParam, categorySlug: catParam } = useLocalSearchParams<{
     quizId: string | string[];
     categorySlug?: string | string[];
@@ -106,9 +108,11 @@ export default function QuizEntryScreen() {
             .maybeSingle();
           if (cancelled) return;
           if (!canVisitorPlayQuiz(quizMeta?.difficulty_level)) {
-            Alert.alert('Connexion requise', 'Connectez-vous pour accéder à ce quiz.', [
-              { text: 'OK', onPress: () => router.replace(Routes.LOGIN) },
-            ]);
+            showAppError('Connectez-vous pour accéder à ce quiz.', {
+              title: 'Connexion requise',
+              confirmLabel: 'Se connecter',
+              onClose: () => router.replace(Routes.LOGIN),
+            });
             return;
           }
         }
@@ -153,12 +157,12 @@ export default function QuizEntryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [quizId, router, startPlay, token]);
+  }, [quizId, router, showAppError, startPlay, token]);
 
   useEffect(() => {
     if (!error) return;
-    Alert.alert('Quiz', error, [{ text: 'OK', onPress: goBack }]);
-  }, [error, goBack]);
+    showAppError(error, { title: 'Quiz', onClose: goBack });
+  }, [error, goBack, showAppError]);
 
   const onConfirmReplay = useCallback(() => {
     if (!pendingReplay) return;

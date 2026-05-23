@@ -12,12 +12,14 @@ import {
   registerForCompetition,
   unregisterFromCompetition,
 } from '@services/defis/competitionRepository';
+import { useAppError } from '@providers/AppErrorProvider';
 
 export default function TournoiDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const competitionId = typeof id === 'string' ? id : '';
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
 
@@ -38,7 +40,10 @@ export default function TournoiDetailScreen() {
       await refresh();
       Alert.alert('Tournoi', '✓ Vous êtes inscrit !');
     } catch (error) {
-      Alert.alert('Tournoi', error instanceof Error ? error.message : 'Inscription impossible.');
+      showAppError(
+        error instanceof Error ? error.message : 'Inscription impossible.',
+        { title: 'Tournoi' },
+      );
     }
   };
 
@@ -48,7 +53,9 @@ export default function TournoiDetailScreen() {
       await unregisterFromCompetition(userId, competitionId);
       await refresh();
     } catch (error) {
-      Alert.alert('Tournoi', error instanceof Error ? error.message : 'Erreur');
+      showAppError(error instanceof Error ? error.message : 'Désinscription impossible.', {
+        title: 'Tournoi',
+      });
     }
   };
 

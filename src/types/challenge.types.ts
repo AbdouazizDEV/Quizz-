@@ -69,6 +69,13 @@ export interface CompetitionSummary {
   isRegistered: boolean;
 }
 
+export type DuelPhase =
+  | 'needs_your_acceptance'
+  | 'waiting_opponent_acceptance'
+  | 'your_turn'
+  | 'waiting_opponent_play'
+  | 'finished';
+
 export interface DuelSummary {
   id: string;
   challengerId: string;
@@ -82,4 +89,5 @@ export interface DuelSummary {
   expiresAt: string;
   questionsCount: number;
   quizId: string;
+  phase: DuelPhase;
 }

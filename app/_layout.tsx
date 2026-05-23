@@ -7,6 +7,7 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 
 import { AppQueryProvider } from '@providers/AppQueryProvider';
+import { AppErrorProvider } from '@providers/AppErrorProvider';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -15,7 +16,9 @@ export default function RootLayout() {
 
   return (
     <AppQueryProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <AppErrorProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </AppErrorProvider>
     </AppQueryProvider>
   );
 }

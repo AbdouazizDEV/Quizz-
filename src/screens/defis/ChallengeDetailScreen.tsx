@@ -1,4 +1,4 @@
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { CountdownTimer } from '@components/atoms/CountdownTimer';
@@ -14,11 +14,13 @@ import {
   assertCanParticipateInChallengeQuiz,
   ChallengeParticipationError,
 } from '@services/defis/participateChallenge.service';
+import { useAppError } from '@providers/AppErrorProvider';
 
 export default function ChallengeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const challengeId = typeof id === 'string' ? id : '';
   const router = useRouter();
+  const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id;
   const { data, isLoading } = useChallenge(challengeId, userId);
@@ -35,8 +37,10 @@ export default function ChallengeDetailScreen() {
       router.push(buildQuizEntryHref(quiz.quizId));
     } catch (error) {
       if (error instanceof ChallengeParticipationError) {
-        Alert.alert('Challenge', error.message);
+        showAppError(error.message, { title: 'Challenge' });
+        return;
       }
+      showAppError('Impossible de lancer ce quiz.', { title: 'Challenge' });
     }
   };
 

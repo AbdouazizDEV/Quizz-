@@ -15,6 +15,7 @@ interface ApiDuelItem {
   expires_at: string;
   quiz_id: string;
   questions_count: number;
+  phase: DuelSummary['phase'];
 }
 
 function authHeaders(): { Authorization: string } {
@@ -37,6 +38,7 @@ function mapItem(row: ApiDuelItem): DuelSummary {
     expiresAt: row.expires_at,
     questionsCount: row.questions_count,
     quizId: row.quiz_id,
+    phase: row.phase,
   };
 }
 

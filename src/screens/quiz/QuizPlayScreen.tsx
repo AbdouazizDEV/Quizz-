@@ -21,10 +21,12 @@ import { useQuestionTimer } from '@hooks/useQuestionTimer';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
+import { useAppError } from '@providers/AppErrorProvider';
 
 export default function QuizPlayScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAppError } = useAppError();
   const { quizId: idParam } = useLocalSearchParams<{ quizId: string | string[] }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
   const { width: screenWidth } = useWindowDimensions();
@@ -85,11 +87,12 @@ export default function QuizPlayScreen() {
 
   useEffect(() => {
     if (!payload || !quizId) {
-      Alert.alert('Session', 'Données du quiz absentes.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      showAppError('Les données du quiz sont absentes ou la session a expiré.', {
+        title: 'Session',
+        onClose: () => router.back(),
+      });
     }
-  }, [payload, quizId, router]);
+  }, [payload, quizId, router, showAppError]);
 
   useEffect(() => {
     expiredForQuestionRef.current = false;
@@ -151,10 +154,12 @@ export default function QuizPlayScreen() {
       answers,
     });
     if (!res.ok) {
-      Alert.alert('Enregistrement', res.errorMessage ?? 'Score non enregistré.');
+      showAppError(res.errorMessage ?? 'Votre score n\'a pas pu être enregistré.', {
+        title: 'Enregistrement',
+      });
     }
     router.replace(`/quiz/${quizId}/congrats`);
-  }, [advanceFromFeedback, quizId, payload, router]);
+  }, [advanceFromFeedback, quizId, payload, router, showAppError]);
 
   if (!payload || !question) {
     return (

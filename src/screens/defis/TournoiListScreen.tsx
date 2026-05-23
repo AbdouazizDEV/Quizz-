@@ -21,6 +21,7 @@ import {
   fetchCompetitionsByTab,
   registerForCompetition,
 } from '@services/defis/competitionRepository';
+import { useAppError } from '@providers/AppErrorProvider';
 
 type TournoiTab = 'inscriptions' | 'en_cours' | 'fin';
 
@@ -34,6 +35,7 @@ export default function TournoiListScreen() {
   const [tab, setTab] = useState<TournoiTab>('inscriptions');
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
 
@@ -46,7 +48,9 @@ export default function TournoiListScreen() {
   const onRegister = async (competition: CompetitionSummary) => {
     if (!userId) return;
     if (competition.registeredCount >= competition.maxParticipants) {
-      Alert.alert('Tournoi', 'Ce tournoi est complet.');
+      showAppError('Ce tournoi a atteint le nombre maximum de participants.', {
+        title: 'Tournoi complet',
+      });
       return;
     }
     try {
@@ -54,7 +58,10 @@ export default function TournoiListScreen() {
       await queryClient.invalidateQueries({ queryKey: ['competitions'] });
       Alert.alert('Tournoi', '✓ Vous êtes inscrit !');
     } catch (error) {
-      Alert.alert('Tournoi', error instanceof Error ? error.message : 'Inscription impossible.');
+      showAppError(
+        error instanceof Error ? error.message : 'Inscription impossible.',
+        { title: 'Tournoi' },
+      );
     }
   };
 

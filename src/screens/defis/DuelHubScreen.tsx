@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,14 +10,16 @@ import {
   View,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 
+import { DuelIncomingModal } from '@components/ui/defis/DuelIncomingModal';
+import { DuelSentModal } from '@components/ui/defis/DuelSentModal';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
 import { DefisSurfaceCard } from '@components/ui/defis/DefisSurfaceCard';
 import { SectionTitle } from '@components/ui/common/SectionTitle';
-import { DefisRoutes } from '@constants/defisRoutes';
 import { COLORS } from '@constants/Colors';
-import { buildQuizEntryHref } from '@constants/Routes';
+import { DefisRoutes } from '@constants/defisRoutes';
 import { useAuthMe } from '@hooks/useAuthMe';
 import type { DuelSummary } from '@app-types/challenge.types';
 import {
@@ -27,13 +29,21 @@ import {
   respondToDuel,
 } from '@services/defis/duelRepository';
 import { searchFriendsForDuel } from '@services/defis/duelFriendsSearch';
+import { useAppError } from '@providers/AppErrorProvider';
 
 export default function DuelHubScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
   const [search, setSearch] = useState('');
+  const [sentModal, setSentModal] = useState<{
+    duel: DuelSummary;
+    friendName: string;
+  } | null>(null);
+  const [incomingDuel, setIncomingDuel] = useState<DuelSummary | null>(null);
+  const shownIncomingIds = useRef<Set<string>>(new Set());
 
   const { data: pending, isLoading: loadingPending } = useQuery({
     queryKey: ['duels-pending', userId],
@@ -47,16 +57,48 @@ export default function DuelHubScreen() {
     enabled: Boolean(userId),
   });
 
-  const { data: friends, isLoading: loadingFriends, isError: friendsError } = useQuery({
+  const {
+    data: friends,
+    isLoading: loadingFriends,
+    isError: friendsError,
+    refetch: refetchFriends,
+  } = useQuery({
     queryKey: ['duel-friends-search', search],
     queryFn: () => searchFriendsForDuel(search),
     enabled: Boolean(userId),
   });
 
+  useEffect(() => {
+    if (!friendsError) return;
+    showAppError('Impossible de charger la liste de vos amis. Vérifiez votre connexion.', {
+      title: 'Amis',
+      onRetry: () => void refetchFriends(),
+    });
+  }, [friendsError, refetchFriends, showAppError]);
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['duels-pending'] });
     await queryClient.invalidateQueries({ queryKey: ['duels-recent'] });
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      void queryClient.invalidateQueries({ queryKey: ['duels-pending', userId] });
+      void queryClient.invalidateQueries({ queryKey: ['duels-recent', userId] });
+    }, [queryClient, userId]),
+  );
+
+  useEffect(() => {
+    if (!pending?.length || !userId) return;
+    const nextIncoming = pending.find(
+      (duel) => duel.phase === 'needs_your_acceptance' && !shownIncomingIds.current.has(duel.id),
+    );
+    if (nextIncoming) {
+      shownIncomingIds.current.add(nextIncoming.id);
+      setIncomingDuel(nextIncoming);
+    }
+  }, [pending, userId]);
 
   const onQuickDuel = () => {
     Alert.alert('Duel rapide', 'Recherche d\'un adversaire aléatoire — bientôt disponible.');
@@ -67,20 +109,39 @@ export default function DuelHubScreen() {
     try {
       const duel = await createFriendDuel(userId, friendId);
       await refresh();
-      Alert.alert(
-        'Défi envoyé',
-        `${friendName} a reçu une notification avec les détails du défi. Vous pouvez jouer vos questions dès maintenant.`,
-        [
-          { text: 'Plus tard', style: 'cancel' },
-          {
-            text: 'Jouer maintenant',
-            onPress: () => router.push(DefisRoutes.duelDetail(duel.id)),
-          },
-        ],
-      );
+      setSentModal({ duel, friendName });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Impossible de créer le duel.';
-      Alert.alert('Duel', message);
+      showAppError(message, { title: 'Duel' });
+    }
+  };
+
+  const onIncomingAccept = async () => {
+    if (!incomingDuel || !userId) return;
+    const duelId = incomingDuel.id;
+    setIncomingDuel(null);
+    try {
+      await respondToDuel(duelId, userId, true);
+      await refresh();
+      router.push(DefisRoutes.duelDetail(duelId));
+    } catch (error) {
+      showAppError(error instanceof Error ? error.message : 'Impossible d\'accepter le duel.', {
+        title: 'Duel',
+      });
+    }
+  };
+
+  const onIncomingDecline = async () => {
+    if (!incomingDuel || !userId) return;
+    const duelId = incomingDuel.id;
+    setIncomingDuel(null);
+    try {
+      await respondToDuel(duelId, userId, false);
+      await refresh();
+    } catch (error) {
+      showAppError(error instanceof Error ? error.message : 'Impossible de refuser le duel.', {
+        title: 'Duel',
+      });
     }
   };
 
@@ -96,7 +157,9 @@ export default function DuelHubScreen() {
         Alert.alert('Défi refusé', `${challengerName} sera notifié de votre refus.`);
       }
     } catch (error) {
-      Alert.alert('Duel', error instanceof Error ? error.message : 'Erreur');
+      showAppError(error instanceof Error ? error.message : 'Une erreur est survenue.', {
+        title: 'Duel',
+      });
     }
   };
 
@@ -104,6 +167,29 @@ export default function DuelHubScreen() {
 
   return (
     <DefisPageShell title="Duel">
+      <DuelSentModal
+        visible={sentModal !== null}
+        friendName={sentModal?.friendName ?? ''}
+        questionsCount={sentModal?.duel.questionsCount ?? 15}
+        expiresAt={sentModal?.duel.expiresAt ?? new Date().toISOString()}
+        onLater={() => setSentModal(null)}
+        onPlayNow={() => {
+          const duelId = sentModal?.duel.id;
+          setSentModal(null);
+          if (duelId) router.push(DefisRoutes.duelDetail(duelId));
+        }}
+      />
+
+      <DuelIncomingModal
+        visible={incomingDuel !== null}
+        challengerName={incomingDuel?.challengerName ?? ''}
+        questionsCount={incomingDuel?.questionsCount ?? 15}
+        expiresAt={incomingDuel?.expiresAt ?? new Date().toISOString()}
+        onAccept={() => void onIncomingAccept()}
+        onDecline={() => void onIncomingDecline()}
+        onClose={() => setIncomingDuel(null)}
+      />
+
       <Pressable style={styles.heroCard} onPress={onQuickDuel}>
         <Text style={styles.heroEyebrow}>⚡ Duel rapide</Text>
         <Text style={styles.heroTitle}>Affrontez un adversaire aléatoire maintenant !</Text>
@@ -122,9 +208,6 @@ export default function DuelHubScreen() {
         autoCorrect={false}
       />
       {loadingFriends ? <ActivityIndicator color={COLORS.primary} /> : null}
-      {friendsError ? (
-        <Text style={styles.empty}>Impossible de charger vos amis.</Text>
-      ) : null}
       {!loadingFriends && filteredFriends.length === 0 ? (
         <Text style={styles.empty}>
           {search.trim() ? 'Aucun ami trouvé pour cette recherche.' : 'Aucun ami dans votre réseau.'}
@@ -152,11 +235,20 @@ export default function DuelHubScreen() {
         <Text style={styles.empty}>Aucun duel en attente.</Text>
       ) : null}
       {(pending ?? []).map((duel) => (
-        <PendingDuelCard key={duel.id} duel={duel} onRespond={onRespond} />
+        <ActiveDuelCard
+          key={duel.id}
+          duel={duel}
+          userId={userId}
+          onRespond={onRespond}
+          onOpen={() => router.push(DefisRoutes.duelDetail(duel.id))}
+        />
       ))}
 
       <SectionTitle title="Mes duels récents" />
       {loadingRecent ? <ActivityIndicator color={COLORS.primary} /> : null}
+      {(recent ?? []).length === 0 && !loadingRecent ? (
+        <Text style={styles.empty}>Aucun duel terminé pour le moment.</Text>
+      ) : null}
       <DefisSurfaceCard>
         {(recent ?? []).map((duel, index) => (
           <RecentDuelRow
@@ -164,7 +256,15 @@ export default function DuelHubScreen() {
             duel={duel}
             userId={userId}
             isLast={index === (recent?.length ?? 0) - 1}
-            onPress={() => router.push(DefisRoutes.duelResult(duel.id))}
+            onPress={() => {
+              const hasScores =
+                duel.challengerScore !== null && duel.challengedScore !== null;
+              if (duel.status === 'completed' || hasScores) {
+                router.push(DefisRoutes.duelResult(duel.id));
+                return;
+              }
+              router.push(DefisRoutes.duelDetail(duel.id));
+            }}
           />
         ))}
       </DefisSurfaceCard>
@@ -172,33 +272,135 @@ export default function DuelHubScreen() {
   );
 }
 
-function PendingDuelCard({
+function getActiveDuelLabel(duel: DuelSummary, userId: string): string {
+  const opponent =
+    duel.challengerId === userId ? duel.challengedName : duel.challengerName;
+
+  switch (duel.phase) {
+    case 'needs_your_acceptance':
+      return `${duel.challengerName} vous a défié`;
+    case 'waiting_opponent_acceptance':
+      return `En attente que ${opponent} accepte`;
+    case 'your_turn':
+      return `À vous de jouer vs ${opponent}`;
+    case 'waiting_opponent_play':
+      return `En attente de ${opponent}`;
+    default:
+      return `Duel vs ${opponent}`;
+  }
+}
+
+function getActiveDuelMeta(duel: DuelSummary, userId: string): string {
+  const isChallenger = duel.challengerId === userId;
+  const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
+
+  if (duel.phase === 'needs_your_acceptance') {
+    return `${duel.questionsCount} questions · Acceptez ou refusez`;
+  }
+  if (duel.phase === 'waiting_opponent_acceptance') {
+    return myScore !== null
+      ? `Score envoyé (${myScore} pts) · En attente d'acceptation`
+      : `${duel.questionsCount} questions · Défi envoyé`;
+  }
+  if (duel.phase === 'your_turn') {
+    return `${duel.questionsCount} questions · Lancez votre partie`;
+  }
+  if (duel.phase === 'waiting_opponent_play') {
+    return `Votre score : ${myScore ?? 0} pts · Adversaire n'a pas encore joué`;
+  }
+  return `${duel.questionsCount} questions`;
+}
+
+function ActiveDuelCard({
   duel,
+  userId,
   onRespond,
+  onOpen,
 }: {
   duel: DuelSummary;
+  userId: string;
   onRespond: (duelId: string, accept: boolean, challengerName: string) => void;
+  onOpen: () => void;
 }) {
+  const title = getActiveDuelLabel(duel, userId);
+  const meta = getActiveDuelMeta(duel, userId);
+  const showAcceptDecline = duel.phase === 'needs_your_acceptance';
+  const showPlay = duel.phase === 'your_turn' || duel.phase === 'waiting_opponent_acceptance';
+
   return (
-    <View style={styles.pendingCard}>
-      <Text style={styles.pendingTitle}>{duel.challengerName} vous a défié</Text>
-      <Text style={styles.pendingMeta}>{duel.questionsCount} questions · Quiz du défi</Text>
-      <View style={styles.pendingActions}>
+    <Pressable style={styles.pendingCard} onPress={onOpen}>
+      <Text style={styles.pendingTitle}>{title}</Text>
+      <Text style={styles.pendingMeta}>{meta}</Text>
+      {showAcceptDecline ? (
+        <View style={styles.pendingActions}>
+          <Pressable
+            style={styles.acceptBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              void onRespond(duel.id, true, duel.challengerName);
+            }}
+          >
+            <Text style={styles.acceptBtnText}>Accepter</Text>
+          </Pressable>
+          <Pressable
+            style={styles.declineBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              void onRespond(duel.id, false, duel.challengerName);
+            }}
+          >
+            <Text style={styles.declineBtnText}>Refuser</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {showPlay ? (
         <Pressable
-          style={styles.acceptBtn}
-          onPress={() => void onRespond(duel.id, true, duel.challengerName)}
+          style={styles.openDuelBtn}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onOpen();
+          }}
         >
-          <Text style={styles.acceptBtnText}>Accepter</Text>
+          <Text style={styles.openDuelBtnText}>
+            {duel.phase === 'your_turn' ? 'Jouer maintenant →' : 'Voir le duel →'}
+          </Text>
         </Pressable>
-        <Pressable
-          style={styles.declineBtn}
-          onPress={() => void onRespond(duel.id, false, duel.challengerName)}
-        >
-          <Text style={styles.declineBtnText}>Refuser</Text>
-        </Pressable>
-      </View>
-    </View>
+      ) : null}
+      {duel.phase === 'waiting_opponent_play' ? (
+        <Text style={styles.pendingHint}>Vous serez notifié quand l&apos;adversaire aura joué.</Text>
+      ) : null}
+    </Pressable>
   );
+}
+
+function resolveDuelOutcome(duel: DuelSummary, userId: string) {
+  if (duel.status === 'declined') {
+    const refusedByMe = duel.challengedId === userId;
+    return {
+      label: refusedByMe ? 'Refusé' : 'Décliné',
+      points: '+0 pts',
+      won: false,
+      lost: !refusedByMe,
+    };
+  }
+
+  const isChallenger = duel.challengerId === userId;
+  const myScore = isChallenger ? duel.challengerScore ?? 0 : duel.challengedScore ?? 0;
+  const oppScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
+
+  if (duel.winnerId === userId) {
+    return { label: 'Victoire', points: '+15 pts', won: true, lost: false };
+  }
+  if (duel.winnerId && duel.winnerId !== userId) {
+    return { label: 'Défaite', points: '+5 pts', won: false, lost: true };
+  }
+  if (myScore > oppScore) {
+    return { label: 'Victoire', points: '+15 pts', won: true, lost: false };
+  }
+  if (myScore < oppScore) {
+    return { label: 'Défaite', points: '+5 pts', won: false, lost: true };
+  }
+  return { label: 'Égalité', points: '+5 pts', won: false, lost: false };
 }
 
 function RecentDuelRow({
@@ -214,16 +416,23 @@ function RecentDuelRow({
 }) {
   const opponent =
     duel.challengerId === userId ? duel.challengedName : duel.challengerName;
-  const won = duel.winnerId === userId;
-  const lost = duel.winnerId !== null && duel.winnerId !== userId;
-  const outcome = won ? 'Victoire' : lost ? 'Défaite' : 'Terminé';
-  const points = won ? '+15 pts' : '+5 pts';
+  const outcome = resolveDuelOutcome(duel, userId);
+  const isChallenger = duel.challengerId === userId;
+  const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
+  const oppScore = isChallenger ? duel.challengedScore : duel.challengerScore;
+  const scoreLine =
+    myScore !== null && oppScore !== null ? `${myScore} - ${oppScore} pts` : null;
 
   return (
     <Pressable style={[styles.recentRow, !isLast && styles.recentRowBorder]} onPress={onPress}>
-      <Text style={styles.recentName}>{opponent}</Text>
-      <Text style={[styles.recentOutcome, won && styles.win, lost && styles.loss]}>{outcome}</Text>
-      <Text style={styles.recentPoints}>{points}</Text>
+      <View style={styles.recentMain}>
+        <Text style={styles.recentName}>{opponent}</Text>
+        {scoreLine ? <Text style={styles.recentScoreLine}>{scoreLine}</Text> : null}
+      </View>
+      <Text style={[styles.recentOutcome, outcome.won && styles.win, outcome.lost && styles.loss]}>
+        {outcome.label}
+      </Text>
+      <Text style={styles.recentPoints}>{outcome.points}</Text>
     </Pressable>
   );
 }
@@ -332,6 +541,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
   },
+  pendingHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  openDuelBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.primary,
+    borderRadius: 100,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  openDuelBtnText: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 13,
+    color: COLORS.textLight,
+  },
   pendingActions: {
     flexDirection: 'row',
     gap: 10,
@@ -366,15 +594,23 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
   },
-  recentRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.separator,
+  recentMain: {
+    flex: 1,
+    gap: 2,
+  },
+  recentScoreLine: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.textSecondary,
   },
   recentName: {
-    flex: 1,
     fontFamily: 'Nunito_700Bold',
     fontSize: 14,
     color: COLORS.textPrimary,
+  },
+  recentRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.separator,
   },
   recentOutcome: {
     fontFamily: 'Nunito_600SemiBold',

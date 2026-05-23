@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,6 +30,7 @@ import {
   assertCanParticipateInChallengeQuiz,
   ChallengeParticipationError,
 } from '@services/defis/participateChallenge.service';
+import { useAppError } from '@providers/AppErrorProvider';
 
 type ChallengeTab = 'active' | 'past';
 
@@ -42,6 +42,7 @@ const TABS = [
 export default function ChallengeListScreen() {
   const [tab, setTab] = useState<ChallengeTab>('active');
   const router = useRouter();
+  const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id;
 
@@ -76,10 +77,10 @@ export default function ChallengeListScreen() {
       router.push(buildQuizEntryHref(quiz.quizId));
     } catch (error) {
       if (error instanceof ChallengeParticipationError) {
-        Alert.alert('Challenge', error.message);
+        showAppError(error.message, { title: 'Challenge' });
         return;
       }
-      Alert.alert('Challenge', 'Impossible de lancer ce quiz.');
+      showAppError('Impossible de lancer ce quiz.', { title: 'Challenge' });
     }
   };
 

@@ -22,7 +22,13 @@ export default function DuelResultScreen() {
     enabled: Boolean(duelId),
   });
 
-  if (isLoading || !duel || duel.status !== 'completed') {
+  const isResultReady =
+    duel &&
+    (duel.status === 'completed' ||
+      duel.status === 'declined' ||
+      (duel.challengerScore !== null && duel.challengedScore !== null));
+
+  if (isLoading || !duel || !isResultReady) {
     return (
       <DefisPageShell title="Résultat">
         <ActivityIndicator color={COLORS.primary} />
@@ -34,7 +40,9 @@ export default function DuelResultScreen() {
   const myScore = isChallenger ? duel.challengerScore ?? 0 : duel.challengedScore ?? 0;
   const opponentScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
   const opponentName = isChallenger ? duel.challengedName : duel.challengerName;
-  const won = duel.winnerId === userId;
+  const won =
+    duel.winnerId === userId ||
+    (duel.winnerId === null && myScore > opponentScore);
 
   return (
     <DefisPageShell title="Résultat">
