@@ -1,4 +1,7 @@
+import { AUTH_MESSAGES } from '@constants/auth.messages';
+
 import type { IPasswordResetGateway } from './IPasswordResetGateway';
+import { validateResetPasswordFields } from './resetPasswordValidation';
 
 /**
  * Implémentation de démo : mémorise l’e-mail courant et accepte tout OTP à 4 chiffres.
@@ -27,13 +30,18 @@ export class StubPasswordResetGateway implements IPasswordResetGateway {
     this.otpVerified = true;
   }
 
-  async completePendingReset(newPassword: string): Promise<void> {
+  async completePendingReset(newPassword: string, confirmPassword?: string): Promise<void> {
     await this.delay(300);
     if (!this.otpVerified || !this.pendingEmail) {
       throw new Error('Réinitialisation non autorisée');
     }
-    if (newPassword.length < 4) {
-      throw new Error('Mot de passe trop court');
+    const validation = validateResetPasswordFields(newPassword, confirmPassword ?? newPassword);
+    if (!validation.isValid) {
+      throw new Error(
+        validation.fieldErrors.newPasswordError ??
+          validation.fieldErrors.confirmPasswordError ??
+          AUTH_MESSAGES.password.changeError,
+      );
     }
     this.otpVerified = false;
     this.pendingEmail = null;

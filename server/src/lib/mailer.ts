@@ -26,6 +26,18 @@ export function isEmailDeliveryConfigured(): boolean {
   return hasResendConfig() || hasFullSmtpConfig();
 }
 
+/** Render Free bloque le SMTP sortant (ports 25/465/587) — Resend passe en HTTPS. */
+function isRenderHosted(): boolean {
+  return Boolean(process.env.RENDER?.trim());
+}
+
+function smtpBlockedOnCurrentHost(): boolean {
+  return process.env.NODE_ENV === 'production' || isRenderHosted();
+}
+
+const RENDER_SMTP_HINT =
+  'Sur Render (plan gratuit), le SMTP sortant est bloqué. Ajoutez RESEND_API_KEY + SMTP_FROM (domaine vérifié sur https://resend.com) dans Environment, puis redéployez. Retirez SMTP_HOST si inutile.';
+
 function getTransporter(): Transporter {
   if (cached) return cached;
   const env = getEnv();
@@ -135,6 +147,10 @@ export async function sendPasswordResetOtpEmail(toEmail: string, code: string): 
   if (env.RESEND_API_KEY?.trim()) {
     await sendViaResend(toEmail, message.subject, message.text, message.html);
     return;
+  }
+
+  if (smtpBlockedOnCurrentHost() && hasFullSmtpConfig()) {
+    throw new Error(RENDER_SMTP_HINT);
   }
 
   await getTransporter().sendMail({

@@ -1,6 +1,8 @@
+import { AUTH_MESSAGES } from '@constants/auth.messages';
 import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 
 import type { IPasswordResetGateway } from './IPasswordResetGateway';
+import { isPasswordReuseApiMessage, validateResetPasswordFields } from './resetPasswordValidation';
 
 export class ApiPasswordResetGateway implements IPasswordResetGateway {
   private pendingEmail: string | null = null;
@@ -46,19 +48,30 @@ export class ApiPasswordResetGateway implements IPasswordResetGateway {
     this.pendingResetToken = data.reset_token;
   }
 
-  async completePendingReset(newPassword: string): Promise<void> {
+  async completePendingReset(newPassword: string, confirmPassword?: string): Promise<void> {
     if (!this.pendingEmail || !this.pendingResetToken) {
       throw new Error('Réinitialisation non autorisée.');
     }
-    if (newPassword.length < 6) {
-      throw new Error('Le mot de passe doit contenir au moins 6 caractères.');
+
+    const confirm = confirmPassword ?? newPassword;
+    const validation = validateResetPasswordFields(newPassword, confirm);
+    if (!validation.isValid) {
+      const message =
+        validation.fieldErrors.newPasswordError ??
+        validation.fieldErrors.confirmPasswordError ??
+        AUTH_MESSAGES.password.changeError;
+      throw new Error(message);
     }
 
     const { error } = await getQuizzApiClient().POST('/auth/reset-password', {
       body: { reset_token: this.pendingResetToken, new_password: newPassword },
     });
     if (error) {
-      throw new Error(parseQuizzApiError(error) ?? 'Impossible de réinitialiser le mot de passe.');
+      const parsed = parseQuizzApiError(error);
+      if (parsed && isPasswordReuseApiMessage(parsed)) {
+        throw new Error(AUTH_MESSAGES.password.sameAsOld);
+      }
+      throw new Error(parsed ?? AUTH_MESSAGES.password.changeError);
     }
 
     this.pendingEmail = null;

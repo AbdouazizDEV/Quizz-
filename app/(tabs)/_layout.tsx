@@ -13,6 +13,7 @@ export default function TabsGroupLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="home" />
+      <Stack.Screen name="defis" />
       <Stack.Screen name="profile" />
     </Stack>
   );

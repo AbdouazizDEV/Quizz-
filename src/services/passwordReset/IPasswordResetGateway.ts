@@ -2,5 +2,5 @@
 export interface IPasswordResetGateway {
   requestOtp(email: string): Promise<void>;
   verifyOtp(email: string, code: string): Promise<void>;
-  completePendingReset(newPassword: string): Promise<void>;
+  completePendingReset(newPassword: string, confirmPassword?: string): Promise<void>;
 }

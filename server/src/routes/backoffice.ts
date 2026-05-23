@@ -140,6 +140,16 @@ function jsonError(message: string, status = 400, details?: unknown) {
   return { ok: false, error: message, details, status };
 }
 
+function mapQuestionInsertError(error: { code?: string; message: string }): {
+  message: string;
+  status: 409 | 500;
+} {
+  if (error.code === '23505') {
+    return { message: 'Cette question existe déjà dans ce quiz.', status: 409 };
+  }
+  return { message: error.message, status: 500 };
+}
+
 function readAuthToken(c: { req: { header: (name: string) => string | undefined } }): string {
   return (
     c.req.header('x-api-key')?.trim() ??
@@ -566,7 +576,10 @@ export const backofficeRoutes = new Hono()
         difficulty_label: q.difficulty_label,
       }));
       const { error: insErr } = await admin.from('questions').insert(payload);
-      if (insErr) return c.json(jsonError(insErr.message, 500), 500);
+      if (insErr) {
+        const mapped = mapQuestionInsertError(insErr);
+        return c.json(jsonError(mapped.message, mapped.status), mapped.status);
+      }
     }
     return c.json({ ok: true, quiz_ids: createdQuizIds, imported_questions: questions.length }, 201);
   })
@@ -612,7 +625,10 @@ export const backofficeRoutes = new Hono()
       difficulty_label: q.difficulty_label,
     }));
     const { error: insErr } = await admin.from('questions').insert(payload);
-    if (insErr) return c.json(jsonError(insErr.message, 500), 500);
+    if (insErr) {
+      const mapped = mapQuestionInsertError(insErr);
+      return c.json(jsonError(mapped.message, mapped.status), mapped.status);
+    }
     return c.json({ ok: true, quiz_id: quiz.id, imported_questions: questions.length }, 201);
   })
   // Questions CRUD
@@ -653,7 +669,10 @@ export const backofficeRoutes = new Hono()
       );
     }
     const { data, error } = await admin.from('questions').insert(parsed.data).select('*').single();
-    if (error) return c.json(jsonError(error.message, 500), 500);
+    if (error) {
+      const mapped = mapQuestionInsertError(error);
+      return c.json(jsonError(mapped.message, mapped.status), mapped.status);
+    }
     return c.json({ ok: true, item: data }, 201);
   })
   .put('/questions/:questionId', async (c) => {

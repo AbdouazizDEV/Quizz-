@@ -1,27 +1,9 @@
-import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { Platform, Vibration } from 'react-native';
 
-const WRONG_ALERT = require('../../../../assets/sounds/quiz-wrong-alert.mp3');
+import { playBundledSound } from '@services/quiz/play/quizSoundPlayer';
 
-let wrongSound: Audio.Sound | null = null;
-
-async function playWrongAlert(): Promise<void> {
-  try {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-    });
-    if (!wrongSound) {
-      const { sound } = await Audio.Sound.createAsync(WRONG_ALERT);
-      wrongSound = sound;
-    }
-    await wrongSound.setPositionAsync(0);
-    await wrongSound.playAsync();
-  } catch {
-    // Web ou module audio indisponible
-  }
-}
+const WRONG_ANSWER_SOUND = require('../../../../assets/sounds/mixkit-police-whistle-614.wav');
 
 /**
  * Retour haptique, vibration (Android) et court signal sonore pour une mauvaise réponse ou le temps écoulé.
@@ -35,5 +17,5 @@ export async function triggerQuizWrongFeedback(): Promise<void> {
   if (Platform.OS === 'android') {
     Vibration.vibrate([0, 100, 50, 100]);
   }
-  await playWrongAlert();
+  await playBundledSound(WRONG_ANSWER_SOUND);
 }

@@ -16,7 +16,11 @@ INSERT INTO public.difficulty_levels (code, label, description, max_questions_pe
 VALUES
   ('Z0', 'Facile', 'Onboarding et confiance utilisateur.', 10, 1, TRUE),
   ('Z1', 'Moyen', 'Réflexion intermédiaire.', 15, 2, TRUE),
-  ('Z2', 'Difficile', 'Expertise / compétition.', 20, 3, TRUE)
+  ('Z2', 'Difficile', 'Expertise / compétition.', 20, 3, TRUE),
+  ('Z3', 'Expert', 'Expertise / compétition. Concentration.', 25, 4, TRUE),
+  ('A1', 'Avancé', 'Expertise / compétition. Régularité.', 30, 5, TRUE),
+  ('A2', 'Expert avancé', 'Expertise / compétition. Régularité.', 35, 6, TRUE),
+  ('A3', 'Maître', 'Expertise / compétition. Régularité.', 40, 7, TRUE)
 ON CONFLICT (code) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.subcategories (

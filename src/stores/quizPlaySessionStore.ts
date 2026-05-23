@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { QuizAnswerRecord, QuizPlayPayload, QuizPlayQuestion } from '@app-types/quizPlay.types';
+import { getTimerSecondsForDifficulty } from '@constants/quiz.constants';
 
 export type QuizFeedbackPhase = 'idle' | 'correct' | 'incorrect' | 'timeout';
 
@@ -58,6 +59,7 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
       ...initial,
       payload,
       categorySlug,
+      secondsPerQuestion: getTimerSecondsForDifficulty(payload.quiz.difficultyLevel),
     }),
   selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) =>
     set({

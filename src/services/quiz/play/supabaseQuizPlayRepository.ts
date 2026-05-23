@@ -30,7 +30,7 @@ export class SupabaseQuizPlayRepository implements IQuizPlayRepository {
 
     const { data: quiz, error: qErr } = await client
       .from('quizzes')
-      .select('id, title, thumbnail_url, points_per_question, completion_bonus, is_published')
+      .select('id, title, thumbnail_url, points_per_question, completion_bonus, is_published, difficulty_level')
       .eq('id', quizId)
       .maybeSingle();
 
@@ -50,6 +50,7 @@ export class SupabaseQuizPlayRepository implements IQuizPlayRepository {
       thumbnailUrl: quiz.thumbnail_url,
       pointsPerQuestion: quiz.points_per_question ?? 1,
       completionBonus: quiz.completion_bonus ?? 0,
+      difficultyLevel: quiz.difficulty_level ?? null,
     };
 
     return {

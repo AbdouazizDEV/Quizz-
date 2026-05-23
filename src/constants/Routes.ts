@@ -12,6 +12,7 @@ export const Routes = {
   /** Retour après clic sur le lien de confirmation (deep link quizzplus://auth/callback). */
   AUTH_EMAIL_CALLBACK: '/auth/callback',
   HOME: '/(tabs)/home',
+  DEFIS: '/(tabs)/defis',
   /** Liste des catégories (grille). */
   CATEGORIES: '/categories',
   SCOREBOARD: '/scoreboard',

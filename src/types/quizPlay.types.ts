@@ -20,6 +20,7 @@ export interface QuizPlayMeta {
   thumbnailUrl: string | null;
   pointsPerQuestion: number;
   completionBonus: number;
+  difficultyLevel: string | null;
 }
 
 export interface QuizPlayPayload {
