@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 
 import { DuelIncomingModal } from '@components/ui/defis/DuelIncomingModal';
 import { DuelSentModal } from '@components/ui/defis/DuelSentModal';
+import { CountdownTimer } from '@components/atoms/CountdownTimer';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
 import { DefisSurfaceCard } from '@components/ui/defis/DefisSurfaceCard';
 import { SectionTitle } from '@components/ui/common/SectionTitle';
@@ -43,6 +44,7 @@ export default function DuelHubScreen() {
     friendName: string;
   } | null>(null);
   const [incomingDuel, setIncomingDuel] = useState<DuelSummary | null>(null);
+  const [respondingDuelId, setRespondingDuelId] = useState<string | null>(null);
   const shownIncomingIds = useRef<Set<string>>(new Set());
 
   const { data: pending, isLoading: loadingPending } = useQuery({
@@ -120,6 +122,7 @@ export default function DuelHubScreen() {
     if (!incomingDuel || !userId) return;
     const duelId = incomingDuel.id;
     setIncomingDuel(null);
+    setRespondingDuelId(duelId);
     try {
       await respondToDuel(duelId, userId, true);
       await refresh();
@@ -128,6 +131,8 @@ export default function DuelHubScreen() {
       showAppError(error instanceof Error ? error.message : 'Impossible d\'accepter le duel.', {
         title: 'Duel',
       });
+    } finally {
+      setRespondingDuelId(null);
     }
   };
 
@@ -135,6 +140,7 @@ export default function DuelHubScreen() {
     if (!incomingDuel || !userId) return;
     const duelId = incomingDuel.id;
     setIncomingDuel(null);
+    setRespondingDuelId(duelId);
     try {
       await respondToDuel(duelId, userId, false);
       await refresh();
@@ -142,11 +148,14 @@ export default function DuelHubScreen() {
       showAppError(error instanceof Error ? error.message : 'Impossible de refuser le duel.', {
         title: 'Duel',
       });
+    } finally {
+      setRespondingDuelId(null);
     }
   };
 
   const onRespond = async (duelId: string, accept: boolean, challengerName: string) => {
-    if (!userId) return;
+    if (!userId || respondingDuelId) return;
+    setRespondingDuelId(duelId);
     try {
       await respondToDuel(duelId, userId, accept);
       await refresh();
@@ -159,7 +168,10 @@ export default function DuelHubScreen() {
     } catch (error) {
       showAppError(error instanceof Error ? error.message : 'Une erreur est survenue.', {
         title: 'Duel',
+        onRetry: () => void onRespond(duelId, accept, challengerName),
       });
+    } finally {
+      setRespondingDuelId(null);
     }
   };
 
@@ -239,6 +251,7 @@ export default function DuelHubScreen() {
           key={duel.id}
           duel={duel}
           userId={userId}
+          busy={respondingDuelId === duel.id}
           onRespond={onRespond}
           onOpen={() => router.push(DefisRoutes.duelDetail(duel.id))}
         />
@@ -259,6 +272,10 @@ export default function DuelHubScreen() {
             onPress={() => {
               const hasScores =
                 duel.challengerScore !== null && duel.challengedScore !== null;
+              if (duel.status === 'expired' || duel.isExpired) {
+                router.push(DefisRoutes.duelDetail(duel.id));
+                return;
+              }
               if (duel.status === 'completed' || hasScores) {
                 router.push(DefisRoutes.duelResult(duel.id));
                 return;
@@ -275,6 +292,10 @@ export default function DuelHubScreen() {
 function getActiveDuelLabel(duel: DuelSummary, userId: string): string {
   const opponent =
     duel.challengerId === userId ? duel.challengedName : duel.challengerName;
+
+  if (duel.phase === 'expired' || duel.isExpired) {
+    return `Duel expiré vs ${opponent}`;
+  }
 
   switch (duel.phase) {
     case 'needs_your_acceptance':
@@ -294,8 +315,14 @@ function getActiveDuelMeta(duel: DuelSummary, userId: string): string {
   const isChallenger = duel.challengerId === userId;
   const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
 
+  if (duel.phase === 'expired' || duel.isExpired) {
+    return myScore === null
+      ? 'Délai dépassé · Vous n\'avez pas joué'
+      : 'Délai dépassé · Partie non terminée';
+  }
+
   if (duel.phase === 'needs_your_acceptance') {
-    return `${duel.questionsCount} questions · Acceptez ou refusez`;
+    return `${duel.questionsCount} questions · 30 min pour accepter`;
   }
   if (duel.phase === 'waiting_opponent_acceptance') {
     return myScore !== null
@@ -314,53 +341,58 @@ function getActiveDuelMeta(duel: DuelSummary, userId: string): string {
 function ActiveDuelCard({
   duel,
   userId,
+  busy,
   onRespond,
   onOpen,
 }: {
   duel: DuelSummary;
   userId: string;
+  busy: boolean;
   onRespond: (duelId: string, accept: boolean, challengerName: string) => void;
   onOpen: () => void;
 }) {
   const title = getActiveDuelLabel(duel, userId);
   const meta = getActiveDuelMeta(duel, userId);
-  const showAcceptDecline = duel.phase === 'needs_your_acceptance';
-  const showPlay = duel.phase === 'your_turn' || duel.phase === 'waiting_opponent_acceptance';
+  const showAcceptDecline = duel.phase === 'needs_your_acceptance' && !duel.isExpired;
+  const showPlay =
+    !duel.isExpired &&
+    (duel.phase === 'your_turn' || duel.phase === 'waiting_opponent_acceptance');
 
   return (
-    <Pressable style={styles.pendingCard} onPress={onOpen}>
-      <Text style={styles.pendingTitle}>{title}</Text>
-      <Text style={styles.pendingMeta}>{meta}</Text>
+    <View style={styles.pendingCard}>
+      <Pressable onPress={onOpen} accessibilityRole="button">
+        <Text style={styles.pendingTitle}>{title}</Text>
+        <Text style={styles.pendingMeta}>{meta}</Text>
+        {!duel.isExpired ? (
+          <View style={styles.pendingTimer}>
+            <CountdownTimer endsAt={duel.expiresAt} />
+          </View>
+        ) : null}
+      </Pressable>
       {showAcceptDecline ? (
         <View style={styles.pendingActions}>
           <Pressable
-            style={styles.acceptBtn}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              void onRespond(duel.id, true, duel.challengerName);
-            }}
+            style={[styles.acceptBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => onRespond(duel.id, true, duel.challengerName)}
           >
-            <Text style={styles.acceptBtnText}>Accepter</Text>
+            {busy ? (
+              <ActivityIndicator color={COLORS.textLight} size="small" />
+            ) : (
+              <Text style={styles.acceptBtnText}>Accepter</Text>
+            )}
           </Pressable>
           <Pressable
-            style={styles.declineBtn}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              void onRespond(duel.id, false, duel.challengerName);
-            }}
+            style={[styles.declineBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => onRespond(duel.id, false, duel.challengerName)}
           >
             <Text style={styles.declineBtnText}>Refuser</Text>
           </Pressable>
         </View>
       ) : null}
       {showPlay ? (
-        <Pressable
-          style={styles.openDuelBtn}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onOpen();
-          }}
-        >
+        <Pressable style={styles.openDuelBtn} onPress={onOpen}>
           <Text style={styles.openDuelBtnText}>
             {duel.phase === 'your_turn' ? 'Jouer maintenant →' : 'Voir le duel →'}
           </Text>
@@ -369,11 +401,22 @@ function ActiveDuelCard({
       {duel.phase === 'waiting_opponent_play' ? (
         <Text style={styles.pendingHint}>Vous serez notifié quand l&apos;adversaire aura joué.</Text>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 
 function resolveDuelOutcome(duel: DuelSummary, userId: string) {
+  if (duel.status === 'expired' || duel.isExpired) {
+    const isChallenger = duel.challengerId === userId;
+    const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
+    return {
+      label: myScore === null ? 'Expiré · Non joué' : 'Expiré',
+      points: '+0 pts',
+      won: false,
+      lost: true,
+    };
+  }
+
   if (duel.status === 'declined') {
     const refusedByMe = duel.challengedId === userId;
     return {
@@ -540,6 +583,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 13,
     color: COLORS.textSecondary,
+  },
+  pendingTimer: {
+    marginTop: 6,
+  },
+  btnDisabled: {
+    opacity: 0.55,
   },
   pendingHint: {
     fontFamily: 'Nunito_600SemiBold',

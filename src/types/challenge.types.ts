@@ -74,6 +74,7 @@ export type DuelPhase =
   | 'waiting_opponent_acceptance'
   | 'your_turn'
   | 'waiting_opponent_play'
+  | 'expired'
   | 'finished';
 
 export interface DuelSummary {
@@ -82,12 +83,17 @@ export interface DuelSummary {
   challengedId: string;
   challengerName: string;
   challengedName: string;
+  challengerAvatarUrl: string | null;
+  challengedAvatarUrl: string | null;
+  challengerTotalScore: number;
+  challengedTotalScore: number;
   challengerScore: number | null;
   challengedScore: number | null;
-  status: 'pending' | 'accepted' | 'declined' | 'completed';
+  status: 'pending' | 'accepted' | 'declined' | 'completed' | 'expired';
   winnerId: string | null;
   expiresAt: string;
   questionsCount: number;
   quizId: string;
   phase: DuelPhase;
+  isExpired: boolean;
 }

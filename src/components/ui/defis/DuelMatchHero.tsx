@@ -10,13 +10,17 @@ interface DuelMatchHeroProps {
   myName: string;
   myUserId: string;
   myAvatarUrl?: string | null;
+  myTotalScore: number;
   opponentName: string;
   opponentUserId: string;
-  myScore: number | null;
-  showOpponentScore: boolean;
-  opponentScore: number | null;
+  opponentAvatarUrl?: string | null;
+  opponentTotalScore: number;
+  myQuizScore: number | null;
+  showOpponentQuizScore: boolean;
+  opponentQuizScore: number | null;
   questionsCount: number;
   expiresAt: string;
+  isExpired: boolean;
   statusLabel: string;
   motivationalLine: string;
 }
@@ -25,27 +29,37 @@ export function DuelMatchHero({
   myName,
   myUserId,
   myAvatarUrl,
+  myTotalScore,
   opponentName,
   opponentUserId,
-  myScore,
-  showOpponentScore,
-  opponentScore,
+  opponentAvatarUrl,
+  opponentTotalScore,
+  myQuizScore,
+  showOpponentQuizScore,
+  opponentQuizScore,
   questionsCount,
   expiresAt,
+  isExpired,
   statusLabel,
   motivationalLine,
 }: DuelMatchHeroProps) {
   return (
     <Animated.View entering={FadeInDown.duration(450)}>
       <LinearGradient
-        colors={[COLORS.primaryLight, '#FFE8A3', COLORS.primaryLight]}
+        colors={
+          isExpired
+            ? ['#FFF0F0', '#FFE4E4', '#FFF5F5']
+            : [COLORS.primaryLight, '#FFE8A3', COLORS.primaryLight]
+        }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.hero}
+        style={[styles.hero, isExpired && styles.heroExpired]}
       >
         <View style={styles.badgeRow}>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>⚡ {statusLabel}</Text>
+          <View style={[styles.statusBadge, isExpired && styles.statusBadgeExpired]}>
+            <Text style={styles.statusText}>
+              {isExpired ? '⏱ Expiré' : `⚡ ${statusLabel}`}
+            </Text>
           </View>
         </View>
 
@@ -56,7 +70,8 @@ export function DuelMatchHero({
             label="Vous"
             name={myName}
             avatarUri={getUserAvatarUri(myUserId, myAvatarUrl)}
-            score={myScore}
+            totalScore={myTotalScore}
+            quizScore={myQuizScore}
             highlight
           />
           <View style={styles.vsBubble}>
@@ -65,20 +80,26 @@ export function DuelMatchHero({
           <PlayerColumn
             label={opponentName.split(' ')[0]}
             name={opponentName}
-            avatarUri={getUserAvatarUri(opponentUserId, null)}
-            score={showOpponentScore ? opponentScore : null}
-            locked={!showOpponentScore}
+            avatarUri={getUserAvatarUri(opponentUserId, opponentAvatarUrl)}
+            totalScore={opponentTotalScore}
+            quizScore={showOpponentQuizScore ? opponentQuizScore : null}
+            locked={!showOpponentQuizScore && opponentQuizScore === null}
           />
         </View>
 
         <View style={styles.statsRow}>
           <StatChip icon="📋" label={`${questionsCount} questions`} />
-          <StatChip icon="⏱" label="~3 min" />
-          <StatChip icon="🏆" label="+15 pts max" />
+          <StatChip icon="🏆" label="Score classement" />
+          <StatChip icon="⭐" label="Points quiz du duel" />
         </View>
 
         <View style={styles.countdownWrap}>
           <CountdownTimer endsAt={expiresAt} />
+          {isExpired ? (
+            <Text style={styles.expiredHint}>
+              Ce défi n&apos;est plus disponible. Consultez « Mes duels récents ».
+            </Text>
+          ) : null}
         </View>
       </LinearGradient>
     </Animated.View>
@@ -89,14 +110,16 @@ function PlayerColumn({
   label,
   name,
   avatarUri,
-  score,
+  totalScore,
+  quizScore,
   highlight = false,
   locked = false,
 }: {
   label: string;
   name: string;
   avatarUri: string;
-  score: number | null;
+  totalScore: number;
+  quizScore: number | null;
   highlight?: boolean;
   locked?: boolean;
 }) {
@@ -109,14 +132,17 @@ function PlayerColumn({
       <Text style={styles.playerName} numberOfLines={1}>
         {name}
       </Text>
+      <Text style={styles.totalScoreLine}>{totalScore} pts classement</Text>
       {locked ? (
         <View style={styles.scoreLocked}>
-          <Text style={styles.scoreLockedText}>🔒 Secret</Text>
+          <Text style={styles.scoreLockedText}>🔒 Quiz secret</Text>
         </View>
-      ) : score !== null ? (
-        <Text style={[styles.playerScore, highlight && styles.playerScoreHighlight]}>{score} pts</Text>
+      ) : quizScore !== null ? (
+        <Text style={[styles.quizScoreLine, highlight && styles.quizScoreHighlight]}>
+          {quizScore} pts quiz
+        </Text>
       ) : (
-        <Text style={styles.scorePending}>À jouer</Text>
+        <Text style={styles.scorePending}>Quiz · à jouer</Text>
       )}
     </View>
   );
@@ -141,6 +167,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     overflow: 'hidden',
   },
+  heroExpired: {
+    borderColor: COLORS.error,
+  },
   badgeRow: {
     alignItems: 'center',
   },
@@ -149,6 +178,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 100,
+  },
+  statusBadgeExpired: {
+    backgroundColor: COLORS.error,
   },
   statusText: {
     fontFamily: 'Nunito_700Bold',
@@ -167,7 +199,7 @@ const styles = StyleSheet.create({
   },
   versusRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
   },
@@ -180,6 +212,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 24,
     shadowColor: COLORS.primary,
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -230,12 +263,17 @@ const styles = StyleSheet.create({
     maxWidth: 110,
     textAlign: 'center',
   },
-  playerScore: {
-    fontFamily: 'Nunito_800ExtraBold',
-    fontSize: 16,
+  totalScoreLine: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 12,
     color: COLORS.textSecondary,
   },
-  playerScoreHighlight: {
+  quizScoreLine: {
+    fontFamily: 'Nunito_800ExtraBold',
+    fontSize: 15,
+    color: COLORS.textSecondary,
+  },
+  quizScoreHighlight: {
     color: COLORS.primary,
   },
   scorePending: {
@@ -275,5 +313,13 @@ const styles = StyleSheet.create({
   },
   countdownWrap: {
     alignItems: 'center',
+    gap: 6,
+  },
+  expiredHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.error,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

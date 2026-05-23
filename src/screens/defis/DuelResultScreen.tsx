@@ -1,7 +1,9 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { DuelMatchHero } from '@components/ui/defis/DuelMatchHero';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { Routes } from '@constants/Routes';
@@ -26,6 +28,8 @@ export default function DuelResultScreen() {
     duel &&
     (duel.status === 'completed' ||
       duel.status === 'declined' ||
+      duel.status === 'expired' ||
+      duel.isExpired ||
       (duel.challengerScore !== null && duel.challengedScore !== null));
 
   if (isLoading || !duel || !isResultReady) {
@@ -37,36 +41,83 @@ export default function DuelResultScreen() {
   }
 
   const isChallenger = duel.challengerId === userId;
-  const myScore = isChallenger ? duel.challengerScore ?? 0 : duel.challengedScore ?? 0;
-  const opponentScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
+  const myQuizScore = isChallenger ? duel.challengerScore ?? 0 : duel.challengedScore ?? 0;
+  const opponentQuizScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
   const opponentName = isChallenger ? duel.challengedName : duel.challengerName;
+  const opponentUserId = isChallenger ? duel.challengedId : duel.challengerId;
+  const myName =
+    authMe?.profile?.full_name?.trim() ||
+    authMe?.profile?.username?.trim() ||
+    'Vous';
+
+  const expired = duel.isExpired || duel.status === 'expired';
   const won =
-    duel.winnerId === userId ||
-    (duel.winnerId === null && myScore > opponentScore);
+    !expired &&
+    (duel.winnerId === userId || (duel.winnerId === null && myQuizScore > opponentQuizScore));
+
+  const headline = expired
+    ? '⏱ Duel expiré'
+    : duel.status === 'declined'
+      ? 'Défi refusé'
+      : won
+        ? '🎉 Victoire !'
+        : 'Bien joué !';
+
+  const subline = expired
+    ? isChallenger
+      ? duel.challengerScore === null
+        ? 'Vous n\'avez pas joué à temps.'
+        : 'L\'adversaire n\'a pas terminé à temps.'
+      : duel.challengedScore === null
+        ? 'Vous n\'avez pas joué à temps.'
+        : 'Le délai est dépassé.'
+    : won
+      ? '+15 pts de récompense'
+      : '+5 pts pour la participation';
 
   return (
     <DefisPageShell title="Résultat">
-      <Text style={styles.headline}>{won ? '🎉 Victoire !' : 'Bien joué, continuez !'}</Text>
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.headlineWrap}>
+        <Text style={[styles.headline, expired && styles.headlineExpired]}>{headline}</Text>
+        <Text style={styles.subline}>{subline}</Text>
+      </Animated.View>
 
-      <View style={styles.scoresRow}>
-        <ScoreColumn label="Vous" score={myScore} highlight={won} />
-        <Text style={styles.vs}>VS</Text>
-        <ScoreColumn label={opponentName} score={opponentScore} highlight={!won} />
-      </View>
+      <DuelMatchHero
+        myName={myName}
+        myUserId={userId}
+        myAvatarUrl={
+          (isChallenger ? duel.challengerAvatarUrl : duel.challengedAvatarUrl) ??
+          authMe?.profile?.avatar_url
+        }
+        myTotalScore={isChallenger ? duel.challengerTotalScore : duel.challengedTotalScore}
+        opponentName={opponentName}
+        opponentUserId={opponentUserId}
+        opponentAvatarUrl={isChallenger ? duel.challengedAvatarUrl : duel.challengerAvatarUrl}
+        opponentTotalScore={isChallenger ? duel.challengedTotalScore : duel.challengerTotalScore}
+        myQuizScore={isChallenger ? duel.challengerScore : duel.challengedScore}
+        showOpponentQuizScore
+        opponentQuizScore={isChallenger ? duel.challengedScore : duel.challengerScore}
+        questionsCount={duel.questionsCount}
+        expiresAt={duel.expiresAt}
+        isExpired={expired}
+        statusLabel={expired ? 'Expiré' : won ? 'Victoire' : 'Résultat'}
+        motivationalLine={
+          expired
+            ? 'Ce duel est archivé dans vos duels récents.'
+            : `Score quiz : ${myQuizScore} vs ${opponentQuizScore}`
+        }
+      />
 
-      <Text style={[styles.points, won ? styles.pointsWin : styles.pointsLoss]}>
-        {won ? '+15 pts gagnés' : '+5 pts pour la participation'}
-      </Text>
-
-      {!won ? (
+      {!expired && !won && opponentQuizScore > myQuizScore ? (
         <Text style={styles.encourage}>
-          {opponentName} n&apos;était qu&apos;à {Math.max(1, opponentScore - myScore)} pts devant vous !
+          {opponentName} n&apos;était qu&apos;à {opponentQuizScore - myQuizScore} pt
+          {opponentQuizScore - myQuizScore > 1 ? 's' : ''} devant vous !
         </Text>
       ) : null}
 
       <View style={styles.actions}>
         <Pressable style={styles.primaryBtn} onPress={() => router.push(DefisRoutes.duelHub)}>
-          <Text style={styles.primaryBtnText}>Revanche →</Text>
+          <Text style={styles.primaryBtnText}>Nouveau duel →</Text>
         </Pressable>
         <Pressable style={styles.secondaryBtn} onPress={() => router.replace(Routes.HOME)}>
           <Text style={styles.secondaryBtnText}>Accueil</Text>
@@ -76,112 +127,60 @@ export default function DuelResultScreen() {
   );
 }
 
-function ScoreColumn({
-  label,
-  score,
-  highlight,
-}: {
-  label: string;
-  score: number;
-  highlight: boolean;
-}) {
-  return (
-    <View style={styles.scoreCol}>
-      <Text style={styles.scoreLabel}>{label}</Text>
-      <View style={[styles.scoreBox, highlight && styles.scoreBoxHighlight]}>
-        <Text style={[styles.scoreValue, highlight && styles.scoreValueHighlight]}>{score}</Text>
-        <Text style={styles.scoreUnit}>pts</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
+  headlineWrap: {
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
   headline: {
     fontFamily: 'Nunito_900Black',
     fontSize: 26,
     textAlign: 'center',
     color: COLORS.textPrimary,
   },
-  scoresRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginVertical: 16,
+  headlineExpired: {
+    color: COLORS.error,
   },
-  scoreCol: { alignItems: 'center', gap: 8, flex: 1 },
-  scoreLabel: {
+  subline: {
     fontFamily: 'Nunito_600SemiBold',
-    fontSize: 13,
+    fontSize: 15,
     color: COLORS.textSecondary,
-  },
-  scoreBox: {
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.border,
-    alignItems: 'center',
-    minWidth: 100,
-  },
-  scoreBoxHighlight: {
-    backgroundColor: COLORS.primaryLight,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  scoreValue: {
-    fontFamily: 'Nunito_900Black',
-    fontSize: 32,
-    color: COLORS.textSecondary,
-  },
-  scoreValueHighlight: {
-    color: COLORS.primary,
-  },
-  scoreUnit: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  vs: {
-    fontFamily: 'Nunito_800ExtraBold',
-    fontSize: 16,
-    color: COLORS.textSecondary,
-  },
-  points: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 16,
     textAlign: 'center',
   },
-  pointsWin: { color: COLORS.success },
-  pointsLoss: { color: COLORS.textSecondary },
   encourage: {
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    marginTop: 8,
   },
   actions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+    marginTop: 20,
   },
   primaryBtn: {
     flex: 1,
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   primaryBtnText: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: 'Nunito_800ExtraBold',
     color: COLORS.textLight,
     fontSize: 14,
   },
   secondaryBtn: {
     flex: 1,
     backgroundColor: COLORS.border,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
   },
   secondaryBtnText: {
