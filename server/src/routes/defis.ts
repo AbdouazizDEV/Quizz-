@@ -12,10 +12,6 @@ const duelIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
-const submitDuelScoreSchema = z.object({
-  score: z.coerce.number().int().min(0),
-});
-
 function bearerToken(c: { req: { header: (n: string) => string | undefined } }): string | null {
   const h = c.req.header('Authorization');
   if (!h?.startsWith('Bearer ')) return null;
