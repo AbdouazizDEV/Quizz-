@@ -1,5 +1,7 @@
 import type { ProfileScreenData } from '@app-types/profile.types';
 import { apiClient } from '@services/api/apiClient';
+import { profileScreenCacheKey, readWithOfflineCache } from '@services/offline';
+import { fetchNetworkOnline } from '@services/offline/networkStatus';
 import { useAuthStore } from '@stores/authStore';
 import { formatCompactNumber } from '@utils/formatCompactNumber';
 import { getUserAvatarUri } from '@utils/getUserAvatarUri';
@@ -53,8 +55,56 @@ function relativeLabelFromIso(dateIso?: string | null): string {
   return `il y a ${weeks} semaines`;
 }
 
+function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScreenData {
+  const identity = data.identity;
+  const stats = data.stats;
+  const quizzes = data.quizzes ?? [];
+
+  const displayName = identity?.display_name?.trim() || 'Joueur';
+  const uid = identity?.id || userId || '';
+  const avatarUri = getUserAvatarUri(uid, identity?.avatar_url);
+
+  return {
+    identity: {
+      id: uid,
+      displayName,
+      handle: identity?.handle?.trim() || '@joueur',
+      avatarUri,
+      coverUri: identity?.cover_url?.trim() || COVER_PLACEHOLDER,
+      gender: identity?.gender ?? 'unknown',
+      viewerRelationship: identity?.viewer_relationship ?? (userId ? 'none' : 'self'),
+    },
+    stats: [
+      { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quiz' },
+      { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Parties' },
+      { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Joueurs' },
+      { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Collections' },
+      { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'Abonnés' },
+      { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
+    ],
+    quizTotalCount: stats?.quiz_count ?? 0,
+    quizzes: quizzes.map((q) => ({
+      id: q.id,
+      title: q.title?.trim() || 'Quiz',
+      thumbnailUri:
+        q.thumbnail_url?.trim() ||
+        'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=400&q=80',
+      questionCount: q.question_count ?? 0,
+      relativeTimeLabel: relativeLabelFromIso(q.played_at),
+      playCount: q.play_count ?? 0,
+      visibility: 'public',
+    })),
+  };
+}
+
 async function resolveTargetUserId(userId?: string): Promise<string> {
   if (userId?.trim()) return userId.trim();
+
+  const online = await fetchNetworkOnline();
+  if (!online) {
+    throw new Error('Profil indisponible hors ligne. Ouvrez votre profil une fois en ligne.');
+  }
+
   const token = useAuthStore.getState().token?.trim();
   if (!token) throw new Error('Utilisateur non connecté.');
   const { data } = await apiClient.get<{ user?: { id?: string } }>('/auth/me', {
@@ -65,55 +115,27 @@ async function resolveTargetUserId(userId?: string): Promise<string> {
   return id;
 }
 
-export class ApiProfileDataProvider implements IProfileDataProvider {
-  async getProfileScreenData(userId?: string): Promise<ProfileScreenData> {
-    const token = useAuthStore.getState().token?.trim();
-    if (!token) throw new Error('Utilisateur non connecté.');
-    const targetUserId = await resolveTargetUserId(userId);
+async function loadProfileFromApi(targetUserId: string, isExternal: boolean): Promise<ProfileScreenData> {
+  const token = useAuthStore.getState().token?.trim();
+  if (!token) throw new Error('Utilisateur non connecté.');
 
-    const { data } = await apiClient.get<ApiProfilePayload>(`/users/${encodeURIComponent(targetUserId)}/profile`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  const { data } = await apiClient.get<ApiProfilePayload>(
+    `/users/${encodeURIComponent(targetUserId)}/profile`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
 
-    const identity = data.identity;
-    const stats = data.stats;
-    const quizzes = data.quizzes ?? [];
-
-    const displayName = identity?.display_name?.trim() || 'Joueur';
-    const uid = identity?.id || targetUserId;
-    const avatarUri = getUserAvatarUri(uid, identity?.avatar_url);
-
-    return {
-      identity: {
-        id: uid,
-        displayName,
-        handle: identity?.handle?.trim() || '@joueur',
-        avatarUri,
-        coverUri: identity?.cover_url?.trim() || COVER_PLACEHOLDER,
-        gender: identity?.gender ?? 'unknown',
-        viewerRelationship: identity?.viewer_relationship ?? (userId ? 'none' : 'self'),
-      },
-      stats: [
-        { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quiz' },
-        { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Parties' },
-        { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Joueurs' },
-        { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Collections' },
-        { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'Abonnés' },
-        { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
-      ],
-      quizTotalCount: stats?.quiz_count ?? 0,
-      quizzes: quizzes.map((q) => ({
-        id: q.id,
-        title: q.title?.trim() || 'Quiz',
-        thumbnailUri:
-          q.thumbnail_url?.trim() ||
-          'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=400&q=80',
-        questionCount: q.question_count ?? 0,
-        relativeTimeLabel: relativeLabelFromIso(q.played_at),
-        playCount: q.play_count ?? 0,
-        visibility: 'public',
-      })),
-    };
-  }
+  return mapProfilePayload(data, isExternal ? targetUserId : undefined);
 }
 
+export class ApiProfileDataProvider implements IProfileDataProvider {
+  async getProfileScreenData(userId?: string): Promise<ProfileScreenData> {
+    const targetUserId = await resolveTargetUserId(userId);
+    const isExternal = Boolean(userId?.trim());
+
+    return readWithOfflineCache({
+      cacheKey: profileScreenCacheKey(targetUserId),
+      source: 'api',
+      fetchOnline: () => loadProfileFromApi(targetUserId, isExternal),
+    });
+  }
+}

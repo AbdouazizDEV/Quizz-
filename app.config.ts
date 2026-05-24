@@ -26,5 +26,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: '23a2334f-26a5-4ae1-9911-56fcbed0ca9c',
     },
   },
-  plugins: ['expo-router', 'expo-font', 'expo-secure-store', '@react-native-community/datetimepicker'],
+  plugins: ['expo-router', 'expo-font', 'expo-secure-store', '@react-native-community/datetimepicker', 'expo-sqlite'],
 });

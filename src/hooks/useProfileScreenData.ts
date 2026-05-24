@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ProfileScreenData } from '@app-types/profile.types';
+import { onOfflineSyncComplete } from '@services/offline';
 import { getProfileDataProvider } from '@services/profile/profileDataProviderInstance';
 
 interface UseProfileScreenDataResult {
@@ -31,6 +32,12 @@ export function useProfileScreenData(userId?: string): UseProfileScreenDataResul
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    return onOfflineSyncComplete(() => {
+      void load();
+    });
   }, [load]);
 
   return { data, loading, error, refetch: load };

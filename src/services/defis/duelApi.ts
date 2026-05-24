@@ -1,8 +1,15 @@
-import type { DuelSummary } from '@app-types/challenge.types';
-import type { PaginatedResponse } from '@app-types/pagination.types';
 import { apiClient } from '@services/api/apiClient';
+import {
+  duelDetailCacheKey,
+  pendingDuelsCacheKey,
+  readWithOfflineCache,
+  recentDuelsCacheKey,
+} from '@services/offline';
 import { useAuthStore } from '@stores/authStore';
 import { extractApiError } from '@utils/extractApiError';
+
+import type { DuelSummary } from '@app-types/challenge.types';
+import type { PaginatedResponse } from '@app-types/pagination.types';
 
 interface ApiDuelItem {
   id: string;
@@ -54,12 +61,11 @@ function mapItem(row: ApiDuelItem): DuelSummary {
   };
 }
 
-function mapPaginated(items: ApiDuelItem[] | undefined, meta: {
-  page?: number;
-  limit?: number;
-  total?: number;
-  has_more?: boolean;
-}, fallbackLimit: number): PaginatedResponse<DuelSummary> {
+function mapPaginated(
+  items: ApiDuelItem[] | undefined,
+  meta: { page?: number; limit?: number; total?: number; has_more?: boolean },
+  fallbackLimit: number,
+): PaginatedResponse<DuelSummary> {
   const mapped = (items ?? []).map(mapItem);
   return {
     items: mapped,
@@ -70,10 +76,11 @@ function mapPaginated(items: ApiDuelItem[] | undefined, meta: {
   };
 }
 
-export async function apiFetchPendingDuels(params?: {
+async function fetchPendingDuelsOnline(params?: {
   page?: number;
   limit?: number;
 }): Promise<PaginatedResponse<DuelSummary>> {
+  const page = params?.page ?? 1;
   const limit = params?.limit ?? 20;
   const { data } = await apiClient.get<{
     items?: ApiDuelItem[];
@@ -83,15 +90,16 @@ export async function apiFetchPendingDuels(params?: {
     has_more?: boolean;
   }>('/defis/duels/pending', {
     headers: authHeaders(),
-    params: { page: params?.page ?? 1, limit },
+    params: { page, limit },
   });
   return mapPaginated(data.items, data, limit);
 }
 
-export async function apiFetchRecentDuels(params?: {
+async function fetchRecentDuelsOnline(params?: {
   page?: number;
   limit?: number;
 }): Promise<PaginatedResponse<DuelSummary>> {
+  const page = params?.page ?? 1;
   const limit = params?.limit ?? 20;
   const { data } = await apiClient.get<{
     items?: ApiDuelItem[];
@@ -101,17 +109,51 @@ export async function apiFetchRecentDuels(params?: {
     has_more?: boolean;
   }>('/defis/duels/recent', {
     headers: authHeaders(),
-    params: { page: params?.page ?? 1, limit },
+    params: { page, limit },
   });
   return mapPaginated(data.items, data, limit);
 }
 
-export async function apiFetchDuelById(duelId: string): Promise<DuelSummary | null> {
+async function fetchDuelByIdOnline(duelId: string): Promise<DuelSummary | null> {
   const { data } = await apiClient.get<{ item?: ApiDuelItem }>(
     `/defis/duels/${encodeURIComponent(duelId)}`,
     { headers: authHeaders() },
   );
   return data.item ? mapItem(data.item) : null;
+}
+
+export async function apiFetchPendingDuels(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<DuelSummary>> {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  return readWithOfflineCache({
+    cacheKey: pendingDuelsCacheKey(page, limit),
+    source: 'api',
+    fetchOnline: () => fetchPendingDuelsOnline(params),
+  });
+}
+
+export async function apiFetchRecentDuels(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<DuelSummary>> {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  return readWithOfflineCache({
+    cacheKey: recentDuelsCacheKey(page, limit),
+    source: 'api',
+    fetchOnline: () => fetchRecentDuelsOnline(params),
+  });
+}
+
+export async function apiFetchDuelById(duelId: string): Promise<DuelSummary | null> {
+  return readWithOfflineCache({
+    cacheKey: duelDetailCacheKey(duelId),
+    source: 'api',
+    fetchOnline: () => fetchDuelByIdOnline(duelId),
+  });
 }
 
 export async function apiCreateFriendDuel(challengedId: string): Promise<DuelSummary> {
@@ -138,7 +180,7 @@ export async function apiAcceptDuel(duelId: string): Promise<{ quizId: string }>
     if (!data.quiz_id) throw new Error('Quiz du duel introuvable.');
     return { quizId: data.quiz_id };
   } catch (error) {
-    throw new Error(extractApiError(error, 'Impossible d\'accepter le duel.'));
+    throw new Error(extractApiError(error, "Impossible d'accepter le duel."));
   }
 }
 
@@ -164,6 +206,6 @@ export async function apiSubmitDuelScore(duelId: string, score: number): Promise
     if (!data.item) throw new Error('Réponse serveur invalide.');
     return mapItem(data.item);
   } catch (error) {
-    throw new Error(extractApiError(error, 'Impossible d\'enregistrer votre score de duel.'));
+    throw new Error(extractApiError(error, "Impossible d'enregistrer votre score de duel."));
   }
 }

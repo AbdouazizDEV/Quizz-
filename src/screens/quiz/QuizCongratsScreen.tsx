@@ -26,13 +26,22 @@ import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 export default function QuizCongratsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { quizId: idParam, duelId: duelParam } = useLocalSearchParams<{
+  const { quizId: idParam, duelId: duelParam, challengeId: challengeParam } = useLocalSearchParams<{
     quizId: string | string[];
     duelId?: string | string[];
+    challengeId?: string | string[];
   }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
   const duelId =
     typeof duelParam === 'string' ? duelParam : Array.isArray(duelParam) ? duelParam[0] : undefined;
+  const challengeIdFromStore = useQuizPlaySessionStore((s) => s.challengeId);
+  const challengeId =
+    challengeIdFromStore ??
+    (typeof challengeParam === 'string'
+      ? challengeParam
+      : Array.isArray(challengeParam)
+        ? challengeParam[0]
+        : undefined);
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, QuizPlayTheme.contentMaxWidth);
 
@@ -87,12 +96,16 @@ export default function QuizCongratsScreen() {
       router.replace(DefisRoutes.duelResult(duelId));
       return;
     }
+    if (challengeId) {
+      router.replace(DefisRoutes.challengeDetail(challengeId));
+      return;
+    }
     if (categorySlug) {
       router.dismissTo(`${Routes.CATEGORIES}/${encodeURIComponent(categorySlug)}`);
       return;
     }
     router.dismissTo(Routes.HOME);
-  }, [categorySlug, duelId, reset, router]);
+  }, [categorySlug, challengeId, duelId, reset, router]);
 
   const onShare = useCallback(async () => {
     if (!payload) return;

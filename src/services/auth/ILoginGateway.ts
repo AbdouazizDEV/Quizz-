@@ -5,5 +5,5 @@ export interface LoginCredentials {
 
 /** Point d’extension pour brancher l’API réelle sans coupler l’écran. */
 export interface ILoginGateway {
-  signIn(credentials: LoginCredentials): Promise<{ accessToken: string }>;
+  signIn(credentials: LoginCredentials): Promise<{ accessToken: string; refreshToken: string }>;
 }

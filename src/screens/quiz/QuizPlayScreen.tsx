@@ -19,9 +19,11 @@ import { QuizQuestionHeader } from '@components/ui/quiz/play/QuizQuestionHeader'
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import { seedDuelQueryCache } from '@hooks/defis/useDuelQuery';
+import { useAuthMe } from '@hooks/useAuthMe';
 import { useQuestionTimer } from '@hooks/useQuestionTimer';
-import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
+import { recordChallengeParticipation } from '@services/defis/participateChallenge.service';
 import { submitDuelScore } from '@services/defis/duelRepository';
+import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAppError } from '@providers/AppErrorProvider';
@@ -31,6 +33,8 @@ export default function QuizPlayScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { showAppError } = useAppError();
+  const { data: authMe } = useAuthMe();
+  const userId = authMe?.user?.id ?? '';
   const { quizId: idParam } = useLocalSearchParams<{ quizId: string | string[] }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
   const { width: screenWidth } = useWindowDimensions();
@@ -38,6 +42,7 @@ export default function QuizPlayScreen() {
 
   const payload = useQuizPlaySessionStore((s) => s.payload);
   const duelId = useQuizPlaySessionStore((s) => s.duelId);
+  const challengeId = useQuizPlaySessionStore((s) => s.challengeId);
   const currentIndex = useQuizPlaySessionStore((s) => s.currentIndex);
   const sessionPoints = useQuizPlaySessionStore((s) => s.sessionPoints);
   const feedbackPhase = useQuizPlaySessionStore((s) => s.feedbackPhase);
@@ -166,12 +171,16 @@ export default function QuizPlayScreen() {
 
     if (duelId) {
       try {
-        const updatedDuel = await submitDuelScore(duelId, earned);
-        seedDuelQueryCache(queryClient, updatedDuel);
-        await queryClient.invalidateQueries({ queryKey: ['duels-pending'] });
-        await queryClient.invalidateQueries({ queryKey: ['duels-recent'] });
-        await queryClient.invalidateQueries({ queryKey: ['duels-pending-list'] });
-        await queryClient.invalidateQueries({ queryKey: ['duels-recent-list'] });
+        const result = await submitDuelScore(duelId, earned);
+        if (result.queued) {
+          Alert.alert('Duel', 'Score enregistré — synchronisation à la reconnexion.');
+        } else if (result.data) {
+          seedDuelQueryCache(queryClient, result.data);
+          await queryClient.invalidateQueries({ queryKey: ['duels-pending'] });
+          await queryClient.invalidateQueries({ queryKey: ['duels-recent'] });
+          await queryClient.invalidateQueries({ queryKey: ['duels-pending-list'] });
+          await queryClient.invalidateQueries({ queryKey: ['duels-recent-list'] });
+        }
       } catch (error) {
         showAppError(
           error instanceof Error ? error.message : 'Score duel non enregistré.',
@@ -180,11 +189,34 @@ export default function QuizPlayScreen() {
       }
     }
 
-    const congratsHref = duelId
-      ? `/quiz/${quizId}/congrats?duelId=${encodeURIComponent(duelId)}`
+    if (challengeId && userId) {
+      try {
+        const result = await recordChallengeParticipation(userId, challengeId, quizId, earned);
+        if (result.queued) {
+          Alert.alert('Challenge', 'Score enregistré — synchronisation à la reconnexion.');
+        }
+        await queryClient.invalidateQueries({ queryKey: ['weekly-challenges'] });
+        await queryClient.invalidateQueries({ queryKey: ['challenge', challengeId, userId] });
+        await queryClient.invalidateQueries({
+          queryKey: ['challenge-leaderboard', challengeId, userId],
+        });
+      } catch (error) {
+        showAppError(
+          error instanceof Error ? error.message : 'Score challenge non enregistré.',
+          { title: 'Challenge' },
+        );
+      }
+    }
+
+    const congratsParams = new URLSearchParams();
+    if (duelId) congratsParams.set('duelId', duelId);
+    if (challengeId) congratsParams.set('challengeId', challengeId);
+    const congratsQs = congratsParams.toString();
+    const congratsHref = congratsQs
+      ? `/quiz/${quizId}/congrats?${congratsQs}`
       : `/quiz/${quizId}/congrats`;
     router.replace(congratsHref);
-  }, [advanceFromFeedback, duelId, queryClient, quizId, payload, router, showAppError]);
+  }, [advanceFromFeedback, challengeId, duelId, queryClient, quizId, payload, router, showAppError, userId]);
 
   if (!payload || !question) {
     return (

@@ -1,6 +1,28 @@
+import {
+  applyOptimisticRegistration,
+  validateRegistrationFromCache,
+} from '@services/offline/competitionCacheOptimistic';
+import {
+  COMPETITION_REGISTER_MUTATION,
+  COMPETITION_UNREGISTER_MUTATION,
+} from '@services/offline/competitionMutations';
+import {
+  competitionDetailCacheKey,
+  competitionsListCacheKey,
+  fetchNetworkOnline,
+  offlineStore,
+  readWithOfflineCache,
+  updateOfflinePendingCount,
+} from '@services/offline';
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
+import { ensureSupabaseAuthSession } from '@services/supabase/syncSupabaseAuthSession';
+import { useAuthStore } from '@stores/authStore';
 
 import type { CompetitionSummary } from '@app-types/challenge.types';
+
+export interface CompetitionMutationResult {
+  queued: boolean;
+}
 
 interface CompetitionRow {
   id: string;
@@ -31,7 +53,7 @@ function mapCompetition(row: CompetitionRow, registeredCount: number, isRegister
   };
 }
 
-export async function fetchCompetitionsByTab(
+async function loadCompetitionsByTabFromSupabase(
   tab: 'inscriptions' | 'en_cours' | 'fin',
   userId: string,
 ): Promise<CompetitionSummary[]> {
@@ -70,9 +92,42 @@ export async function fetchCompetitionsByTab(
   );
 }
 
-export async function registerForCompetition(userId: string, competitionId: string): Promise<void> {
+async function loadCompetitionByIdFromSupabase(
+  competitionId: string,
+  userId: string,
+): Promise<CompetitionSummary | null> {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error('Supabase non configuré');
+
+  const { data, error } = await supabase
+    .from('competitions')
+    .select('id, title, description, status, starts_at, ends_at, reward_text, category_id')
+    .eq('id', competitionId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const { count } = await supabase
+    .from('competition_registrations')
+    .select('id', { count: 'exact', head: true })
+    .eq('competition_id', competitionId);
+
+  const { data: mine } = await supabase
+    .from('competition_registrations')
+    .select('id')
+    .eq('competition_id', competitionId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return mapCompetition(data as CompetitionRow, count ?? 0, Boolean(mine));
+}
+
+async function registerForCompetitionOnline(userId: string, competitionId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error('Supabase non configuré');
+
+  await ensureSupabaseAuthSession(useAuthStore.getState().token);
 
   const { data: competition } = await supabase
     .from('competitions')
@@ -92,9 +147,11 @@ export async function registerForCompetition(userId: string, competitionId: stri
   if (error) throw new Error(error.message);
 }
 
-export async function unregisterFromCompetition(userId: string, competitionId: string): Promise<void> {
+async function unregisterFromCompetitionOnline(userId: string, competitionId: string): Promise<void> {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error('Supabase non configuré');
+
+  await ensureSupabaseAuthSession(useAuthStore.getState().token);
 
   const { error } = await supabase
     .from('competition_registrations')
@@ -105,32 +162,86 @@ export async function unregisterFromCompetition(userId: string, competitionId: s
   if (error) throw new Error(error.message);
 }
 
+export async function fetchCompetitionsByTab(
+  tab: 'inscriptions' | 'en_cours' | 'fin',
+  userId: string,
+): Promise<CompetitionSummary[]> {
+  return readWithOfflineCache({
+    cacheKey: competitionsListCacheKey(tab, userId),
+    source: 'supabase',
+    fetchOnline: () => loadCompetitionsByTabFromSupabase(tab, userId),
+  });
+}
+
+export async function registerForCompetition(
+  userId: string,
+  competitionId: string,
+): Promise<CompetitionMutationResult> {
+  const online = await fetchNetworkOnline();
+  if (!online) {
+    await validateRegistrationFromCache(userId, competitionId, true);
+
+    const alreadyQueued = await offlineStore.hasPendingMutation(COMPETITION_REGISTER_MUTATION, {
+      user_id: userId,
+      competition_id: competitionId,
+    });
+    if (alreadyQueued) {
+      throw new Error('Inscription déjà en attente de synchronisation.');
+    }
+
+    await offlineStore.enqueueMutation({
+      source: 'supabase',
+      method: 'POST',
+      url: COMPETITION_REGISTER_MUTATION,
+      body: { user_id: userId, competition_id: competitionId },
+    });
+    await applyOptimisticRegistration(userId, competitionId, true);
+    await updateOfflinePendingCount();
+    return { queued: true };
+  }
+
+  await registerForCompetitionOnline(userId, competitionId);
+  return { queued: false };
+}
+
+export async function unregisterFromCompetition(
+  userId: string,
+  competitionId: string,
+): Promise<CompetitionMutationResult> {
+  const online = await fetchNetworkOnline();
+  if (!online) {
+    await validateRegistrationFromCache(userId, competitionId, false);
+
+    const alreadyQueued = await offlineStore.hasPendingMutation(COMPETITION_UNREGISTER_MUTATION, {
+      user_id: userId,
+      competition_id: competitionId,
+    });
+    if (alreadyQueued) {
+      throw new Error('Désinscription déjà en attente de synchronisation.');
+    }
+
+    await offlineStore.enqueueMutation({
+      source: 'supabase',
+      method: 'DELETE',
+      url: COMPETITION_UNREGISTER_MUTATION,
+      body: { user_id: userId, competition_id: competitionId },
+    });
+    await applyOptimisticRegistration(userId, competitionId, false);
+    await updateOfflinePendingCount();
+    return { queued: true };
+  }
+
+  await unregisterFromCompetitionOnline(userId, competitionId);
+  return { queued: false };
+}
+
 export async function fetchCompetitionById(
   competitionId: string,
   userId: string,
 ): Promise<CompetitionSummary | null> {
-  const supabase = getSupabaseClient();
-  if (!supabase) throw new Error('Supabase non configuré');
-
-  const { data } = await supabase
-    .from('competitions')
-    .select('id, title, description, status, starts_at, ends_at, reward_text, category_id')
-    .eq('id', competitionId)
-    .maybeSingle();
-
-  if (!data) return null;
-
-  const { count } = await supabase
-    .from('competition_registrations')
-    .select('id', { count: 'exact', head: true })
-    .eq('competition_id', competitionId);
-
-  const { data: mine } = await supabase
-    .from('competition_registrations')
-    .select('id')
-    .eq('competition_id', competitionId)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  return mapCompetition(data as CompetitionRow, count ?? 0, Boolean(mine));
+  return readWithOfflineCache({
+    cacheKey: competitionDetailCacheKey(competitionId, userId),
+    source: 'supabase',
+    fetchOnline: () => loadCompetitionByIdFromSupabase(competitionId, userId),
+  });
 }

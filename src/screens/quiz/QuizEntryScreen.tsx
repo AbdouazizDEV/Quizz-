@@ -37,16 +37,28 @@ interface PendingReplayStart {
 export default function QuizEntryScreen() {
   const router = useRouter();
   const { showAppError } = useAppError();
-  const { quizId: idParam, categorySlug: catParam, duelId: duelParam } = useLocalSearchParams<{
+  const {
+    quizId: idParam,
+    categorySlug: catParam,
+    duelId: duelParam,
+    challengeId: challengeParam,
+  } = useLocalSearchParams<{
     quizId: string | string[];
     categorySlug?: string | string[];
     duelId?: string | string[];
+    challengeId?: string | string[];
   }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
   const categorySlug =
     typeof catParam === 'string' ? catParam : Array.isArray(catParam) ? catParam[0] : undefined;
   const duelId =
     typeof duelParam === 'string' ? duelParam : Array.isArray(duelParam) ? duelParam[0] : undefined;
+  const challengeId =
+    typeof challengeParam === 'string'
+      ? challengeParam
+      : Array.isArray(challengeParam)
+        ? challengeParam[0]
+        : undefined;
 
   const [fontsLoaded] = useFonts({ Nunito_700Bold, Nunito_600SemiBold });
   const bootstrap = useQuizPlaySessionStore((s) => s.bootstrap);
@@ -78,10 +90,10 @@ export default function QuizEntryScreen() {
         ...raw,
         questions: shuffleArray(raw.questions),
       };
-      bootstrap(payload, categorySlug ?? null, duelId ?? null);
+      bootstrap(payload, categorySlug ?? null, duelId ?? null, challengeId ?? null);
       router.replace(`/quiz/${quizId}/play`);
     },
-    [bootstrap, categorySlug, duelId, quizId, router],
+    [bootstrap, categorySlug, challengeId, duelId, quizId, router],
   );
 
   useEffect(() => {
@@ -160,7 +172,7 @@ export default function QuizEntryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [quizId, router, showAppError, startPlay, token]);
+  }, [challengeId, quizId, router, showAppError, startPlay, token]);
 
   useEffect(() => {
     if (!error) return;

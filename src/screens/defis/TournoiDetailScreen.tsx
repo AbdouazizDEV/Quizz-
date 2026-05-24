@@ -7,6 +7,7 @@ import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { COLORS } from '@constants/Colors';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import {
   fetchCompetitionById,
   registerForCompetition,
@@ -22,8 +23,9 @@ export default function TournoiDetailScreen() {
   const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
+  const { isOnline } = useNetworkStatus();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['competition', competitionId, userId],
     queryFn: () => fetchCompetitionById(competitionId, userId),
     enabled: Boolean(competitionId && userId),
@@ -36,9 +38,14 @@ export default function TournoiDetailScreen() {
   const onRegister = async () => {
     if (!userId) return;
     try {
-      await registerForCompetition(userId, competitionId);
+      const result = await registerForCompetition(userId, competitionId);
       await refresh();
-      Alert.alert('Tournoi', '✓ Vous êtes inscrit !');
+      Alert.alert(
+        'Tournoi',
+        result.queued
+          ? '✓ Inscription enregistrée — synchronisation à la reconnexion.'
+          : '✓ Vous êtes inscrit !',
+      );
     } catch (error) {
       showAppError(
         error instanceof Error ? error.message : 'Inscription impossible.',
@@ -50,8 +57,11 @@ export default function TournoiDetailScreen() {
   const onUnregister = async () => {
     if (!userId) return;
     try {
-      await unregisterFromCompetition(userId, competitionId);
+      const result = await unregisterFromCompetition(userId, competitionId);
       await refresh();
+      if (result.queued) {
+        Alert.alert('Tournoi', '✓ Désinscription enregistrée — synchronisation à la reconnexion.');
+      }
     } catch (error) {
       showAppError(error instanceof Error ? error.message : 'Désinscription impossible.', {
         title: 'Tournoi',
@@ -59,10 +69,28 @@ export default function TournoiDetailScreen() {
     }
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <DefisPageShell title="Tournoi">
         <ActivityIndicator color={COLORS.primary} />
+      </DefisPageShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DefisPageShell title="Tournoi">
+        <Text style={styles.errorText}>
+          {error instanceof Error ? error.message : 'Impossible de charger ce tournoi.'}
+        </Text>
+      </DefisPageShell>
+    );
+  }
+
+  if (!data) {
+    return (
+      <DefisPageShell title="Tournoi">
+        <Text style={styles.errorText}>Tournoi introuvable.</Text>
       </DefisPageShell>
     );
   }
@@ -73,6 +101,9 @@ export default function TournoiDetailScreen() {
 
   return (
     <DefisPageShell title="Tournoi">
+      {!isOnline ? (
+        <Text style={styles.offlineHint}>Données en cache — reconnectez-vous pour actualiser.</Text>
+      ) : null}
       <Text style={styles.title}>{data.title}</Text>
       <Text style={styles.meta}>
         {data.registeredCount}/{data.maxParticipants} inscrits · Élimination directe
@@ -201,5 +232,17 @@ const styles = StyleSheet.create({
     color: COLORS.primaryDark,
     fontSize: 14,
     textAlign: 'right',
+  },
+  errorText: {
+    fontFamily: 'Nunito_600SemiBold',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 24,
+  },
+  offlineHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.info,
+    marginBottom: 8,
   },
 });

@@ -9,6 +9,7 @@ import { COLORS } from '@constants/Colors';
 import { buildQuizEntryHref } from '@constants/Routes';
 import { useChallenge } from '@hooks/defis/useChallenge';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import type { DailyQuiz } from '@app-types/challenge.types';
 import {
   assertCanParticipateInChallengeQuiz,
@@ -23,7 +24,8 @@ export default function ChallengeDetailScreen() {
   const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id;
-  const { data, isLoading } = useChallenge(challengeId, userId);
+  const { isOnline } = useNetworkStatus();
+  const { data, isLoading, isError, error } = useChallenge(challengeId, userId);
 
   const onStartQuiz = async (quiz: DailyQuiz) => {
     if (!userId || !challengeId) return;
@@ -34,7 +36,7 @@ export default function ChallengeDetailScreen() {
         quiz.quizId,
         quiz.scheduledDay,
       );
-      router.push(buildQuizEntryHref(quiz.quizId));
+      router.push(buildQuizEntryHref(quiz.quizId, { challengeId }));
     } catch (error) {
       if (error instanceof ChallengeParticipationError) {
         showAppError(error.message, { title: 'Challenge' });
@@ -46,10 +48,19 @@ export default function ChallengeDetailScreen() {
 
   return (
     <DefisPageShell title="Challenge">
-      {isLoading || !data ? (
+      {isLoading && !data ? (
         <ActivityIndicator color={COLORS.primary} style={styles.loader} />
-      ) : (
+      ) : isError ? (
+        <Text style={styles.error}>
+          {error instanceof Error ? error.message : 'Impossible de charger ce challenge.'}
+        </Text>
+      ) : data ? (
         <>
+          {!isOnline ? (
+            <Text style={styles.offlineHint}>
+              Données en cache — reconnectez-vous pour actualiser.
+            </Text>
+          ) : null}
           <Text style={styles.title}>{data.challenge.title}</Text>
           <CountdownTimer endsAt={data.challenge.endsAt} />
           {data.challenge.rewardText ? (
@@ -74,7 +85,7 @@ export default function ChallengeDetailScreen() {
             <Text style={styles.secondaryBtnText}>Voir le classement</Text>
           </Pressable>
         </>
-      )}
+      ) : null}
     </DefisPageShell>
   );
 }
@@ -134,6 +145,19 @@ function QuizDetailRow({
 
 const styles = StyleSheet.create({
   loader: { marginTop: 32 },
+  error: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 24,
+  },
+  offlineHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+  },
   title: {
     fontFamily: 'Nunito_800ExtraBold',
     fontSize: 22,

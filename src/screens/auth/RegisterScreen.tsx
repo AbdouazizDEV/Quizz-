@@ -127,8 +127,9 @@ export default function RegisterScreen() {
       }
 
       const token = data.session?.access_token;
-      if (token) {
-        await persistLoginAndSyncStore(token);
+      const refreshToken = data.session?.refresh_token;
+      if (token && refreshToken) {
+        await persistLoginAndSyncStore(token, refreshToken);
         onboarding.clear();
         setShowSuccess(true);
         return;

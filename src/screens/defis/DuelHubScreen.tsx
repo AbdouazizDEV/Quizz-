@@ -29,6 +29,7 @@ import {
 } from '@constants/duelList';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import type { DuelSummary } from '@app-types/challenge.types';
 import {
   createFriendDuel,
@@ -46,6 +47,7 @@ export default function DuelHubScreen() {
   const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
+  const { isOnline } = useNetworkStatus();
   const [search, setSearch] = useState('');
   const [sentModal, setSentModal] = useState<{
     duel: DuelSummary;
@@ -126,9 +128,15 @@ export default function DuelHubScreen() {
   const onChallengeFriend = async (friendName: string, friendId: string) => {
     if (!userId) return;
     try {
-      const duel = await createFriendDuel(userId, friendId);
+      const result = await createFriendDuel(userId, friendId);
       await refresh();
-      setSentModal({ duel, friendName });
+      if (result.queued) {
+        Alert.alert('Duel', 'Défi enregistré — synchronisation à la reconnexion.');
+        return;
+      }
+      if (result.data) {
+        setSentModal({ duel: result.data, friendName });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Impossible de créer le duel.';
       showAppError(message, { title: 'Duel' });
@@ -141,8 +149,15 @@ export default function DuelHubScreen() {
     setIncomingDuel(null);
     setRespondingDuelId(duelId);
     try {
-      await respondToDuel(duelId, userId, true);
+      const result = await respondToDuel(duelId, userId, true);
       await refresh();
+      if (result.queued) {
+        Alert.alert(
+          'Duel',
+          'Acceptation enregistrée — le duel sera disponible à la reconnexion.',
+        );
+        return;
+      }
       router.push(DefisRoutes.duelDetail(duelId));
     } catch (error) {
       showAppError(error instanceof Error ? error.message : 'Impossible d\'accepter le duel.', {
@@ -159,8 +174,11 @@ export default function DuelHubScreen() {
     setIncomingDuel(null);
     setRespondingDuelId(duelId);
     try {
-      await respondToDuel(duelId, userId, false);
+      const result = await respondToDuel(duelId, userId, false);
       await refresh();
+      if (result.queued) {
+        Alert.alert('Duel', 'Refus enregistré — synchronisation à la reconnexion.');
+      }
     } catch (error) {
       showAppError(error instanceof Error ? error.message : 'Impossible de refuser le duel.', {
         title: 'Duel',
@@ -174,8 +192,17 @@ export default function DuelHubScreen() {
     if (!userId || respondingDuelId) return;
     setRespondingDuelId(duelId);
     try {
-      await respondToDuel(duelId, userId, accept);
+      const result = await respondToDuel(duelId, userId, accept);
       await refresh();
+      if (result.queued) {
+        Alert.alert(
+          'Duel',
+          accept
+            ? 'Acceptation enregistrée — le duel sera disponible à la reconnexion.'
+            : 'Refus enregistré — synchronisation à la reconnexion.',
+        );
+        return;
+      }
       if (accept) {
         Alert.alert('Défi accepté', `Le duel contre ${challengerName} est lancé. Bonne chance !`);
         router.push(DefisRoutes.duelDetail(duelId));
@@ -223,6 +250,12 @@ export default function DuelHubScreen() {
         <Text style={styles.heroMeta}>15 questions · ~3 min</Text>
         <Text style={styles.heroCta}>Jouer maintenant →</Text>
       </Pressable>
+
+      {!isOnline && (pendingTotal > 0 || recentTotal > 0) ? (
+        <Text style={styles.offlineHint}>
+          Données en cache — reconnectez-vous pour actualiser.
+        </Text>
+      ) : null}
 
       <SectionTitle
         title={friendsTotal > 0 ? `Défier un ami (${friendsTotal})` : 'Défier un ami'}
@@ -374,5 +407,11 @@ const styles = StyleSheet.create({
   },
   pendingList: {
     gap: 10,
+  },
+  offlineHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
   },
 });

@@ -1,8 +1,15 @@
+import type { ChallengeProgress } from '@app-types/challenge.types';
+import {
+  activeWeeklyChallengesCacheKey,
+  challengeLeaderboardCacheKey,
+  challengeProgressCacheKey,
+  pastWeeklyChallengesCacheKey,
+  readWithOfflineCache,
+} from '@services/offline';
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 
 import type {
   ChallengeLeaderboard,
-  ChallengeProgress,
   DailyQuiz,
   WeeklyChallenge,
 } from '@app-types/challenge.types';
@@ -46,7 +53,7 @@ function todayDateString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-export async function fetchActiveWeeklyChallenges(): Promise<WeeklyChallenge[]> {
+async function loadActiveWeeklyChallengesFromSupabase(): Promise<WeeklyChallenge[]> {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error('Supabase non configuré');
 
@@ -61,11 +68,10 @@ export async function fetchActiveWeeklyChallenges(): Promise<WeeklyChallenge[]> 
     .order('starts_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-
   return ((data ?? []) as WeeklyChallengeRow[]).map(mapChallenge);
 }
 
-export async function fetchPastWeeklyChallenges(): Promise<WeeklyChallenge[]> {
+async function loadPastWeeklyChallengesFromSupabase(): Promise<WeeklyChallenge[]> {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error('Supabase non configuré');
 
@@ -80,11 +86,42 @@ export async function fetchPastWeeklyChallenges(): Promise<WeeklyChallenge[]> {
     .limit(12);
 
   if (error) throw new Error(error.message);
-
   return ((data ?? []) as WeeklyChallengeRow[]).map(mapChallenge);
 }
 
-export async function fetchChallengeProgress(
+function userSemanticScore(participationByQuiz: Map<string, number>): number {
+  let total = 0;
+  for (const score of participationByQuiz.values()) {
+    total += score;
+  }
+  return total;
+}
+
+async function computeUserRank(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  challengeId: string,
+  userId: string,
+  userScore: number,
+): Promise<number | null> {
+  if (userScore <= 0) return null;
+
+  const { data: allParticipations } = await supabase
+    .from('challenge_participations')
+    .select('user_id, score')
+    .eq('challenge_id', challengeId);
+
+  const totalsByUser = new Map<string, number>();
+  for (const row of allParticipations ?? []) {
+    const prev = totalsByUser.get(row.user_id) ?? 0;
+    totalsByUser.set(row.user_id, prev + (row.score ?? 0));
+  }
+
+  const sorted = [...totalsByUser.entries()].sort((a, b) => b[1] - a[1]);
+  const index = sorted.findIndex(([uid]) => uid === userId);
+  return index >= 0 ? index + 1 : null;
+}
+
+async function loadChallengeProgressFromSupabase(
   challengeId: string,
   userId: string,
 ): Promise<ChallengeProgress> {
@@ -141,7 +178,6 @@ export async function fetchChallengeProgress(
   const userScore = userSemanticScore(participationByQuiz);
   const quizzesPlayed = dailyQuizzes.filter((q) => q.isPlayed).length;
   const totalQuizzes = dailyQuizzes.length;
-
   const userRank = await computeUserRank(supabase, challengeId, userId, userScore);
 
   return {
@@ -154,39 +190,7 @@ export async function fetchChallengeProgress(
   };
 }
 
-function userSemanticScore(participationByQuiz: Map<string, number>): number {
-  let total = 0;
-  for (const score of participationByQuiz.values()) {
-    total += score;
-  }
-  return total;
-}
-
-async function computeUserRank(
-  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
-  challengeId: string,
-  userId: string,
-  userScore: number,
-): Promise<number | null> {
-  if (userScore <= 0) return null;
-
-  const { data: allParticipations } = await supabase
-    .from('challenge_participations')
-    .select('user_id, score')
-    .eq('challenge_id', challengeId);
-
-  const totalsByUser = new Map<string, number>();
-  for (const row of allParticipations ?? []) {
-    const prev = totalsByUser.get(row.user_id) ?? 0;
-    totalsByUser.set(row.user_id, prev + (row.score ?? 0));
-  }
-
-  const sorted = [...totalsByUser.entries()].sort((a, b) => b[1] - a[1]);
-  const index = sorted.findIndex(([uid]) => uid === userId);
-  return index >= 0 ? index + 1 : null;
-}
-
-export async function fetchChallengeLeaderboard(
+async function loadChallengeLeaderboardFromSupabase(
   challengeId: string,
   userId: string,
 ): Promise<ChallengeLeaderboard> {
@@ -250,4 +254,42 @@ export async function fetchChallengeLeaderboard(
       : null,
     entries,
   };
+}
+
+export async function fetchActiveWeeklyChallenges(): Promise<WeeklyChallenge[]> {
+  return readWithOfflineCache({
+    cacheKey: activeWeeklyChallengesCacheKey(),
+    source: 'supabase',
+    fetchOnline: loadActiveWeeklyChallengesFromSupabase,
+  });
+}
+
+export async function fetchPastWeeklyChallenges(): Promise<WeeklyChallenge[]> {
+  return readWithOfflineCache({
+    cacheKey: pastWeeklyChallengesCacheKey(),
+    source: 'supabase',
+    fetchOnline: loadPastWeeklyChallengesFromSupabase,
+  });
+}
+
+export async function fetchChallengeProgress(
+  challengeId: string,
+  userId: string,
+): Promise<ChallengeProgress> {
+  return readWithOfflineCache({
+    cacheKey: challengeProgressCacheKey(challengeId, userId),
+    source: 'supabase',
+    fetchOnline: () => loadChallengeProgressFromSupabase(challengeId, userId),
+  });
+}
+
+export async function fetchChallengeLeaderboard(
+  challengeId: string,
+  userId: string,
+): Promise<ChallengeLeaderboard> {
+  return readWithOfflineCache({
+    cacheKey: challengeLeaderboardCacheKey(challengeId, userId),
+    source: 'supabase',
+    fetchOnline: () => loadChallengeLeaderboardFromSupabase(challengeId, userId),
+  });
 }

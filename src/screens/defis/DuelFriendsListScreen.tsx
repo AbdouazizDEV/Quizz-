@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
@@ -56,9 +56,15 @@ export default function DuelFriendsListScreen() {
   const onChallengeFriend = async (friendName: string, friendId: string) => {
     if (!userId) return;
     try {
-      const duel = await createFriendDuel(userId, friendId);
+      const result = await createFriendDuel(userId, friendId);
       await refreshDuels();
-      setSentModal({ duel, friendName });
+      if (result.queued) {
+        Alert.alert('Duel', 'Défi enregistré — synchronisation à la reconnexion.');
+        return;
+      }
+      if (result.data) {
+        setSentModal({ duel: result.data, friendName });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Impossible de créer le duel.';
       showAppError(message, { title: 'Duel' });

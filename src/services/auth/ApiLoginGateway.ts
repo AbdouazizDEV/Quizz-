@@ -3,7 +3,7 @@ import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 import type { ILoginGateway, LoginCredentials } from './ILoginGateway';
 
 export class ApiLoginGateway implements ILoginGateway {
-  async signIn(credentials: LoginCredentials): Promise<{ accessToken: string }> {
+  async signIn(credentials: LoginCredentials): Promise<{ accessToken: string; refreshToken: string }> {
     const { data, error, response } = await getQuizzApiClient().POST('/auth/login', {
       body: {
         email: credentials.email,
@@ -21,10 +21,11 @@ export class ApiLoginGateway implements ILoginGateway {
     }
 
     const token = data.session?.access_token;
-    if (!token) {
+    const refreshToken = data.session?.refresh_token;
+    if (!token || !refreshToken) {
       throw new Error('Session absente.');
     }
-    return { accessToken: token };
+    return { accessToken: token, refreshToken };
   }
 }
 

@@ -99,8 +99,8 @@ export default function LoginScreen() {
     setFormError(null);
     setSubmitting(true);
     try {
-      const { accessToken } = await loginGateway.signIn({ email: trimmed, password });
-      await persistLoginAndSyncStore(accessToken);
+      const { accessToken, refreshToken } = await loginGateway.signIn({ email: trimmed, password });
+      await persistLoginAndSyncStore(accessToken, refreshToken);
       router.replace(Routes.HOME);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Connexion impossible. Réessayez.');
