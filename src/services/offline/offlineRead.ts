@@ -1,4 +1,5 @@
 import { offlineStore } from './OfflineStore';
+import { ensureOfflineDatabaseReady } from './offlineDatabase';
 import { fetchNetworkOnline } from './networkStatus';
 import type { OfflineSource } from './types';
 
@@ -31,12 +32,17 @@ export async function readWithOfflineCache<T>({
   fetchOnline,
   fallbackToCacheOnError = true,
 }: ReadWithOfflineCacheOptions<T>): Promise<T> {
+  await ensureOfflineDatabaseReady();
   const online = await fetchNetworkOnline();
 
   if (online) {
     try {
       const data = await fetchOnline();
-      await offlineStore.setCachedResponse({ cacheKey, source, data });
+      try {
+        await offlineStore.setCachedResponse({ cacheKey, source, data });
+      } catch {
+        // Ne pas bloquer l'écran si l'écriture cache échoue.
+      }
       return data;
     } catch (error) {
       if (!fallbackToCacheOnError) throw error;

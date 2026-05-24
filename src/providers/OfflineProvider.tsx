@@ -21,6 +21,7 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
       if (await fetchNetworkOnline()) {
         await runOfflineSync();
       }
+      if (!cancelled) useNetworkStore.getState().setReady(true);
     });
 
     void fetchNetworkOnline().then((online) => {
@@ -35,8 +36,6 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
         void updateOfflinePendingCount();
       }
     });
-
-    useNetworkStore.getState().setReady(true);
 
     return () => {
       cancelled = true;

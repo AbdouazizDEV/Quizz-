@@ -122,13 +122,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 10,
     width: '100%',
     marginTop: 4,
   },
   secondaryBtn: {
-    flex: 1,
+    width: '100%',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   primaryBtn: {
-    flex: 1,
+    width: '100%',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -150,5 +150,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_700Bold',
     fontSize: 14,
     color: COLORS.textLight,
+    textAlign: 'center',
   },
 });

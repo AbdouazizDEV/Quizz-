@@ -16,14 +16,14 @@ export const HOME_ACTION_TILES: readonly HomeActionTileDefinition[] = [
   {
     id: 'challenge',
     title: 'Challenge',
-    badge: 'En cours',
+    badge: 'Actif',
     badgeVariant: 'en_cours',
     icon: 'flag',
   },
   {
     id: 'tournament',
     title: 'Tournoi',
-    badge: 'En cours',
+    badge: 'Actif',
     badgeVariant: 'en_cours',
     icon: 'award',
   },

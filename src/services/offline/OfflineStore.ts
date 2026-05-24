@@ -5,10 +5,35 @@ import type {
   OfflineSource,
   QueuedMutation,
 } from './types';
-import { getOfflineDatabase, isUsingMemoryFallback, memoryCache, memoryQueue } from './offlineDatabase';
+import {
+  enableMemoryFallback,
+  getOfflineDatabase,
+  isUsingMemoryFallback,
+  memoryCache,
+  memoryQueue,
+} from './offlineDatabase';
 
 function createMutationId(): string {
   return `mq_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isSqliteError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('NativeDatabase') ||
+    message.includes('prepareAsync') ||
+    message.includes('NullPointerException')
+  );
+}
+
+function handleSqliteFailure(error: unknown): void {
+  if (isSqliteError(error)) {
+    enableMemoryFallback(error);
+    return;
+  }
+  if (__DEV__) {
+    console.warn('[Offline] Erreur SQLite.', error);
+  }
 }
 
 function mapQueuedRow(row: Record<string, unknown>): QueuedMutation {
@@ -43,19 +68,26 @@ export class OfflineStore {
       }
     }
 
-    const db = await getOfflineDatabase();
-    if (!db) return null;
-
-    const row = await db.getFirstAsync<{ response_json: string }>(
-      'SELECT response_json FROM api_cache WHERE cache_key = ?',
-      [cacheKey],
-    );
-    if (!row?.response_json) return null;
-
     try {
+      const db = await getOfflineDatabase();
+      if (!db) return null;
+
+      const row = await db.getFirstAsync<{ response_json: string }>(
+        'SELECT response_json FROM api_cache WHERE cache_key = ?',
+        [cacheKey],
+      );
+      if (!row?.response_json) return null;
+
       return JSON.parse(row.response_json) as T;
-    } catch {
-      return null;
+    } catch (error) {
+      handleSqliteFailure(error);
+      const raw = memoryCache.get(cacheKey);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw) as T;
+      } catch {
+        return null;
+      }
     }
   }
 
@@ -117,20 +149,25 @@ export class OfflineStore {
       return;
     }
 
-    const db = await getOfflineDatabase();
-    if (!db) return;
+    try {
+      const db = await getOfflineDatabase();
+      if (!db) return;
 
-    await db.runAsync(
-      `INSERT INTO api_cache (cache_key, source, method, response_json, status_code, cached_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(cache_key) DO UPDATE SET
-         source = excluded.source,
-         method = excluded.method,
-         response_json = excluded.response_json,
-         status_code = excluded.status_code,
-         cached_at = excluded.cached_at`,
-      [input.cacheKey, input.source, method, responseJson, statusCode, cachedAt],
-    );
+      await db.runAsync(
+        `INSERT INTO api_cache (cache_key, source, method, response_json, status_code, cached_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(cache_key) DO UPDATE SET
+           source = excluded.source,
+           method = excluded.method,
+           response_json = excluded.response_json,
+           status_code = excluded.status_code,
+           cached_at = excluded.cached_at`,
+        [input.cacheKey, input.source, method, responseJson, statusCode, cachedAt],
+      );
+    } catch (error) {
+      handleSqliteFailure(error);
+      memoryCache.set(input.cacheKey, responseJson);
+    }
   }
 
   async enqueueMutation(input: EnqueueMutationInput): Promise<QueuedMutation> {
@@ -158,34 +195,54 @@ export class OfflineStore {
       return mapQueuedRow(item);
     }
 
-    const db = await getOfflineDatabase();
-    if (!db) throw new Error('Base offline indisponible');
+    try {
+      const db = await getOfflineDatabase();
+      if (!db) throw new Error('Base offline indisponible');
 
-    const sortRow = await db.getFirstAsync<{ next_order: number }>(
-      `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM mutation_queue`,
-    );
-    const sortOrder = sortRow?.next_order ?? 0;
+      const sortRow = await db.getFirstAsync<{ next_order: number }>(
+        `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM mutation_queue`,
+      );
+      const sortOrder = sortRow?.next_order ?? 0;
 
-    await db.runAsync(
-      `INSERT INTO mutation_queue
-       (id, source, method, url, headers_json, body_json, created_at, status, attempts, last_error, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, ?)`,
-      [id, input.source, input.method, input.url, headersJson, bodyJson, createdAt, sortOrder],
-    );
+      await db.runAsync(
+        `INSERT INTO mutation_queue
+         (id, source, method, url, headers_json, body_json, created_at, status, attempts, last_error, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, ?)`,
+        [id, input.source, input.method, input.url, headersJson, bodyJson, createdAt, sortOrder],
+      );
 
-    return {
-      id,
-      source: input.source,
-      method: input.method,
-      url: input.url,
-      headersJson,
-      bodyJson,
-      createdAt,
-      status: 'pending',
-      attempts: 0,
-      lastError: null,
-      sortOrder,
-    };
+      return {
+        id,
+        source: input.source,
+        method: input.method,
+        url: input.url,
+        headersJson,
+        bodyJson,
+        createdAt,
+        status: 'pending',
+        attempts: 0,
+        lastError: null,
+        sortOrder,
+      };
+    } catch (error) {
+      handleSqliteFailure(error);
+      const sortOrder = memoryQueue.length;
+      const item = {
+        id,
+        source: input.source,
+        method: input.method,
+        url: input.url,
+        headers_json: headersJson,
+        body_json: bodyJson,
+        created_at: createdAt,
+        status: 'pending',
+        attempts: 0,
+        last_error: null,
+        sort_order: sortOrder,
+      };
+      memoryQueue.push(item);
+      return mapQueuedRow(item);
+    }
   }
 
   async listPendingMutations(): Promise<QueuedMutation[]> {
@@ -196,15 +253,23 @@ export class OfflineStore {
         .map(mapQueuedRow);
     }
 
-    const db = await getOfflineDatabase();
-    if (!db) return [];
+    try {
+      const db = await getOfflineDatabase();
+      if (!db) return [];
 
-    const rows = await db.getAllAsync<Record<string, unknown>>(
-      `SELECT * FROM mutation_queue
-       WHERE status IN ('pending', 'failed')
-       ORDER BY sort_order ASC, created_at ASC`,
-    );
-    return rows.map(mapQueuedRow);
+      const rows = await db.getAllAsync<Record<string, unknown>>(
+        `SELECT * FROM mutation_queue
+         WHERE status IN ('pending', 'failed')
+         ORDER BY sort_order ASC, created_at ASC`,
+      );
+      return rows.map(mapQueuedRow);
+    } catch (error) {
+      handleSqliteFailure(error);
+      return memoryQueue
+        .filter((row) => row.status === 'pending' || row.status === 'failed')
+        .sort((a, b) => Number(a.sort_order) - Number(b.sort_order))
+        .map(mapQueuedRow);
+    }
   }
 
   async markMutationSyncing(id: string): Promise<void> {

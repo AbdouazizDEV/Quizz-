@@ -11,12 +11,13 @@ interface UseProfileScreenDataResult {
   refetch: () => void;
 }
 
-export function useProfileScreenData(userId?: string): UseProfileScreenDataResult {
+export function useProfileScreenData(userId?: string, waitForAuth = false): UseProfileScreenDataResult {
   const [data, setData] = useState<ProfileScreenData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const load = useCallback(async () => {
+    if (waitForAuth) return;
     setLoading(true);
     setError(null);
     try {
@@ -28,7 +29,7 @@ export function useProfileScreenData(userId?: string): UseProfileScreenDataResul
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, waitForAuth]);
 
   useEffect(() => {
     void load();

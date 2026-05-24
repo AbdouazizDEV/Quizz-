@@ -1,9 +1,11 @@
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { CountdownTimer } from '@components/atoms/CountdownTimer';
+import { CompetitionHeroBanner } from '@components/ui/defis/CompetitionHeroBanner';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
+import { DefisSurfaceCard } from '@components/ui/defis/DefisSurfaceCard';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { COLORS } from '@constants/Colors';
 import { useAuthMe } from '@hooks/useAuthMe';
@@ -46,9 +48,9 @@ export default function TournoiDetailScreen() {
           ? '✓ Inscription enregistrée — synchronisation à la reconnexion.'
           : '✓ Vous êtes inscrit !',
       );
-    } catch (error) {
+    } catch (registerError) {
       showAppError(
-        error instanceof Error ? error.message : 'Inscription impossible.',
+        registerError instanceof Error ? registerError.message : 'Inscription impossible.',
         { title: 'Tournoi' },
       );
     }
@@ -62,17 +64,18 @@ export default function TournoiDetailScreen() {
       if (result.queued) {
         Alert.alert('Tournoi', '✓ Désinscription enregistrée — synchronisation à la reconnexion.');
       }
-    } catch (error) {
-      showAppError(error instanceof Error ? error.message : 'Désinscription impossible.', {
-        title: 'Tournoi',
-      });
+    } catch (unregisterError) {
+      showAppError(
+        unregisterError instanceof Error ? unregisterError.message : 'Désinscription impossible.',
+        { title: 'Tournoi' },
+      );
     }
   };
 
   if (isLoading) {
     return (
       <DefisPageShell title="Tournoi">
-        <ActivityIndicator color={COLORS.primary} />
+        <ActivityIndicator color={COLORS.primary} style={styles.loader} />
       </DefisPageShell>
     );
   }
@@ -104,50 +107,75 @@ export default function TournoiDetailScreen() {
       {!isOnline ? (
         <Text style={styles.offlineHint}>Données en cache — reconnectez-vous pour actualiser.</Text>
       ) : null}
-      <Text style={styles.title}>{data.title}</Text>
-      <Text style={styles.meta}>
-        {data.registeredCount}/{data.maxParticipants} inscrits · Élimination directe
-      </Text>
-      {data.startsAt ? <CountdownTimer endsAt={data.startsAt} /> : null}
-      {data.rewardText ? <Text style={styles.reward}>🎁 {data.rewardText}</Text> : null}
-      <Text style={styles.note}>Gratuit · Résultats en direct · 🎁 Récompenses à gagner</Text>
+
+      <CompetitionHeroBanner
+        competition={data}
+        subtitle={data.categoryName ? `Catégorie · ${data.categoryName}` : 'Toutes catégories'}
+      />
+
+      <DefisSurfaceCard style={styles.perksCard}>
+        <Text style={styles.perksTitle}>À savoir</Text>
+        <Text style={styles.perkLine}>✓ Gratuit · Résultats en direct</Text>
+        <Text style={styles.perkLine}>✓ Bracket élimination directe</Text>
+        {data.rewardText ? <Text style={styles.perkLine}>🎁 {data.rewardText} à gagner</Text> : null}
+      </DefisSurfaceCard>
 
       {isOpen && !data.isRegistered ? (
-        <Pressable style={styles.primaryBtn} onPress={() => void onRegister()}>
-          <Text style={styles.primaryBtnText}>S&apos;inscrire au tournoi</Text>
+        <Pressable style={styles.ctaWrap} onPress={() => void onRegister()}>
+          <LinearGradient
+            colors={[COLORS.primaryDark, COLORS.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.primaryBtn}
+          >
+            <Text style={styles.primaryBtnText}>Rejoindre le tournoi</Text>
+          </LinearGradient>
         </Pressable>
       ) : null}
 
       {isOpen && data.isRegistered ? (
-        <>
-          <Text style={styles.success}>✓ Vous êtes inscrit !</Text>
-          <Pressable style={styles.secondaryBtn} disabled>
-            <Text style={styles.secondaryBtnText}>Voir le bracket (bientôt)</Text>
-          </Pressable>
+        <DefisSurfaceCard style={styles.registeredCard}>
+          <Text style={styles.registeredTitle}>✓ Vous êtes inscrit</Text>
+          <Text style={styles.registeredHint}>
+            Le bracket sera disponible dès le lancement du tournoi. Restez prêt !
+          </Text>
           <Pressable onPress={() => void onUnregister()}>
             <Text style={styles.unlink}>Se désinscrire</Text>
           </Pressable>
-        </>
+        </DefisSurfaceCard>
       ) : null}
 
       {isLive ? (
         <>
-          <View style={styles.matchCard}>
+          <LinearGradient
+            colors={['#FFF8E7', '#FFF3D6']}
+            style={styles.matchCard}
+          >
+            <Text style={styles.matchEyebrow}>⚡ Match en cours</Text>
             <Text style={styles.matchTitle}>Mon prochain match</Text>
-            <Text style={styles.matchMeta}>Jouez quand vous voulez avant la fin du tournoi</Text>
-            <Pressable style={styles.primaryBtn}>
-              <Text style={styles.primaryBtnText}>Jouer mon match →</Text>
+            <Text style={styles.matchMeta}>
+              Jouez quand vous voulez avant la fin du tournoi. Chaque victoire vous rapproche du
+              titre.
+            </Text>
+            <Pressable style={styles.matchCta}>
+              <Text style={styles.matchCtaText}>Jouer mon match →</Text>
             </Pressable>
-          </View>
-          <Pressable onPress={() => router.push(DefisRoutes.tournoiBracket(competitionId))}>
-            <Text style={styles.link}>Voir le bracket complet →</Text>
+          </LinearGradient>
+          <Pressable
+            style={styles.bracketLink}
+            onPress={() => router.push(DefisRoutes.tournoiBracket(competitionId))}
+          >
+            <Text style={styles.bracketLinkText}>Voir le bracket complet →</Text>
           </Pressable>
         </>
       ) : null}
 
       {isDone ? (
-        <Pressable onPress={() => router.push(DefisRoutes.tournoiBracket(competitionId))}>
-          <Text style={styles.link}>Voir le bracket final →</Text>
+        <Pressable
+          style={styles.bracketLink}
+          onPress={() => router.push(DefisRoutes.tournoiBracket(competitionId))}
+        >
+          <Text style={styles.bracketLinkText}>Voir le podium & le bracket final →</Text>
         </Pressable>
       ) : null}
     </DefisPageShell>
@@ -155,94 +183,119 @@ export default function TournoiDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontFamily: 'Nunito_800ExtraBold',
-    fontSize: 22,
-    color: COLORS.textPrimary,
-  },
-  meta: {
+  loader: { marginVertical: 32 },
+  offlineHint: {
     fontFamily: 'Nunito_600SemiBold',
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontSize: 12,
+    color: COLORS.info,
+    marginBottom: 4,
   },
-  reward: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 14,
-    color: COLORS.textSecondary,
+  perksCard: {
+    gap: 8,
+    backgroundColor: '#FAFAFA',
   },
-  note: {
-    fontFamily: 'Nunito_400Regular',
+  perksTitle: {
+    fontFamily: 'Nunito_700Bold',
     fontSize: 13,
     color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  perkLine: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  ctaWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: COLORS.primaryDark,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   primaryBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   primaryBtnText: {
-    fontFamily: 'Nunito_700Bold',
+    fontFamily: 'Nunito_800ExtraBold',
     color: COLORS.textLight,
-    fontSize: 15,
-  },
-  secondaryBtn: {
-    backgroundColor: COLORS.border,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    fontFamily: 'Nunito_700Bold',
-    color: COLORS.textSecondary,
-    fontSize: 14,
-  },
-  success: {
-    fontFamily: 'Nunito_700Bold',
-    color: COLORS.success,
     fontSize: 16,
+    letterSpacing: 0.3,
+  },
+  registeredCard: {
+    gap: 8,
+    borderColor: COLORS.success,
+    borderWidth: 1.5,
+  },
+  registeredTitle: {
+    fontFamily: 'Nunito_800ExtraBold',
+    color: COLORS.success,
+    fontSize: 17,
+  },
+  registeredHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
   unlink: {
     fontFamily: 'Nunito_600SemiBold',
     color: COLORS.error,
-    textAlign: 'center',
     fontSize: 13,
+    marginTop: 4,
   },
   matchCard: {
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 18,
+    padding: 18,
     gap: 8,
     borderWidth: 1,
     borderColor: COLORS.primary,
   },
-  matchTitle: {
+  matchEyebrow: {
     fontFamily: 'Nunito_700Bold',
-    fontSize: 14,
-    color: COLORS.primary,
+    fontSize: 12,
+    color: COLORS.primaryDark,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  matchTitle: {
+    fontFamily: 'Nunito_800ExtraBold',
+    fontSize: 20,
+    color: COLORS.textPrimary,
   },
   matchMeta: {
     fontFamily: 'Nunito_600SemiBold',
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.textSecondary,
+    lineHeight: 20,
   },
-  link: {
+  matchCta: {
+    marginTop: 6,
+    backgroundColor: COLORS.primaryDark,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  matchCtaText: {
+    fontFamily: 'Nunito_700Bold',
+    color: COLORS.textLight,
+    fontSize: 15,
+  },
+  bracketLink: {
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+  },
+  bracketLinkText: {
     fontFamily: 'Nunito_700Bold',
     color: COLORS.primaryDark,
     fontSize: 14,
-    textAlign: 'right',
   },
   errorText: {
     fontFamily: 'Nunito_600SemiBold',
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: 24,
-  },
-  offlineHint: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 12,
-    color: COLORS.info,
-    marginBottom: 8,
   },
 });
