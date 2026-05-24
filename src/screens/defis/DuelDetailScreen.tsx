@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -8,15 +9,16 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import { DuelMatchHero } from '@components/ui/defis/DuelMatchHero';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
 import { SectionTitle } from '@components/ui/common/SectionTitle';
 import { COLORS } from '@constants/Colors';
+import { DefisRoutes } from '@constants/defisRoutes';
 import { buildQuizEntryHref } from '@constants/Routes';
 import { useAuthMe } from '@hooks/useAuthMe';
-import { useDuelQuery } from '@hooks/defis/useDuelQuery';
+import { isDuelResultReady, useDuelQuery } from '@hooks/defis/useDuelQuery';
 import { useAppError } from '@providers/AppErrorProvider';
 import { resolveRouteParamId } from '@utils/resolveRouteParamId';
 
@@ -102,6 +104,14 @@ function getDuelUiState(params: {
     };
   }
 
+  if (myScore !== null && opponentScore !== null) {
+    return {
+      statusLabel: 'Terminé',
+      motivationalLine: 'Les deux joueurs ont terminé — découvrez le résultat ! 🏆',
+      tips: ['Consultez le résultat pour voir qui a gagné.'],
+    };
+  }
+
   return {
     statusLabel: 'Duel',
     motivationalLine: 'Que le meilleur gagne ! 🏆',
@@ -128,6 +138,13 @@ export default function DuelDetailScreen() {
     });
   }, [error, isError, refetch, showAppError]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!duelId) return;
+      void refetch();
+    }, [duelId, refetch]),
+  );
+
   const isChallenger = duel?.challengerId === userId;
   const isChallenged = duel?.challengedId === userId;
   const myQuizScore = duel
@@ -150,6 +167,11 @@ export default function DuelDetailScreen() {
       duel.challengerScore === null) ||
       (duel.challengedId === userId && duel.status === 'accepted' && duel.challengedScore === null));
 
+  const bothPlayed = Boolean(
+    duel && myQuizScore !== null && opponentQuizScore !== null && isDuelResultReady(duel),
+  );
+  const showResultCta = Boolean(duel && isDuelResultReady(duel));
+
   useEffect(() => {
     if (canPlay) {
       ctaPulse.value = withRepeat(
@@ -170,6 +192,14 @@ export default function DuelDetailScreen() {
     return (
       <DefisPageShell title="Duel">
         <ActivityIndicator color={COLORS.primary} style={styles.loader} />
+      </DefisPageShell>
+    );
+  }
+
+  if (!duel) {
+    return (
+      <DefisPageShell title="Duel">
+        <Text style={styles.loader}>Duel introuvable.</Text>
       </DefisPageShell>
     );
   }
@@ -207,7 +237,7 @@ export default function DuelDetailScreen() {
         opponentAvatarUrl={opponentAvatar}
         opponentTotalScore={opponentTotalScore}
         myQuizScore={myQuizScore}
-        showOpponentQuizScore={duel.status === 'completed' && opponentQuizScore !== null}
+        showOpponentQuizScore={bothPlayed || duel.status === 'completed'}
         opponentQuizScore={opponentQuizScore}
         questionsCount={duel.questionsCount}
         expiresAt={duel.expiresAt}
@@ -232,7 +262,7 @@ export default function DuelDetailScreen() {
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <AnimatedPressable
             style={[styles.primaryBtn, ctaAnimatedStyle]}
-            onPress={() => router.push(buildQuizEntryHref(duel.quizId))}
+            onPress={() => router.push(buildQuizEntryHref(duel.quizId, { duelId: duel.id }))}
             accessibilityRole="button"
           >
             <Text style={styles.primaryBtnEmoji}>🎮</Text>
@@ -240,6 +270,17 @@ export default function DuelDetailScreen() {
             <Text style={styles.primaryBtnArrow}>→</Text>
           </AnimatedPressable>
           <Text style={styles.ctaHint}>Prêt ? Chaque seconde compte !</Text>
+        </Animated.View>
+      ) : null}
+
+      {showResultCta ? (
+        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+          <Pressable
+            style={styles.primaryBtn}
+            onPress={() => router.push(DefisRoutes.duelResult(duel.id))}
+          >
+            <Text style={styles.primaryBtnText}>Voir le résultat →</Text>
+          </Pressable>
         </Animated.View>
       ) : null}
 

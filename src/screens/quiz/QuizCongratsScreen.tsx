@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizCongratsFlowers } from '@components/ui/quiz/play/QuizCongratsFlowers';
+import { DefisRoutes } from '@constants/defisRoutes';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
@@ -25,8 +26,13 @@ import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 export default function QuizCongratsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { quizId: idParam } = useLocalSearchParams<{ quizId: string | string[] }>();
+  const { quizId: idParam, duelId: duelParam } = useLocalSearchParams<{
+    quizId: string | string[];
+    duelId?: string | string[];
+  }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
+  const duelId =
+    typeof duelParam === 'string' ? duelParam : Array.isArray(duelParam) ? duelParam[0] : undefined;
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, QuizPlayTheme.contentMaxWidth);
 
@@ -77,12 +83,16 @@ export default function QuizCongratsScreen() {
 
   const goCategory = useCallback(() => {
     reset();
+    if (duelId) {
+      router.replace(DefisRoutes.duelResult(duelId));
+      return;
+    }
     if (categorySlug) {
       router.dismissTo(`${Routes.CATEGORIES}/${encodeURIComponent(categorySlug)}`);
       return;
     }
     router.dismissTo(Routes.HOME);
-  }, [categorySlug, reset, router]);
+  }, [categorySlug, duelId, reset, router]);
 
   const onShare = useCallback(async () => {
     if (!payload) return;
@@ -154,6 +164,14 @@ export default function QuizCongratsScreen() {
         </View>
 
         <View style={[styles.actions, { width: contentWidth }]}>
+          {duelId ? (
+            <Pressable style={[styles.actionBtn, styles.duelActionBtn]} onPress={goCategory}>
+              <Feather name="award" size={20} color="#1F2261" />
+              <Text style={[styles.actionTxt, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+                Résultat du duel
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable style={styles.actionBtn} onPress={onShare}>
             <Feather name="share-2" size={20} color="#1F2261" />
             <Text style={[styles.actionTxt, fonts.semiBold && { fontFamily: fonts.semiBold }]}>Partager</Text>
@@ -245,6 +263,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 100,
     paddingVertical: 16,
+  },
+  duelActionBtn: {
+    backgroundColor: '#FFF3D6',
+    borderWidth: 1,
+    borderColor: '#FFB703',
   },
   actionTxt: { fontSize: 15, fontWeight: '700', color: '#212121' },
 });

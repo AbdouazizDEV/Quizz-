@@ -84,7 +84,7 @@ export default function CategoryDetailScreen() {
         router.push(Routes.LOGIN);
         return;
       }
-      router.push(buildQuizEntryHref(quizId, slug));
+      router.push(buildQuizEntryHref(quizId, { categorySlug: slug }));
     },
     [router, slug, token],
   );

@@ -17,6 +17,7 @@ const clearFeedbackFields = {
 
 interface QuizPlaySessionState {
   categorySlug: string | null;
+  duelId: string | null;
   payload: QuizPlayPayload | null;
   currentIndex: number;
   sessionPoints: number;
@@ -28,7 +29,7 @@ interface QuizPlaySessionState {
   correctAnswerLabel: string;
   secondsPerQuestion: number;
   reset: () => void;
-  bootstrap: (payload: QuizPlayPayload, categorySlug: string | null) => void;
+  bootstrap: (payload: QuizPlayPayload, categorySlug: string | null, duelId?: string | null) => void;
   selectOption: (optionId: string, isCorrect: boolean, pointsIfCorrect: number, correctLabel: string) => void;
   /** Après « Suivant » : enregistre la réponse courante et passe à la suite ou termine. */
   advanceFromFeedback: () => 'continue' | 'finished';
@@ -39,6 +40,7 @@ interface QuizPlaySessionState {
 
 const initial = {
   categorySlug: null as string | null,
+  duelId: null as string | null,
   payload: null as QuizPlayPayload | null,
   currentIndex: 0,
   sessionPoints: 0,
@@ -54,11 +56,12 @@ const initial = {
 export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) => ({
   ...initial,
   reset: () => set({ ...initial }),
-  bootstrap: (payload, categorySlug) =>
+  bootstrap: (payload, categorySlug, duelId = null) =>
     set({
       ...initial,
       payload,
       categorySlug,
+      duelId: duelId ?? null,
       secondsPerQuestion: getTimerSecondsForDifficulty(payload.quiz.difficultyLevel),
     }),
   selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) =>

@@ -39,10 +39,14 @@ export function buildUserProfileHref(userId: string): string {
 }
 
 /** Loader 5s + fetch des questions (`app/quiz/[quizId]/index`). */
-export function buildQuizEntryHref(quizId: string, categorySlug?: string | null): string {
+export function buildQuizEntryHref(
+  quizId: string,
+  options?: { categorySlug?: string | null; duelId?: string | null },
+): string {
   const id = encodeURIComponent(quizId);
-  if (categorySlug) {
-    return `/quiz/${id}?categorySlug=${encodeURIComponent(categorySlug)}`;
-  }
-  return `/quiz/${id}`;
+  const params = new URLSearchParams();
+  if (options?.categorySlug) params.set('categorySlug', options.categorySlug);
+  if (options?.duelId) params.set('duelId', options.duelId);
+  const qs = params.toString();
+  return qs ? `/quiz/${id}?${qs}` : `/quiz/${id}`;
 }

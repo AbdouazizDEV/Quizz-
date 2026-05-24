@@ -153,3 +153,17 @@ export async function apiDeclineDuel(duelId: string): Promise<void> {
     throw new Error(extractApiError(error, 'Impossible de refuser le duel.'));
   }
 }
+
+export async function apiSubmitDuelScore(duelId: string, score: number): Promise<DuelSummary> {
+  try {
+    const { data } = await apiClient.post<{ item?: ApiDuelItem }>(
+      `/defis/duels/${encodeURIComponent(duelId)}/score`,
+      { score },
+      { headers: authHeaders() },
+    );
+    if (!data.item) throw new Error('Réponse serveur invalide.');
+    return mapItem(data.item);
+  } catch (error) {
+    throw new Error(extractApiError(error, 'Impossible d\'enregistrer votre score de duel.'));
+  }
+}
