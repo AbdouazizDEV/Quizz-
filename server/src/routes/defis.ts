@@ -19,6 +19,41 @@ const duelIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
+const duelListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+const DUEL_FETCH_BUFFER = 500;
+
+type DuelPhase =
+  | 'needs_your_acceptance'
+  | 'waiting_opponent_acceptance'
+  | 'your_turn'
+  | 'waiting_opponent_play'
+  | 'expired'
+  | 'finished';
+
+const PENDING_PHASE_PRIORITY: Record<DuelPhase, number> = {
+  needs_your_acceptance: 0,
+  your_turn: 1,
+  waiting_opponent_acceptance: 2,
+  waiting_opponent_play: 3,
+  expired: 4,
+  finished: 5,
+};
+
+function sortPendingDuelRows<T extends { expires_at: string }>(
+  rows: T[],
+  phaseOf: (row: T) => DuelPhase,
+): T[] {
+  return [...rows].sort((a, b) => {
+    const phaseDiff = (PENDING_PHASE_PRIORITY[phaseOf(a)] ?? 99) - (PENDING_PHASE_PRIORITY[phaseOf(b)] ?? 99);
+    if (phaseDiff !== 0) return phaseDiff;
+    return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime();
+  });
+}
+
 function bearerToken(c: { req: { header: (n: string) => string | undefined } }): string | null {
   const h = c.req.header('Authorization');
   if (!h?.startsWith('Bearer ')) return null;
@@ -87,14 +122,6 @@ async function notifyAdmins(
   const { error } = await admin.from('notifications').insert(rows);
   if (error) throw new Error(error.message);
 }
-
-type DuelPhase =
-  | 'needs_your_acceptance'
-  | 'waiting_opponent_acceptance'
-  | 'your_turn'
-  | 'waiting_opponent_play'
-  | 'expired'
-  | 'finished';
 
 interface PlayerProfile {
   name: string;
@@ -219,7 +246,7 @@ function computeDuelPhase(
 async function fetchUserDuels(
   admin: ReturnType<typeof createServiceRoleClient>,
   viewerId: string,
-  limit = 40,
+  limit = DUEL_FETCH_BUFFER,
 ) {
   const { data: rows, error } = await admin
     .from('challenges')
@@ -292,6 +319,15 @@ export const defisRoutes = new Hono()
     if (!token) return c.json({ error: 'Authorization: Bearer <access_token> requis.' }, 401);
     if (!hasServiceRoleKey()) return c.json(serviceRole503(), 503);
 
+    const parsedQuery = duelListQuerySchema.safeParse({
+      page: c.req.query('page'),
+      limit: c.req.query('limit'),
+    });
+    if (!parsedQuery.success) {
+      return c.json({ error: 'Paramètres invalides', details: parsedQuery.error.flatten() }, 400);
+    }
+    const { page, limit } = parsedQuery.data;
+
     const userClient = createUserClient(token);
     const { data: meData, error: meErr } = await userClient.auth.getUser();
     const viewerId = meData.user?.id;
@@ -300,10 +336,22 @@ export const defisRoutes = new Hono()
     const admin = createServiceRoleClient();
     try {
       const rows = await syncExpiredDuels(admin, await fetchUserDuels(admin, viewerId));
-      const activeRows = rows.filter(isDuelActive);
-      const ids = [...new Set(activeRows.flatMap((r) => [r.challenger_id, r.challenged_id]))];
+      const activeRows = sortPendingDuelRows(
+        rows.filter(isDuelActive),
+        (row) => computeDuelPhase(row, viewerId),
+      );
+      const total = activeRows.length;
+      const from = (page - 1) * limit;
+      const pageRows = activeRows.slice(from, from + limit);
+      const ids = [...new Set(pageRows.flatMap((r) => [r.challenger_id, r.challenged_id]))];
       const profiles = await loadPlayerProfiles(admin, ids);
-      return c.json({ items: activeRows.map((r) => mapDuelRow(r, profiles, viewerId)) });
+      return c.json({
+        items: pageRows.map((r) => mapDuelRow(r, profiles, viewerId)),
+        page,
+        limit,
+        total,
+        has_more: from + limit < total,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur serveur';
       return c.json({ error: message }, 500);
@@ -314,6 +362,15 @@ export const defisRoutes = new Hono()
     if (!token) return c.json({ error: 'Authorization: Bearer <access_token> requis.' }, 401);
     if (!hasServiceRoleKey()) return c.json(serviceRole503(), 503);
 
+    const parsedQuery = duelListQuerySchema.safeParse({
+      page: c.req.query('page'),
+      limit: c.req.query('limit'),
+    });
+    if (!parsedQuery.success) {
+      return c.json({ error: 'Paramètres invalides', details: parsedQuery.error.flatten() }, 400);
+    }
+    const { page, limit } = parsedQuery.data;
+
     const userClient = createUserClient(token);
     const { data: meData, error: meErr } = await userClient.auth.getUser();
     const viewerId = meData.user?.id;
@@ -323,10 +380,17 @@ export const defisRoutes = new Hono()
     try {
       const rows = await syncExpiredDuels(admin, await fetchUserDuels(admin, viewerId));
       const finishedRows = rows.filter(isDuelFinished);
-      const ids = [...new Set(finishedRows.flatMap((r) => [r.challenger_id, r.challenged_id]))];
+      const total = finishedRows.length;
+      const from = (page - 1) * limit;
+      const pageRows = finishedRows.slice(from, from + limit);
+      const ids = [...new Set(pageRows.flatMap((r) => [r.challenger_id, r.challenged_id]))];
       const profiles = await loadPlayerProfiles(admin, ids);
       return c.json({
-        items: finishedRows.slice(0, 15).map((r) => mapDuelRow(r, profiles, viewerId)),
+        items: pageRows.map((r) => mapDuelRow(r, profiles, viewerId)),
+        page,
+        limit,
+        total,
+        has_more: from + limit < total,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur serveur';

@@ -1,4 +1,5 @@
 import type { DuelSummary } from '@app-types/challenge.types';
+import type { PaginatedResponse } from '@app-types/pagination.types';
 
 import {
   apiAcceptDuel,
@@ -9,12 +10,18 @@ import {
   apiFetchRecentDuels,
 } from './duelApi';
 
-export async function fetchPendingDuelsForUser(_userId: string): Promise<DuelSummary[]> {
-  return apiFetchPendingDuels();
+export async function fetchPendingDuelsForUser(
+  _userId: string,
+  params?: { page?: number; limit?: number },
+): Promise<PaginatedResponse<DuelSummary>> {
+  return apiFetchPendingDuels(params);
 }
 
-export async function fetchRecentDuelsForUser(_userId: string, _limit = 10): Promise<DuelSummary[]> {
-  return apiFetchRecentDuels();
+export async function fetchRecentDuelsForUser(
+  _userId: string,
+  params?: { page?: number; limit?: number },
+): Promise<PaginatedResponse<DuelSummary>> {
+  return apiFetchRecentDuels(params);
 }
 
 export async function fetchDuelById(duelId: string): Promise<DuelSummary | null> {
