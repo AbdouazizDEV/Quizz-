@@ -88,7 +88,14 @@ export default function LoginScreen() {
   const onSubmit = useCallback(async () => {
     if (submitting) return;
     const trimmed = email.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setFormError('Saisissez votre adresse e-mail.');
+      return;
+    }
+    if (!password.trim()) {
+      setFormError('Saisissez votre mot de passe.');
+      return;
+    }
     setFormError(null);
     setSubmitting(true);
     try {
