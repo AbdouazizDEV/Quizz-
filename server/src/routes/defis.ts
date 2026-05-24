@@ -15,6 +15,10 @@ const createDuelSchema = z.object({
   challenged_id: z.string().uuid(),
 });
 
+const submitDuelScoreSchema = z.object({
+  score: z.coerce.number().int().min(0),
+});
+
 const duelIdParamSchema = z.object({
   id: z.string().uuid(),
 });
@@ -669,4 +673,138 @@ export const defisRoutes = new Hono()
     );
 
     return c.json({ ok: true });
+  })
+  .post('/duels/:id/score', async (c) => {
+    const token = bearerToken(c);
+    if (!token) return c.json({ error: 'Authorization: Bearer <access_token> requis.' }, 401);
+    if (!hasServiceRoleKey()) return c.json(serviceRole503(), 503);
+
+    const parsedParam = duelIdParamSchema.safeParse(c.req.param());
+    if (!parsedParam.success) return c.json({ error: 'Paramètre invalide' }, 400);
+
+    const parsedBody = submitDuelScoreSchema.safeParse(await c.req.json());
+    if (!parsedBody.success) {
+      return c.json({ error: 'Payload invalide', details: parsedBody.error.flatten() }, 400);
+    }
+
+    const userClient = createUserClient(token);
+    const { data: meData, error: meErr } = await userClient.auth.getUser();
+    const viewerId = meData.user?.id;
+    if (meErr || !viewerId) return c.json({ error: meErr?.message ?? 'Jeton invalide.' }, 401);
+
+    const admin = createServiceRoleClient();
+    const { data: duel, error: fetchErr } = await admin
+      .from('challenges')
+      .select(
+        'id, challenger_id, challenged_id, challenger_score, challenged_score, status, winner_id, expires_at, quiz_id',
+      )
+      .eq('id', parsedParam.data.id)
+      .maybeSingle();
+
+    if (fetchErr) return c.json({ error: fetchErr.message }, 500);
+    if (!duel) return c.json({ error: 'Duel introuvable.' }, 404);
+    if (duel.challenger_id !== viewerId && duel.challenged_id !== viewerId) {
+      return c.json({ error: 'Accès refusé.' }, 403);
+    }
+
+    if (isDuelPastExpiry(duel.expires_at)) {
+      await admin.from('challenges').update({ status: 'expired' }).eq('id', duel.id);
+      return c.json({ error: 'Ce duel a expiré.' }, 410);
+    }
+
+    if (duel.status === 'declined' || duel.status === 'completed' || duel.status === 'expired') {
+      return c.json({ error: 'Ce duel est déjà terminé.' }, 409);
+    }
+
+    const isChallenger = duel.challenger_id === viewerId;
+    if (!isChallenger && duel.status !== 'accepted') {
+      return c.json({ error: 'Acceptez le duel avant de jouer.' }, 409);
+    }
+
+    if (isChallenger && duel.challenger_score !== null) {
+      return c.json({ error: 'Vous avez déjà joué ce duel.' }, 409);
+    }
+    if (!isChallenger && duel.challenged_score !== null) {
+      return c.json({ error: 'Vous avez déjà joué ce duel.' }, 409);
+    }
+
+    const score = parsedBody.data.score;
+    const newChallengerScore = isChallenger ? score : duel.challenger_score;
+    const newChallengedScore = isChallenger ? duel.challenged_score : score;
+    const bothPlayed = newChallengerScore !== null && newChallengedScore !== null;
+
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      ...(isChallenger ? { challenger_score: score } : { challenged_score: score }),
+    };
+
+    if (bothPlayed) {
+      let winnerId: string | null = null;
+      if (newChallengerScore > newChallengedScore) winnerId = duel.challenger_id;
+      else if (newChallengedScore > newChallengerScore) winnerId = duel.challenged_id;
+      updatePayload.status = 'completed';
+      updatePayload.winner_id = winnerId;
+    }
+
+    const { data: updated, error: updErr } = await admin
+      .from('challenges')
+      .update(updatePayload)
+      .eq('id', duel.id)
+      .select(
+        'id, challenger_id, challenged_id, challenger_score, challenged_score, status, winner_id, expires_at, quiz_id',
+      )
+      .single();
+
+    if (updErr || !updated) return c.json({ error: updErr?.message ?? 'Mise à jour impossible.' }, 500);
+
+    const opponentId = isChallenger ? duel.challenged_id : duel.challenger_id;
+    const playerName = await profileDisplayName(admin, viewerId);
+    const { data: quiz } = await admin.from('quizzes').select('title').eq('id', duel.quiz_id).maybeSingle();
+    const quizTitle = quiz?.title ?? 'Quiz';
+
+    const notifData = {
+      duel_id: duel.id,
+      quiz_id: duel.quiz_id,
+      quiz_title: quizTitle,
+      score,
+      status: bothPlayed ? 'completed' : 'score_submitted',
+    };
+
+    try {
+      if (bothPlayed) {
+        const resultBody =
+          updated.winner_id === viewerId
+            ? `Victoire ! ${newChallengerScore} - ${newChallengedScore} pts sur « ${quizTitle} ».`
+            : updated.winner_id === opponentId
+              ? `Défaite · ${newChallengerScore} - ${newChallengedScore} pts sur « ${quizTitle} ».`
+              : `Égalité · ${newChallengerScore} - ${newChallengedScore} pts sur « ${quizTitle} ».`;
+
+        await notifyUser(admin, duel.challenger_id, 'duel_completed', 'Duel terminé !', resultBody, {
+          ...notifData,
+          winner_id: updated.winner_id,
+          challenger_score: newChallengerScore,
+          challenged_score: newChallengedScore,
+        });
+        await notifyUser(admin, duel.challenged_id, 'duel_completed', 'Duel terminé !', resultBody, {
+          ...notifData,
+          winner_id: updated.winner_id,
+          challenger_score: newChallengerScore,
+          challenged_score: newChallengedScore,
+        });
+      } else {
+        await notifyUser(
+          admin,
+          opponentId,
+          'duel_score',
+          'Adversaire a joué',
+          `${playerName} a terminé sa partie (${score} pts). À vous de jouer !`,
+          notifData,
+        );
+      }
+    } catch {
+      // Le score est enregistré même si la notification échoue.
+    }
+
+    const profiles = await loadPlayerProfiles(admin, [updated.challenger_id, updated.challenged_id]);
+    return c.json({ item: mapDuelRow(updated, profiles, viewerId) });
   });

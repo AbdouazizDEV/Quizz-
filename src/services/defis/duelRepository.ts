@@ -8,6 +8,7 @@ import {
   apiFetchDuelById,
   apiFetchPendingDuels,
   apiFetchRecentDuels,
+  apiSubmitDuelScore,
 } from './duelApi';
 
 export async function fetchPendingDuelsForUser(
@@ -38,4 +39,8 @@ export async function respondToDuel(duelId: string, _userId: string, accept: boo
     return;
   }
   await apiDeclineDuel(duelId);
+}
+
+export async function submitDuelScore(duelId: string, score: number): Promise<DuelSummary> {
+  return apiSubmitDuelScore(duelId, score);
 }

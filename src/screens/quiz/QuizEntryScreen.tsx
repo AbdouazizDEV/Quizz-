@@ -37,13 +37,16 @@ interface PendingReplayStart {
 export default function QuizEntryScreen() {
   const router = useRouter();
   const { showAppError } = useAppError();
-  const { quizId: idParam, categorySlug: catParam } = useLocalSearchParams<{
+  const { quizId: idParam, categorySlug: catParam, duelId: duelParam } = useLocalSearchParams<{
     quizId: string | string[];
     categorySlug?: string | string[];
+    duelId?: string | string[];
   }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
   const categorySlug =
     typeof catParam === 'string' ? catParam : Array.isArray(catParam) ? catParam[0] : undefined;
+  const duelId =
+    typeof duelParam === 'string' ? duelParam : Array.isArray(duelParam) ? duelParam[0] : undefined;
 
   const [fontsLoaded] = useFonts({ Nunito_700Bold, Nunito_600SemiBold });
   const bootstrap = useQuizPlaySessionStore((s) => s.bootstrap);
@@ -75,10 +78,10 @@ export default function QuizEntryScreen() {
         ...raw,
         questions: shuffleArray(raw.questions),
       };
-      bootstrap(payload, categorySlug ?? null);
+      bootstrap(payload, categorySlug ?? null, duelId ?? null);
       router.replace(`/quiz/${quizId}/play`);
     },
-    [bootstrap, categorySlug, quizId, router],
+    [bootstrap, categorySlug, duelId, quizId, router],
   );
 
   useEffect(() => {

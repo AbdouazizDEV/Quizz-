@@ -9,6 +9,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizAnswerGrid } from '@components/ui/quiz/play/QuizAnswerGrid';
@@ -17,8 +18,10 @@ import { QuizPlayNavbar } from '@components/ui/quiz/play/QuizPlayNavbar';
 import { QuizQuestionHeader } from '@components/ui/quiz/play/QuizQuestionHeader';
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
+import { seedDuelQueryCache } from '@hooks/defis/useDuelQuery';
 import { useQuestionTimer } from '@hooks/useQuestionTimer';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
+import { submitDuelScore } from '@services/defis/duelRepository';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAppError } from '@providers/AppErrorProvider';
@@ -26,6 +29,7 @@ import { useAppError } from '@providers/AppErrorProvider';
 export default function QuizPlayScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { showAppError } = useAppError();
   const { quizId: idParam } = useLocalSearchParams<{ quizId: string | string[] }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
@@ -33,6 +37,7 @@ export default function QuizPlayScreen() {
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, QuizPlayTheme.contentMaxWidth);
 
   const payload = useQuizPlaySessionStore((s) => s.payload);
+  const duelId = useQuizPlaySessionStore((s) => s.duelId);
   const currentIndex = useQuizPlaySessionStore((s) => s.currentIndex);
   const sessionPoints = useQuizPlaySessionStore((s) => s.sessionPoints);
   const feedbackPhase = useQuizPlaySessionStore((s) => s.feedbackPhase);
@@ -158,8 +163,28 @@ export default function QuizPlayScreen() {
         title: 'Enregistrement',
       });
     }
-    router.replace(`/quiz/${quizId}/congrats`);
-  }, [advanceFromFeedback, quizId, payload, router, showAppError]);
+
+    if (duelId) {
+      try {
+        const updatedDuel = await submitDuelScore(duelId, earned);
+        seedDuelQueryCache(queryClient, updatedDuel);
+        await queryClient.invalidateQueries({ queryKey: ['duels-pending'] });
+        await queryClient.invalidateQueries({ queryKey: ['duels-recent'] });
+        await queryClient.invalidateQueries({ queryKey: ['duels-pending-list'] });
+        await queryClient.invalidateQueries({ queryKey: ['duels-recent-list'] });
+      } catch (error) {
+        showAppError(
+          error instanceof Error ? error.message : 'Score duel non enregistré.',
+          { title: 'Duel' },
+        );
+      }
+    }
+
+    const congratsHref = duelId
+      ? `/quiz/${quizId}/congrats?duelId=${encodeURIComponent(duelId)}`
+      : `/quiz/${quizId}/congrats`;
+    router.replace(congratsHref);
+  }, [advanceFromFeedback, duelId, queryClient, quizId, payload, router, showAppError]);
 
   if (!payload || !question) {
     return (
