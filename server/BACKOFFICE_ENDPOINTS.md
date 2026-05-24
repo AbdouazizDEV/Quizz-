@@ -430,7 +430,10 @@ Base URL: `http://localhost:3000/api/v1/backoffice`
 
 ---
 
-## 7) Challenges
+## 7) Challenges (duels 1v1)
+
+> **Note :** ces endpoints gèrent les **duels entre joueurs** (table `challenges`).
+> Pour les **challenges hebdomadaires** mobile, utiliser la section **9) Weekly Challenges**.
 
 ### `GET /challenges`
 - **Query supportees**: `page`, `limit`
@@ -584,7 +587,182 @@ Base URL: `http://localhost:3000/api/v1/backoffice`
 
 ---
 
-## 9) Profiles (admin)
+## 9) Weekly Challenges (hebdomadaires)
+
+> **Note :** ces endpoints gèrent les **challenges hebdomadaires** mobile (tables `weekly_challenges` + `weekly_challenge_quizzes`).
+> Ne pas confondre avec `/challenges` (duels 1v1).
+
+### `GET /weekly-challenges`
+- **Query supportees**: `page`, `limit`, `status=draft|actif|termine`
+- **Body**: aucun
+- **Reponse 200**:
+```json
+{
+  "ok": true,
+  "items": [
+    {
+      "id": "uuid",
+      "title": "Challenge de la semaine",
+      "type": "hebdomadaire",
+      "status": "actif",
+      "starts_at": "2026-06-01T00:00:00Z",
+      "ends_at": "2026-06-07T23:59:59Z"
+    }
+  ],
+  "page": 1,
+  "limit": 20,
+  "total": 1
+}
+```
+
+### `GET /weekly-challenges/:id`
+- **Body**: aucun
+- **Reponse 200**:
+```json
+{
+  "ok": true,
+  "item": {
+    "id": "uuid",
+    "title": "Challenge de la semaine",
+    "description": "7 jours, 7 quiz",
+    "type": "hebdomadaire",
+    "status": "draft",
+    "starts_at": "2026-06-01T00:00:00Z",
+    "ends_at": "2026-06-07T23:59:59Z",
+    "reward_text": "Meilleur score cumulé"
+  }
+}
+```
+
+### `POST /weekly-challenges`
+- **Body (JSON)**:
+```json
+{
+  "title": "Challenge de la semaine",
+  "description": "7 jours, 7 quiz",
+  "type": "hebdomadaire",
+  "status": "draft",
+  "starts_at": "2026-06-01T00:00:00Z",
+  "ends_at": "2026-06-07T23:59:59Z",
+  "reward_text": "Meilleur score cumulé"
+}
+```
+- **Statuts** : `draft` | `actif` | `termine`
+- **Reponse 201**:
+```json
+{
+  "ok": true,
+  "item": {
+    "id": "uuid",
+    "title": "Challenge de la semaine",
+    "status": "draft"
+  }
+}
+```
+
+### `PUT /weekly-challenges/:id`
+- **Body (JSON)** (partiel) :
+```json
+{
+  "status": "actif"
+}
+```
+- **Reponse 200**:
+```json
+{
+  "ok": true,
+  "item": {
+    "id": "uuid",
+    "status": "actif"
+  }
+}
+```
+
+### `DELETE /weekly-challenges/:id`
+- **Body**: aucun
+- **Reponse 200**:
+```json
+{ "ok": true }
+```
+
+### `GET /weekly-challenges/:id/quizzes`
+- **Body**: aucun
+- **Reponse 200**:
+```json
+{
+  "ok": true,
+  "items": [
+    {
+      "id": "uuid-link",
+      "challenge_id": "uuid",
+      "quiz_id": "uuid-quiz",
+      "scheduled_day": "2026-06-01",
+      "day_order": 1,
+      "quizzes": {
+        "id": "uuid-quiz",
+        "title": "Quiz Culture G",
+        "difficulty_level": "Z1",
+        "is_published": true,
+        "total_questions": 10
+      }
+    }
+  ]
+}
+```
+
+### `POST /weekly-challenges/:id/quizzes`
+- **Body (JSON)**:
+```json
+{
+  "quiz_id": "uuid-quiz",
+  "scheduled_day": "2026-06-01",
+  "day_order": 1
+}
+```
+- **Reponse 201**:
+```json
+{
+  "ok": true,
+  "item": {
+    "id": "uuid-link",
+    "challenge_id": "uuid",
+    "quiz_id": "uuid-quiz",
+    "scheduled_day": "2026-06-01",
+    "day_order": 1
+  }
+}
+```
+
+### `PUT /weekly-challenges/:id/quizzes/:linkId`
+- **Body (JSON)** (partiel) :
+```json
+{
+  "scheduled_day": "2026-06-02",
+  "day_order": 2
+}
+```
+- **Reponse 200**:
+```json
+{
+  "ok": true,
+  "item": {
+    "id": "uuid-link",
+    "scheduled_day": "2026-06-02",
+    "day_order": 2
+  }
+}
+```
+
+### `DELETE /weekly-challenges/:id/quizzes/:linkId`
+- **Body**: aucun
+- **Reponse 200**:
+```json
+{ "ok": true }
+```
+
+---
+
+## 10) Profiles (admin)
 
 ### `GET /profiles`
 - **Query supportees**: `page`, `limit`, `search`, `is_suspended=true|false`
@@ -648,7 +826,7 @@ Base URL: `http://localhost:3000/api/v1/backoffice`
 
 ---
 
-## 10) Notifications
+## 11) Notifications
 
 ### `POST /notifications/send`
 - **Body (JSON)**:

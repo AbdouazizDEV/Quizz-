@@ -102,6 +102,33 @@ const competitionCreateSchema = z.object({
 });
 const competitionUpdateSchema = competitionCreateSchema.partial();
 
+const weeklyChallengeBaseSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).nullable().optional(),
+  type: z.string().trim().min(1).max(20).default('hebdomadaire'),
+  status: z.enum(['draft', 'actif', 'termine']).default('draft'),
+  starts_at: z.string().datetime(),
+  ends_at: z.string().datetime(),
+  reward_text: z.string().trim().max(1000).nullable().optional(),
+});
+const weeklyChallengeCreateSchema = weeklyChallengeBaseSchema.refine(
+  (data) => new Date(data.ends_at) > new Date(data.starts_at),
+  { message: 'ends_at doit être postérieur à starts_at', path: ['ends_at'] },
+);
+const weeklyChallengeUpdateSchema = weeklyChallengeBaseSchema.partial();
+
+const weeklyChallengeQuizCreateSchema = z.object({
+  quiz_id: z.string().uuid(),
+  scheduled_day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format attendu: YYYY-MM-DD'),
+  day_order: z.coerce.number().int().min(1).max(31).default(1),
+});
+const weeklyChallengeQuizUpdateSchema = weeklyChallengeQuizCreateSchema.partial();
+
+const weeklyChallengeQuizLinkParam = z.object({
+  id: z.string().uuid(),
+  linkId: z.string().uuid(),
+});
+
 const profileSuspendSchema = z.object({
   is_suspended: z.boolean(),
   suspended_until: z.string().datetime().nullable().optional(),
@@ -783,6 +810,152 @@ export const backofficeRoutes = new Hono()
     if (!param.success) return c.json(jsonError('Paramètre invalide', 400, param.error.flatten()), 400);
     const admin = createServiceRoleClient();
     const { error } = await admin.from('competitions').delete().eq('id', param.data.id);
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true });
+  })
+  // Weekly challenges CRUD (mobile « Challenge hebdo », table weekly_challenges)
+  .get('/weekly-challenges', async (c) => {
+    const paged = parsePagination(c.req.query());
+    if ('error' in paged) return c.json(jsonError('Query invalide', 400, paged.error), 400);
+    const { page, limit, from, to } = paged;
+    const status = c.req.query('status');
+    const admin = createServiceRoleClient();
+    let query = admin
+      .from('weekly_challenges')
+      .select('*', { count: 'exact' })
+      .order('starts_at', { ascending: false })
+      .range(from, to);
+    if (status === 'draft' || status === 'actif' || status === 'termine') {
+      query = query.eq('status', status);
+    }
+    const { data, error, count } = await query;
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true, items: data ?? [], page, limit, total: count ?? 0 });
+  })
+  .get('/weekly-challenges/:id', async (c) => {
+    const param = uuidParam.safeParse(c.req.param());
+    if (!param.success) return c.json(jsonError('Paramètre invalide', 400, param.error.flatten()), 400);
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin
+      .from('weekly_challenges')
+      .select('*')
+      .eq('id', param.data.id)
+      .maybeSingle();
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    if (!data) return c.json(jsonError('Challenge hebdomadaire introuvable', 404), 404);
+    return c.json({ ok: true, item: data });
+  })
+  .post('/weekly-challenges', async (c) => {
+    const parsed = weeklyChallengeCreateSchema.safeParse(await c.req.json());
+    if (!parsed.success) return c.json(jsonError('Payload invalide', 400, parsed.error.flatten()), 400);
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin.from('weekly_challenges').insert(parsed.data).select('*').single();
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true, item: data }, 201);
+  })
+  .put('/weekly-challenges/:id', async (c) => {
+    const param = uuidParam.safeParse(c.req.param());
+    const parsed = weeklyChallengeUpdateSchema.safeParse(await c.req.json());
+    if (!param.success || !parsed.success) {
+      return c.json(jsonError('Payload invalide', 400, { param: param.error?.flatten(), body: parsed.error?.flatten() }), 400);
+    }
+    if (
+      parsed.data.starts_at &&
+      parsed.data.ends_at &&
+      new Date(parsed.data.ends_at) <= new Date(parsed.data.starts_at)
+    ) {
+      return c.json(jsonError('ends_at doit être postérieur à starts_at', 400), 400);
+    }
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin
+      .from('weekly_challenges')
+      .update({ ...parsed.data, updated_at: new Date().toISOString() })
+      .eq('id', param.data.id)
+      .select('*')
+      .single();
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true, item: data });
+  })
+  .delete('/weekly-challenges/:id', async (c) => {
+    const param = uuidParam.safeParse(c.req.param());
+    if (!param.success) return c.json(jsonError('Paramètre invalide', 400, param.error.flatten()), 400);
+    const admin = createServiceRoleClient();
+    const { error } = await admin.from('weekly_challenges').delete().eq('id', param.data.id);
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true });
+  })
+  .get('/weekly-challenges/:id/quizzes', async (c) => {
+    const param = uuidParam.safeParse(c.req.param());
+    if (!param.success) return c.json(jsonError('Paramètre invalide', 400, param.error.flatten()), 400);
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin
+      .from('weekly_challenge_quizzes')
+      .select('id, challenge_id, quiz_id, scheduled_day, day_order, quizzes(id, title, difficulty_level, is_published, total_questions)')
+      .eq('challenge_id', param.data.id)
+      .order('day_order', { ascending: true });
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true, items: data ?? [] });
+  })
+  .post('/weekly-challenges/:id/quizzes', async (c) => {
+    const param = uuidParam.safeParse(c.req.param());
+    const parsed = weeklyChallengeQuizCreateSchema.safeParse(await c.req.json());
+    if (!param.success || !parsed.success) {
+      return c.json(jsonError('Payload invalide', 400, { param: param.error?.flatten(), body: parsed.error?.flatten() }), 400);
+    }
+    const admin = createServiceRoleClient();
+    const { data: challenge, error: challengeError } = await admin
+      .from('weekly_challenges')
+      .select('id')
+      .eq('id', param.data.id)
+      .maybeSingle();
+    if (challengeError) return c.json(jsonError(challengeError.message, 500), 500);
+    if (!challenge) return c.json(jsonError('Challenge hebdomadaire introuvable', 404), 404);
+    const { data: quiz, error: quizError } = await admin
+      .from('quizzes')
+      .select('id')
+      .eq('id', parsed.data.quiz_id)
+      .maybeSingle();
+    if (quizError) return c.json(jsonError(quizError.message, 500), 500);
+    if (!quiz) return c.json(jsonError('Quiz introuvable', 404), 404);
+    const { data, error } = await admin
+      .from('weekly_challenge_quizzes')
+      .insert({ challenge_id: param.data.id, ...parsed.data })
+      .select('id, challenge_id, quiz_id, scheduled_day, day_order')
+      .single();
+    if (error) {
+      if (error.code === '23505') {
+        return c.json(jsonError('Ce quiz est déjà associé à ce challenge.', 409), 409);
+      }
+      return c.json(jsonError(error.message, 500), 500);
+    }
+    return c.json({ ok: true, item: data }, 201);
+  })
+  .put('/weekly-challenges/:id/quizzes/:linkId', async (c) => {
+    const param = weeklyChallengeQuizLinkParam.safeParse(c.req.param());
+    const parsed = weeklyChallengeQuizUpdateSchema.safeParse(await c.req.json());
+    if (!param.success || !parsed.success) {
+      return c.json(jsonError('Payload invalide', 400, { param: param.error?.flatten(), body: parsed.error?.flatten() }), 400);
+    }
+    const admin = createServiceRoleClient();
+    const { data, error } = await admin
+      .from('weekly_challenge_quizzes')
+      .update(parsed.data)
+      .eq('id', param.data.linkId)
+      .eq('challenge_id', param.data.id)
+      .select('id, challenge_id, quiz_id, scheduled_day, day_order')
+      .single();
+    if (error) return c.json(jsonError(error.message, 500), 500);
+    return c.json({ ok: true, item: data });
+  })
+  .delete('/weekly-challenges/:id/quizzes/:linkId', async (c) => {
+    const param = weeklyChallengeQuizLinkParam.safeParse(c.req.param());
+    if (!param.success) return c.json(jsonError('Paramètre invalide', 400, param.error.flatten()), 400);
+    const admin = createServiceRoleClient();
+    const { error } = await admin
+      .from('weekly_challenge_quizzes')
+      .delete()
+      .eq('id', param.data.linkId)
+      .eq('challenge_id', param.data.id);
     if (error) return c.json(jsonError(error.message, 500), 500);
     return c.json({ ok: true });
   })

@@ -51,12 +51,16 @@ export async function fetchActiveWeeklyChallenges(): Promise<WeeklyChallenge[]> 
   if (!supabase) throw new Error('Supabase non configuré');
 
   const nowIso = new Date().toISOString();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('weekly_challenges')
     .select('id, title, description, type, status, starts_at, ends_at, reward_text')
     .eq('status', 'actif')
+    .eq('type', 'hebdomadaire')
+    .lte('starts_at', nowIso)
     .gte('ends_at', nowIso)
     .order('starts_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
 
   return ((data ?? []) as WeeklyChallengeRow[]).map(mapChallenge);
 }
@@ -66,13 +70,16 @@ export async function fetchPastWeeklyChallenges(): Promise<WeeklyChallenge[]> {
   if (!supabase) throw new Error('Supabase non configuré');
 
   const nowIso = new Date().toISOString();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('weekly_challenges')
     .select('id, title, description, type, status, starts_at, ends_at, reward_text')
     .in('status', ['termine', 'actif'])
+    .eq('type', 'hebdomadaire')
     .lt('ends_at', nowIso)
     .order('ends_at', { ascending: false })
     .limit(12);
+
+  if (error) throw new Error(error.message);
 
   return ((data ?? []) as WeeklyChallengeRow[]).map(mapChallenge);
 }
