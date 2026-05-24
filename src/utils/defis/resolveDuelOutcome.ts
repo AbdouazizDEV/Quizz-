@@ -1,10 +1,14 @@
 import type { DuelSummary } from '@app-types/challenge.types';
 
+export type DuelOutcomeTone = 'victory' | 'defeat' | 'draw' | 'neutral' | 'expired';
+
 export interface DuelOutcome {
   label: string;
   points: string;
   won: boolean;
   lost: boolean;
+  tone: DuelOutcomeTone;
+  icon: string;
 }
 
 export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutcome {
@@ -12,10 +16,12 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
     const isChallenger = duel.challengerId === userId;
     const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
     return {
-      label: myScore === null ? 'Expiré · Non joué' : 'Expiré',
+      label: myScore === null ? 'Non joué' : 'Expiré',
       points: '+0 pts',
       won: false,
       lost: true,
+      tone: 'expired',
+      icon: '⏱',
     };
   }
 
@@ -26,6 +32,8 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
       points: '+0 pts',
       won: false,
       lost: !refusedByMe,
+      tone: 'neutral',
+      icon: '✕',
     };
   }
 
@@ -34,16 +42,51 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
   const oppScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
 
   if (duel.winnerId === userId) {
-    return { label: 'Victoire', points: '+15 pts', won: true, lost: false };
+    return {
+      label: 'Victoire',
+      points: '+15 pts',
+      won: true,
+      lost: false,
+      tone: 'victory',
+      icon: '🏆',
+    };
   }
   if (duel.winnerId && duel.winnerId !== userId) {
-    return { label: 'Défaite', points: '+5 pts', won: false, lost: true };
+    return {
+      label: 'Défaite',
+      points: '+5 pts',
+      won: false,
+      lost: true,
+      tone: 'defeat',
+      icon: '💔',
+    };
   }
   if (myScore > oppScore) {
-    return { label: 'Victoire', points: '+15 pts', won: true, lost: false };
+    return {
+      label: 'Victoire',
+      points: '+15 pts',
+      won: true,
+      lost: false,
+      tone: 'victory',
+      icon: '🏆',
+    };
   }
   if (myScore < oppScore) {
-    return { label: 'Défaite', points: '+5 pts', won: false, lost: true };
+    return {
+      label: 'Défaite',
+      points: '+5 pts',
+      won: false,
+      lost: true,
+      tone: 'defeat',
+      icon: '💔',
+    };
   }
-  return { label: 'Égalité', points: '+5 pts', won: false, lost: false };
+  return {
+    label: 'Égalité',
+    points: '+5 pts',
+    won: false,
+    lost: false,
+    tone: 'draw',
+    icon: '⚖️',
+  };
 }

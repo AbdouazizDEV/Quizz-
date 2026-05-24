@@ -19,7 +19,6 @@ import { DuelSentModal } from '@components/ui/defis/DuelSentModal';
 import { DuelViewAllLink } from '@components/ui/defis/DuelViewAllLink';
 import { RecentDuelRow } from '@components/ui/defis/RecentDuelRow';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
-import { DefisSurfaceCard } from '@components/ui/defis/DefisSurfaceCard';
 import { SectionTitle } from '@components/ui/common/SectionTitle';
 import { COLORS } from '@constants/Colors';
 import {
@@ -328,17 +327,16 @@ export default function DuelHubScreen() {
         <Text style={styles.empty}>Aucun duel terminé pour le moment.</Text>
       ) : null}
       {recentTotal > 0 ? (
-        <DefisSurfaceCard>
-          {recentItems.map((duel, index) => (
+        <View style={styles.recentPreviewList}>
+          {recentItems.map((duel) => (
             <RecentDuelRow
               key={duel.id}
               duel={duel}
               userId={userId}
-              isLast={index === recentItems.length - 1}
               onPress={() => openDuelFromList(router, queryClient, duel)}
             />
           ))}
-        </DefisSurfaceCard>
+        </View>
       ) : null}
       <DuelViewAllLink
         totalCount={recentTotal}
@@ -406,6 +404,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   pendingList: {
+    gap: 10,
+  },
+  recentPreviewList: {
     gap: 10,
   },
   offlineHint: {

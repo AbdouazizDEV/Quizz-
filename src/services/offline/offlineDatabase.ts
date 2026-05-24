@@ -32,30 +32,53 @@ CREATE INDEX IF NOT EXISTS idx_mutation_queue_pending
 `;
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase | null> | null = null;
 let useMemoryFallback = Platform.OS === 'web';
 
 /** Cache mémoire de secours (web / dev) si SQLite indisponible. */
 export const memoryCache = new Map<string, string>();
 export const memoryQueue: Array<Record<string, unknown>> = [];
 
-export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase | null> {
-  if (useMemoryFallback) return null;
-  if (dbInstance) return dbInstance;
+export function isUsingMemoryFallback(): boolean {
+  return useMemoryFallback;
+}
 
-  try {
-    const db = await SQLite.openDatabaseAsync(DB_NAME);
-    await db.execAsync(SCHEMA);
-    dbInstance = db;
-    return db;
-  } catch (error) {
-    useMemoryFallback = true;
-    if (__DEV__) {
-      console.warn('[Offline] SQLite indisponible, fallback mémoire.', error);
-    }
-    return null;
+/** Bascule vers le cache mémoire après une erreur native SQLite. */
+export function enableMemoryFallback(error?: unknown): void {
+  useMemoryFallback = true;
+  dbInstance = null;
+  dbInitPromise = null;
+  if (__DEV__) {
+    console.warn('[Offline] SQLite indisponible, fallback mémoire.', error);
   }
 }
 
-export function isUsingMemoryFallback(): boolean {
-  return useMemoryFallback;
+async function openDatabaseOnce(): Promise<SQLite.SQLiteDatabase | null> {
+  if (useMemoryFallback) return null;
+  if (dbInstance) return dbInstance;
+
+  if (!dbInitPromise) {
+    dbInitPromise = (async () => {
+      try {
+        const db = await SQLite.openDatabaseAsync(DB_NAME);
+        await db.execAsync(SCHEMA);
+        dbInstance = db;
+        return db;
+      } catch (error) {
+        enableMemoryFallback(error);
+        return null;
+      }
+    })();
+  }
+
+  return dbInitPromise;
+}
+
+export async function getOfflineDatabase(): Promise<SQLite.SQLiteDatabase | null> {
+  return openDatabaseOnce();
+}
+
+/** Attend l'initialisation SQLite (évite les courses au démarrage). */
+export async function ensureOfflineDatabaseReady(): Promise<void> {
+  await openDatabaseOnce();
 }

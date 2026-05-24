@@ -70,7 +70,10 @@ export default function ProfileScreen() {
   const { data: authMe } = useAuthMe();
   const profileUserId = viewedUserId ?? authMe?.user?.id;
   const { isOnline } = useNetworkStatus();
-  const { data, loading, error, refetch } = useProfileScreenData(profileUserId);
+  const { data, loading, error, refetch } = useProfileScreenData(
+    profileUserId,
+    !isExternalProfile && !authMe,
+  );
   const [tab, setTab] = useState<ProfileTabId>('quizzo');
   const [coverModalVisible, setCoverModalVisible] = useState(false);
   const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);

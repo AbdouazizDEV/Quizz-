@@ -13,6 +13,10 @@ import { COLORS } from '@constants/Colors';
 interface CountdownTimerProps {
   endsAt: string;
   style?: TextStyle;
+  /** Texte clair sur fond sombre (ex. bannière tournoi). */
+  light?: boolean;
+  /** Affiche « Se termine dans … » ; désactivé si un libellé est déjà au-dessus. */
+  showPrefix?: boolean;
 }
 
 interface TimeRemaining {
@@ -46,17 +50,23 @@ function getTimeRemaining(endsAt: string): TimeRemaining {
   };
 }
 
-function formatLabel(time: TimeRemaining): string {
+function formatTimeCore(time: TimeRemaining): string {
   if (time.expired) return 'Expiré';
-  if (time.days > 0) return `Se termine dans ${time.days}j ${time.hours}h`;
-  if (time.hours > 0) return `Se termine dans ${time.hours}h ${time.minutes}m`;
+  if (time.days > 0) return `${time.days}j ${time.hours}h`;
+  if (time.hours > 0) return `${time.hours}h ${time.minutes}m`;
   if (time.minutes > 0) {
-    return `Se termine dans ${time.minutes}m ${String(time.seconds).padStart(2, '0')}s`;
+    return `${time.minutes}m ${String(time.seconds).padStart(2, '0')}s`;
   }
-  return `Se termine dans ${time.seconds}s`;
+  return `${time.seconds}s`;
 }
 
-export function CountdownTimer({ endsAt, style }: CountdownTimerProps) {
+function formatLabel(time: TimeRemaining, showPrefix: boolean): string {
+  const core = formatTimeCore(time);
+  if (time.expired || !showPrefix) return core;
+  return `Se termine dans ${core}`;
+}
+
+export function CountdownTimer({ endsAt, style, light = false, showPrefix = true }: CountdownTimerProps) {
   const [time, setTime] = useState(() => getTimeRemaining(endsAt));
   const opacity = useSharedValue(1);
 
@@ -87,13 +97,15 @@ export function CountdownTimer({ endsAt, style }: CountdownTimerProps) {
     <Animated.Text
       style={[
         styles.text,
-        time.isUrgent && !time.expired && styles.urgent,
+        light && styles.light,
+        time.isUrgent && !time.expired && (light ? styles.urgentLight : styles.urgent),
         time.expired && styles.expired,
         style,
         animatedStyle,
       ]}
     >
-      {time.expired ? '⏱' : '📅'} {formatLabel(time)}
+      {!showPrefix && !time.expired ? '⏱ ' : time.expired ? '⏱ ' : showPrefix ? '📅 ' : ''}
+      {formatLabel(time, showPrefix)}
     </Animated.Text>
   );
 }
@@ -104,8 +116,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
   },
+  light: {
+    color: '#FFD54A',
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 15,
+  },
   urgent: {
     color: COLORS.error,
+  },
+  urgentLight: {
+    color: '#FF8A65',
   },
   expired: {
     color: COLORS.error,
