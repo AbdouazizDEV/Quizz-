@@ -92,8 +92,10 @@ export default function DuelResultScreen() {
   }
 
   const isChallenger = duel.challengerId === userId;
-  const myQuizScore = isChallenger ? duel.challengerScore ?? 0 : duel.challengedScore ?? 0;
-  const opponentQuizScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
+  const myQuizScoreRaw = isChallenger ? duel.challengerScore : duel.challengedScore;
+  const opponentQuizScoreRaw = isChallenger ? duel.challengedScore : duel.challengerScore;
+  const myQuizScore = myQuizScoreRaw ?? 0;
+  const opponentQuizScore = opponentQuizScoreRaw ?? 0;
   const opponentName = isChallenger ? duel.challengedName : duel.challengerName;
   const opponentUserId = isChallenger ? duel.challengedId : duel.challengerId;
   const myName =
@@ -117,13 +119,17 @@ export default function DuelResultScreen() {
         : 'Bien joué !';
 
   const subline = expired
-    ? isChallenger
-      ? duel.challengerScore === null
-        ? 'Vous n\'avez pas joué à temps.'
-        : 'L\'adversaire n\'a pas terminé à temps.'
-      : duel.challengedScore === null
-        ? 'Vous n\'avez pas joué à temps.'
-        : 'Le délai est dépassé.'
+    ? myQuizScoreRaw !== null && opponentQuizScoreRaw !== null
+      ? `Score final : ${myQuizScoreRaw} - ${opponentQuizScoreRaw} pts`
+      : isChallenger
+        ? duel.challengerScore === null
+          ? 'Vous n\'avez pas joué à temps.'
+          : 'L\'adversaire n\'a pas terminé à temps.'
+        : duel.challengedScore === null
+          ? 'Vous n\'avez pas joué à temps.'
+          : opponentQuizScoreRaw !== null
+            ? `Adversaire : ${opponentQuizScoreRaw} pts · délai dépassé`
+            : 'Le délai est dépassé.'
     : declined
       ? duel.challengedId === userId
         ? 'Vous avez refusé ce défi.'
@@ -158,9 +164,10 @@ export default function DuelResultScreen() {
         opponentUserId={opponentUserId}
         opponentAvatarUrl={isChallenger ? duel.challengedAvatarUrl : duel.challengerAvatarUrl}
         opponentTotalScore={isChallenger ? duel.challengedTotalScore : duel.challengerTotalScore}
-        myQuizScore={isChallenger ? duel.challengerScore : duel.challengedScore}
-        showOpponentQuizScore={!declined && (expired || myQuizScore > 0 || opponentQuizScore > 0)}
-        opponentQuizScore={isChallenger ? duel.challengedScore : duel.challengerScore}
+        myQuizScore={myQuizScoreRaw}
+        showOpponentQuizScore
+        revealScores={!declined}
+        opponentQuizScore={opponentQuizScoreRaw}
         questionsCount={duel.questionsCount}
         expiresAt={duel.expiresAt}
         isExpired={expired}
@@ -169,8 +176,10 @@ export default function DuelResultScreen() {
           declined
             ? 'Aucune partie n\'a été jouée pour ce duel.'
             : expired
-              ? 'Ce duel est archivé dans vos duels récents.'
-              : `Score quiz : ${myQuizScore} vs ${opponentQuizScore}`
+              ? myQuizScoreRaw !== null && opponentQuizScoreRaw !== null
+                ? `${myQuizScoreRaw} vs ${opponentQuizScoreRaw} pts · duel archivé`
+                : 'Ce duel est archivé dans vos duels récents.'
+              : `${myQuizScoreRaw ?? 0} vs ${opponentQuizScoreRaw ?? 0} pts`
         }
       />
 

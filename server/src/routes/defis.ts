@@ -247,6 +247,29 @@ function computeDuelPhase(
   return 'finished';
 }
 
+async function pickRandomPublishedQuiz(
+  admin: ReturnType<typeof createServiceRoleClient>,
+): Promise<{ id: string; title: string; total_questions: number | null } | null> {
+  const { count, error: countErr } = await admin
+    .from('quizzes')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_published', true);
+
+  if (countErr || !count || count === 0) return null;
+
+  const offset = Math.floor(Math.random() * count);
+  const { data, error } = await admin
+    .from('quizzes')
+    .select('id, title, total_questions')
+    .eq('is_published', true)
+    .order('id', { ascending: true })
+    .range(offset, offset)
+    .maybeSingle();
+
+  if (error || !data?.id) return null;
+  return data;
+}
+
 async function fetchUserDuels(
   admin: ReturnType<typeof createServiceRoleClient>,
   viewerId: string,
@@ -477,13 +500,7 @@ export const defisRoutes = new Hono()
       return c.json({ error: 'Un duel est déjà en attente avec cet ami.' }, 409);
     }
 
-    const { data: quiz } = await admin
-      .from('quizzes')
-      .select('id, title, total_questions')
-      .eq('is_published', true)
-      .order('play_count', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const quiz = await pickRandomPublishedQuiz(admin);
     if (!quiz?.id) return c.json({ error: 'Aucun quiz disponible pour le duel.' }, 503);
 
     const expiresAt = duelExpiresAtIso();
