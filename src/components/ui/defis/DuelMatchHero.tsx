@@ -18,6 +18,8 @@ interface DuelMatchHeroProps {
   myQuizScore: number | null;
   showOpponentQuizScore: boolean;
   opponentQuizScore: number | null;
+  /** Écran résultat / duel terminé : affiche les scores connus ou « Non joué ». */
+  revealScores?: boolean;
   questionsCount: number;
   expiresAt: string;
   isExpired: boolean;
@@ -37,6 +39,7 @@ export function DuelMatchHero({
   myQuizScore,
   showOpponentQuizScore,
   opponentQuizScore,
+  revealScores = false,
   questionsCount,
   expiresAt,
   isExpired,
@@ -73,6 +76,7 @@ export function DuelMatchHero({
             totalScore={myTotalScore}
             quizScore={myQuizScore}
             highlight
+            revealScores={revealScores}
           />
           <View style={styles.vsBubble}>
             <Text style={styles.vsText}>VS</Text>
@@ -82,8 +86,9 @@ export function DuelMatchHero({
             name={opponentName}
             avatarUri={getUserAvatarUri(opponentUserId, opponentAvatarUrl)}
             totalScore={opponentTotalScore}
-            quizScore={showOpponentQuizScore ? opponentQuizScore : null}
-            locked={!showOpponentQuizScore && opponentQuizScore === null}
+            quizScore={revealScores || showOpponentQuizScore ? opponentQuizScore : null}
+            locked={!revealScores && !showOpponentQuizScore && opponentQuizScore === null}
+            revealScores={revealScores}
           />
         </View>
 
@@ -114,6 +119,7 @@ function PlayerColumn({
   quizScore,
   highlight = false,
   locked = false,
+  revealScores = false,
 }: {
   label: string;
   name: string;
@@ -122,6 +128,7 @@ function PlayerColumn({
   quizScore: number | null;
   highlight?: boolean;
   locked?: boolean;
+  revealScores?: boolean;
 }) {
   return (
     <View style={styles.playerCol}>
@@ -141,6 +148,8 @@ function PlayerColumn({
         <Text style={[styles.quizScoreLine, highlight && styles.quizScoreHighlight]}>
           {quizScore} pts quiz
         </Text>
+      ) : revealScores ? (
+        <Text style={styles.scoreNotPlayed}>Non joué</Text>
       ) : (
         <Text style={styles.scorePending}>Quiz · à jouer</Text>
       )}
@@ -280,6 +289,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 12,
     color: COLORS.info,
+  },
+  scoreNotPlayed: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
   },
   scoreLocked: {
     backgroundColor: 'rgba(255,255,255,0.7)',

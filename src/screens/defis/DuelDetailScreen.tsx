@@ -238,6 +238,13 @@ export default function DuelDetailScreen() {
         opponentTotalScore={opponentTotalScore}
         myQuizScore={myQuizScore}
         showOpponentQuizScore={bothPlayed || duel.status === 'completed'}
+        revealScores={
+          bothPlayed ||
+          duel.status === 'completed' ||
+          duel.isExpired ||
+          duel.status === 'expired' ||
+          opponentQuizScore !== null
+        }
         opponentQuizScore={opponentQuizScore}
         questionsCount={duel.questionsCount}
         expiresAt={duel.expiresAt}
