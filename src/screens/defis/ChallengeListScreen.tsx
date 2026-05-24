@@ -20,6 +20,7 @@ import { DefisRoutes } from '@constants/defisRoutes';
 import { COLORS } from '@constants/Colors';
 import { useChallenge } from '@hooks/defis/useChallenge';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import {
   fetchActiveWeeklyChallenges,
   fetchPastWeeklyChallenges,
@@ -45,13 +46,24 @@ export default function ChallengeListScreen() {
   const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id;
+  const { isOnline } = useNetworkStatus();
 
-  const { data: activeChallenges, isLoading: loadingActive } = useQuery({
+  const {
+    data: activeChallenges,
+    isLoading: loadingActive,
+    isError: activeError,
+    error: activeQueryError,
+  } = useQuery({
     queryKey: ['weekly-challenges', 'active'],
     queryFn: fetchActiveWeeklyChallenges,
   });
 
-  const { data: pastChallenges, isLoading: loadingPast } = useQuery({
+  const {
+    data: pastChallenges,
+    isLoading: loadingPast,
+    isError: pastError,
+    error: pastQueryError,
+  } = useQuery({
     queryKey: ['weekly-challenges', 'past'],
     queryFn: fetchPastWeeklyChallenges,
     enabled: tab === 'past',
@@ -64,6 +76,9 @@ export default function ChallengeListScreen() {
   );
 
   const loading = tab === 'active' ? loadingActive || loadingProgress : loadingPast;
+  const listError = tab === 'active' ? activeQueryError : pastQueryError;
+  const hasListError = tab === 'active' ? activeError : pastError;
+  const visibleChallenges = tab === 'active' ? (activeChallenges ?? []) : (pastChallenges ?? []);
 
   const onPlayQuiz = async (quiz: DailyQuiz) => {
     if (!userId || !primaryChallenge) return;
@@ -74,7 +89,7 @@ export default function ChallengeListScreen() {
         quiz.quizId,
         quiz.scheduledDay,
       );
-      router.push(buildQuizEntryHref(quiz.quizId));
+      router.push(buildQuizEntryHref(quiz.quizId, { challengeId: primaryChallenge.id }));
     } catch (error) {
       if (error instanceof ChallengeParticipationError) {
         showAppError(error.message, { title: 'Challenge' });
@@ -89,6 +104,16 @@ export default function ChallengeListScreen() {
       <DefisTabSwitcher tabs={TABS} activeTab={tab} onChange={setTab} />
 
       {loading ? <ActivityIndicator color={COLORS.primary} style={styles.loader} /> : null}
+      {!isOnline && visibleChallenges.length > 0 ? (
+        <Text style={styles.offlineHint}>Données en cache — reconnectez-vous pour actualiser.</Text>
+      ) : null}
+      {hasListError ? (
+        <Text style={styles.empty}>
+          {listError instanceof Error
+            ? listError.message
+            : 'Impossible de charger les challenges.'}
+        </Text>
+      ) : null}
 
       {tab === 'active' && primaryChallenge && progress ? (
         <>
@@ -356,6 +381,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: 24,
+  },
+  offlineHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 8,
   },
   pastRow: { gap: 12, paddingVertical: 4 },
   pastCard: {

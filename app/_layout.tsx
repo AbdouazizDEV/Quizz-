@@ -8,6 +8,9 @@ import { useEffect } from 'react';
 
 import { AppQueryProvider } from '@providers/AppQueryProvider';
 import { AppErrorProvider } from '@providers/AppErrorProvider';
+import { OfflineProvider } from '@providers/OfflineProvider';
+import { OfflineSyncBridge } from '@providers/OfflineSyncBridge';
+import { OfflineBanner } from '@components/ui/common/OfflineBanner';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -16,9 +19,13 @@ export default function RootLayout() {
 
   return (
     <AppQueryProvider>
-      <AppErrorProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </AppErrorProvider>
+      <OfflineProvider>
+        <AppErrorProvider>
+          <OfflineSyncBridge />
+          <OfflineBanner />
+          <Stack screenOptions={{ headerShown: false }} />
+        </AppErrorProvider>
+      </OfflineProvider>
     </AppQueryProvider>
   );
 }

@@ -16,6 +16,7 @@ import { DefisTabSwitcher } from '@components/ui/defis/DefisTabSwitcher';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { COLORS } from '@constants/Colors';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import type { CompetitionSummary } from '@app-types/challenge.types';
 import {
   fetchCompetitionsByTab,
@@ -38,8 +39,9 @@ export default function TournoiListScreen() {
   const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
+  const { isOnline } = useNetworkStatus();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['competitions', tab, userId],
     queryFn: () => fetchCompetitionsByTab(tab, userId),
     enabled: Boolean(userId),
@@ -54,9 +56,14 @@ export default function TournoiListScreen() {
       return;
     }
     try {
-      await registerForCompetition(userId, competition.id);
+      const result = await registerForCompetition(userId, competition.id);
       await queryClient.invalidateQueries({ queryKey: ['competitions'] });
-      Alert.alert('Tournoi', '✓ Vous êtes inscrit !');
+      Alert.alert(
+        'Tournoi',
+        result.queued
+          ? '✓ Inscription enregistrée — synchronisation à la reconnexion.'
+          : '✓ Vous êtes inscrit !',
+      );
     } catch (error) {
       showAppError(
         error instanceof Error ? error.message : 'Inscription impossible.',
@@ -69,6 +76,9 @@ export default function TournoiListScreen() {
     <DefisPageShell title="Tournois">
       <DefisTabSwitcher tabs={TABS} activeTab={tab} onChange={setTab} />
       {isLoading ? <ActivityIndicator color={COLORS.primary} style={styles.loader} /> : null}
+      {!isOnline && (data?.length ?? 0) > 0 ? (
+        <Text style={styles.offlineHint}>Données en cache — reconnectez-vous pour actualiser.</Text>
+      ) : null}
       {(data ?? []).map((competition, index) => (
         <TournoiCard
           key={competition.id}
@@ -79,7 +89,12 @@ export default function TournoiListScreen() {
           onRegister={() => void onRegister(competition)}
         />
       ))}
-      {!isLoading && (data?.length ?? 0) === 0 ? (
+      {!isLoading && isError ? (
+        <Text style={styles.empty}>
+          {error instanceof Error ? error.message : 'Impossible de charger les tournois.'}
+        </Text>
+      ) : null}
+      {!isLoading && !isError && (data?.length ?? 0) === 0 ? (
         <Text style={styles.empty}>Aucun tournoi dans cette catégorie.</Text>
       ) : null}
     </DefisPageShell>
@@ -199,5 +214,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_600SemiBold',
     color: COLORS.textSecondary,
     marginTop: 24,
+  },
+  offlineHint: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
+    color: COLORS.info,
+    marginBottom: 8,
   },
 });

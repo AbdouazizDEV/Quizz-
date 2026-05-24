@@ -30,7 +30,10 @@ import { ProfileTabContent } from '@components/ui/profile/ProfileTabContent';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
+import { useAuthMe } from '@hooks/useAuthMe';
+import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import { useProfileScreenData } from '@hooks/useProfileScreenData';
+import { isOfflineCacheMissError } from '@services/offline';
 import { getCoverPhotoPickerService } from '@services/profile/coverPhotoPickerInstance';
 import { ApiConnectionFollowService } from '@services/network/ApiConnectionFollowService';
 import { uploadMyAvatar } from '@services/profile/profileAvatarApi';
@@ -64,7 +67,10 @@ export default function ProfileScreen() {
     [fontsLoaded],
   );
 
-  const { data, loading, error, refetch } = useProfileScreenData(viewedUserId);
+  const { data: authMe } = useAuthMe();
+  const profileUserId = viewedUserId ?? authMe?.user?.id;
+  const { isOnline } = useNetworkStatus();
+  const { data, loading, error, refetch } = useProfileScreenData(profileUserId);
   const [tab, setTab] = useState<ProfileTabId>('quizzo');
   const [coverModalVisible, setCoverModalVisible] = useState(false);
   const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
@@ -204,7 +210,11 @@ export default function ProfileScreen() {
         </View>
       ) : error ? (
         <View style={[styles.centered, { paddingTop: insets.top, paddingHorizontal: 24 }]}>
-          <Text style={styles.errorText}>Impossible de charger le profil.</Text>
+          <Text style={styles.errorText}>
+            {error && isOfflineCacheMissError(error)
+              ? error.message
+              : 'Impossible de charger le profil.'}
+          </Text>
           <Text style={styles.retry} onPress={() => refetch()}>
             Réessayer
           </Text>
@@ -223,6 +233,12 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.column, { maxWidth: contentWidth, width: '100%' }]}>
+            {!isOnline ? (
+              <Text style={styles.offlineHint}>
+                Données en cache — reconnectez-vous pour actualiser.
+              </Text>
+            ) : null}
+
             {isExternalProfile ? (
               <StatisticsNavbar
                 title={data.identity.displayName}
@@ -328,6 +344,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#C9A000',
+  },
+  offlineHint: {
+    fontSize: 12,
+    color: '#757575',
+    fontFamily: 'Nunito_600SemiBold',
+    width: '100%',
   },
   avatarBusyOverlay: {
     ...StyleSheet.absoluteFillObject,

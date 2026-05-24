@@ -6,6 +6,6 @@ export interface AuthBootstrapSnapshot {
 /** Orchestration persistance + état mémoire pour la session (principe de responsabilité unique côté app). */
 export interface IAuthSessionService {
   bootstrap(): Promise<AuthBootstrapSnapshot>;
-  saveAuthenticatedSession(token: string): Promise<void>;
+  saveAuthenticatedSession(token: string, refreshToken?: string | null): Promise<void>;
   signOut(): Promise<void>;
 }

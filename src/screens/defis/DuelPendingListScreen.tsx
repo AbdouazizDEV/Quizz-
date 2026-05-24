@@ -50,8 +50,17 @@ export default function DuelPendingListScreen() {
     if (!userId || respondingDuelId) return;
     setRespondingDuelId(duelId);
     try {
-      await respondToDuel(duelId, userId, accept);
+      const result = await respondToDuel(duelId, userId, accept);
       await invalidate();
+      if (result.queued) {
+        Alert.alert(
+          'Duel',
+          accept
+            ? 'Acceptation enregistrée — le duel sera disponible à la reconnexion.'
+            : 'Refus enregistré — synchronisation à la reconnexion.',
+        );
+        return;
+      }
       if (accept) {
         Alert.alert('Défi accepté', `Le duel contre ${challengerName} est lancé. Bonne chance !`);
         router.push(DefisRoutes.duelDetail(duelId));
