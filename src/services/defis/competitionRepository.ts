@@ -43,11 +43,13 @@ export async function fetchCompetitionsByTab(
   if (tab === 'en_cours') statusFilter = ['live'];
   if (tab === 'fin') statusFilter = ['completed'];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('competitions')
     .select('id, title, description, status, starts_at, ends_at, reward_text, category_id')
     .in('status', statusFilter)
     .order('starts_at', { ascending: tab !== 'fin' });
+
+  if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as CompetitionRow[];
   const ids = rows.map((r) => r.id);
