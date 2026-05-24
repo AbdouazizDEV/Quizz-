@@ -1,4 +1,5 @@
 import type { DuelSummary } from '@app-types/challenge.types';
+import type { PaginatedResponse } from '@app-types/pagination.types';
 import { apiClient } from '@services/api/apiClient';
 import { useAuthStore } from '@stores/authStore';
 import { extractApiError } from '@utils/extractApiError';
@@ -49,22 +50,60 @@ function mapItem(row: ApiDuelItem): DuelSummary {
     questionsCount: row.questions_count,
     quizId: row.quiz_id,
     phase: row.phase,
-    isExpired: row.is_expired ?? row.phase === 'expired' || row.status === 'expired',
+    isExpired: row.is_expired ?? (row.phase === 'expired' || row.status === 'expired'),
   };
 }
 
-export async function apiFetchPendingDuels(): Promise<DuelSummary[]> {
-  const { data } = await apiClient.get<{ items?: ApiDuelItem[] }>('/defis/duels/pending', {
-    headers: authHeaders(),
-  });
-  return (data.items ?? []).map(mapItem);
+function mapPaginated(items: ApiDuelItem[] | undefined, meta: {
+  page?: number;
+  limit?: number;
+  total?: number;
+  has_more?: boolean;
+}, fallbackLimit: number): PaginatedResponse<DuelSummary> {
+  const mapped = (items ?? []).map(mapItem);
+  return {
+    items: mapped,
+    page: meta.page ?? 1,
+    limit: meta.limit ?? fallbackLimit,
+    total: meta.total ?? mapped.length,
+    hasMore: meta.has_more ?? false,
+  };
 }
 
-export async function apiFetchRecentDuels(): Promise<DuelSummary[]> {
-  const { data } = await apiClient.get<{ items?: ApiDuelItem[] }>('/defis/duels/recent', {
+export async function apiFetchPendingDuels(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<DuelSummary>> {
+  const limit = params?.limit ?? 20;
+  const { data } = await apiClient.get<{
+    items?: ApiDuelItem[];
+    page?: number;
+    limit?: number;
+    total?: number;
+    has_more?: boolean;
+  }>('/defis/duels/pending', {
     headers: authHeaders(),
+    params: { page: params?.page ?? 1, limit },
   });
-  return (data.items ?? []).map(mapItem);
+  return mapPaginated(data.items, data, limit);
+}
+
+export async function apiFetchRecentDuels(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<DuelSummary>> {
+  const limit = params?.limit ?? 20;
+  const { data } = await apiClient.get<{
+    items?: ApiDuelItem[];
+    page?: number;
+    limit?: number;
+    total?: number;
+    has_more?: boolean;
+  }>('/defis/duels/recent', {
+    headers: authHeaders(),
+    params: { page: params?.page ?? 1, limit },
+  });
+  return mapPaginated(data.items, data, limit);
 }
 
 export async function apiFetchDuelById(duelId: string): Promise<DuelSummary | null> {

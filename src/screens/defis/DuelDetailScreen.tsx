@@ -1,6 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -17,8 +16,9 @@ import { SectionTitle } from '@components/ui/common/SectionTitle';
 import { COLORS } from '@constants/Colors';
 import { buildQuizEntryHref } from '@constants/Routes';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { useDuelQuery } from '@hooks/defis/useDuelQuery';
 import { useAppError } from '@providers/AppErrorProvider';
-import { fetchDuelById } from '@services/defis/duelRepository';
+import { resolveRouteParamId } from '@utils/resolveRouteParamId';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -110,19 +110,15 @@ function getDuelUiState(params: {
 }
 
 export default function DuelDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const duelId = typeof id === 'string' ? id : '';
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const duelId = resolveRouteParamId(id);
   const router = useRouter();
   const { showAppError } = useAppError();
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
   const ctaPulse = useSharedValue(1);
 
-  const { data: duel, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['duel', duelId],
-    queryFn: () => fetchDuelById(duelId),
-    enabled: Boolean(duelId),
-  });
+  const { data: duel, isLoading, isError, error, refetch } = useDuelQuery(duelId);
 
   useEffect(() => {
     if (!isError) return;
@@ -170,7 +166,7 @@ export default function DuelDetailScreen() {
     transform: [{ scale: ctaPulse.value }],
   }));
 
-  if (isLoading || !duel) {
+  if ((isLoading && !duel) || !duelId) {
     return (
       <DefisPageShell title="Duel">
         <ActivityIndicator color={COLORS.primary} style={styles.loader} />

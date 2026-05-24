@@ -8,6 +8,9 @@ export const DefisRoutes = {
   tournoiDetail: (id: string) => `/(tabs)/defis/tournoi/${encodeURIComponent(id)}` as const,
   tournoiBracket: (id: string) => `/(tabs)/defis/tournoi/bracket/${encodeURIComponent(id)}` as const,
   duelHub: '/(tabs)/defis/duel',
+  duelFriendsList: '/(tabs)/defis/duel/amis',
+  duelPendingList: '/(tabs)/defis/duel/en-attente',
+  duelRecentList: '/(tabs)/defis/duel/recents',
   duelDetail: (id: string) => `/(tabs)/defis/duel/${encodeURIComponent(id)}` as const,
   duelResult: (id: string) => `/(tabs)/defis/duel/resultat/${encodeURIComponent(id)}` as const,
 } as const;

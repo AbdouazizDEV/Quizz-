@@ -11,6 +11,9 @@ export default function DefisLayout() {
       <Stack.Screen name="tournoi/[id]" />
       <Stack.Screen name="tournoi/bracket/[id]" />
       <Stack.Screen name="duel/index" />
+      <Stack.Screen name="duel/amis/index" />
+      <Stack.Screen name="duel/en-attente/index" />
+      <Stack.Screen name="duel/recents/index" />
       <Stack.Screen name="duel/[id]" />
       <Stack.Screen name="duel/resultat/[id]" />
     </Stack>
