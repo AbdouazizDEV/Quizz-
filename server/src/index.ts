@@ -11,6 +11,7 @@ import { leaderboardRoutes } from './routes/leaderboard.js';
 import { networkRoutes } from './routes/network.js';
 import { defisRoutes } from './routes/defis.js';
 import { quizzesRoutes } from './routes/quizzes.js';
+import { notificationsRoutes } from './routes/notifications.js';
 import { usersRoutes } from './routes/users.js';
 
 loadEnvFiles();
@@ -57,6 +58,7 @@ app.route('/api/v1/network', networkRoutes);
 app.route('/api/v1/defis', defisRoutes);
 app.route('/api/v1/quizzes', quizzesRoutes);
 app.route('/api/v1/users', usersRoutes);
+app.route('/api/v1/notifications', notificationsRoutes);
 
 const env = getEnv();
 if (process.env.NODE_ENV === 'production' && !hasServiceRoleKey()) {

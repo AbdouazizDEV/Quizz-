@@ -1,4 +1,5 @@
 import { apiClient } from '@services/api/apiClient';
+import { invalidateAuthMeCache } from '@services/auth/authMeRepository';
 import { useAuthStore } from '@stores/authStore';
 
 export async function uploadMyCover(imageBase64: string): Promise<string> {
@@ -17,6 +18,7 @@ export async function uploadMyCover(imageBase64: string): Promise<string> {
   if (!cover) {
     throw new Error("L'URL de couverture est absente après upload.");
   }
+  await invalidateAuthMeCache();
   return cover;
 }
 

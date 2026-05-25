@@ -132,6 +132,22 @@ export class OfflineStore {
     };
   }
 
+  async removeCachedResponse(cacheKey: string): Promise<void> {
+    if (isUsingMemoryFallback()) {
+      memoryCache.delete(cacheKey);
+      return;
+    }
+
+    try {
+      const db = await getOfflineDatabase();
+      if (!db) return;
+      await db.runAsync('DELETE FROM api_cache WHERE cache_key = ?', [cacheKey]);
+    } catch (error) {
+      handleSqliteFailure(error);
+      memoryCache.delete(cacheKey);
+    }
+  }
+
   async setCachedResponse(input: {
     cacheKey: string;
     source: OfflineSource;

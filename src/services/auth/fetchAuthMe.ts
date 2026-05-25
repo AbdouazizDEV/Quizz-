@@ -1,15 +1,15 @@
 import type { AuthMeResponse } from '@sdk';
-import { getQuizzApiClient } from '@sdk';
-import { useAuthStore } from '@stores/authStore';
+
+import { getCachedAuthMe, loadAuthMe } from '@services/auth/authMeRepository';
 
 export type { AuthMeResponse };
 
-export async function fetchAuthMe(): Promise<AuthMeResponse | null> {
-  const token = useAuthStore.getState().token;
-  if (!token?.trim()) return null;
-  const { data, error } = await getQuizzApiClient().GET('/auth/me', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (error || !data) return null;
-  return data;
+/** @deprecated Préférer `loadAuthMe` ou `getCachedAuthMe` pour le cache local. */
+export async function fetchAuthMe(options?: { force?: boolean }): Promise<AuthMeResponse | null> {
+  if (options?.force) {
+    return loadAuthMe({ force: true });
+  }
+  const cached = await getCachedAuthMe();
+  if (cached) return cached;
+  return loadAuthMe({ force: false });
 }

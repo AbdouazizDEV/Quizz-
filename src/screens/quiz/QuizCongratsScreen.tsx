@@ -22,14 +22,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizCongratsFlowers } from '@components/ui/quiz/play/QuizCongratsFlowers';
 import { QuizCongratsLeaderboardRow } from '@components/ui/quiz/play/QuizCongratsLeaderboardRow';
+import { QuizScoreShareSheet } from '@components/ui/quiz/play/QuizScoreShareSheet';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import type { QuizLeaderboardEntry } from '@app-types/quizPlay.types';
 import { getQuizLeaderboardPort } from '@services/quiz/leaderboard/quizLeaderboardInstance';
-import { getQuizScoreSharePort } from '@services/quiz/share/quizScoreShareInstance';
-import { triggerQuizMaxScoreCelebration } from '@services/quiz/play/triggerQuizMaxScoreCelebration';
+import { triggerQuizCongratsSound } from '@services/quiz/play/triggerQuizCongratsSound';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 
 export default function QuizCongratsScreen() {
@@ -62,6 +62,7 @@ export default function QuizCongratsScreen() {
 
   const [leaderboard, setLeaderboard] = useState<QuizLeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -88,9 +89,9 @@ export default function QuizCongratsScreen() {
   const isGreatScore = total > 0 && correctCount > total / 2;
 
   useEffect(() => {
-    if (!isMaxScore) return;
-    void triggerQuizMaxScoreCelebration();
-  }, [isMaxScore]);
+    if (total <= 0) return;
+    void triggerQuizCongratsSound(correctCount, total);
+  }, [correctCount, total]);
 
   useEffect(() => {
     if (!quizId) {
@@ -130,15 +131,19 @@ export default function QuizCongratsScreen() {
     router.dismissTo(Routes.HOME);
   }, [categorySlug, challengeId, duelId, reset, router]);
 
-  const onShare = useCallback(async () => {
-    if (!payload) return;
-    await getQuizScoreSharePort().shareScore({
-      quizTitle: payload.quiz.title,
-      score: sessionPoints,
-      correctCount,
-      total,
-    });
-  }, [payload, sessionPoints, correctCount, total]);
+  const shareInput = useMemo(
+    () =>
+      payload
+        ? {
+            quizTitle: payload.quiz.title,
+            score: sessionPoints,
+            correctCount,
+            total,
+            leaderboard,
+          }
+        : null,
+    [payload, sessionPoints, correctCount, total, leaderboard],
+  );
 
   const title = isMaxScore
     ? 'Score parfait !'
@@ -210,7 +215,11 @@ export default function QuizCongratsScreen() {
               </Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.actionBtn} onPress={onShare}>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() => shareInput && setShareSheetVisible(true)}
+            disabled={!shareInput}
+          >
             <Feather name="share-2" size={20} color="#1F2261" />
             <Text style={[styles.actionTxt, fonts.semiBold && { fontFamily: fonts.semiBold }]}>Partager</Text>
           </Pressable>
@@ -222,6 +231,14 @@ export default function QuizCongratsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <QuizScoreShareSheet
+        visible={shareSheetVisible}
+        onClose={() => setShareSheetVisible(false)}
+        shareInput={shareInput}
+        shareVariant={isMaxScore ? 'max' : isGreatScore ? 'great' : 'default'}
+        fonts={fonts}
+      />
     </View>
   );
 }

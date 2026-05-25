@@ -23,7 +23,9 @@ import { useAuthMe } from '@hooks/useAuthMe';
 import { useQuestionTimer } from '@hooks/useQuestionTimer';
 import { recordChallengeParticipation } from '@services/defis/participateChallenge.service';
 import { submitDuelScore } from '@services/defis/duelRepository';
+import { invalidateAuthMeCache } from '@services/auth/authMeRepository';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
+import { triggerQuizCorrectFeedback } from '@services/quiz/play/triggerQuizCorrectFeedback';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAppError } from '@providers/AppErrorProvider';
@@ -57,6 +59,7 @@ export default function QuizPlayScreen() {
 
   const expiredForQuestionRef = useRef(false);
   const wrongFeedbackKeyRef = useRef<string | null>(null);
+  const correctFeedbackKeyRef = useRef<string | null>(null);
 
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -114,6 +117,16 @@ export default function QuizPlayScreen() {
   }, [feedbackPhase, pause, resume]);
 
   useEffect(() => {
+    if (feedbackPhase === 'correct') {
+      wrongFeedbackKeyRef.current = null;
+      const key = `${currentIndex}-correct`;
+      if (correctFeedbackKeyRef.current === key) return;
+      correctFeedbackKeyRef.current = key;
+      void triggerQuizCorrectFeedback();
+      return;
+    }
+    correctFeedbackKeyRef.current = null;
+
     if (feedbackPhase !== 'incorrect' && feedbackPhase !== 'timeout') {
       wrongFeedbackKeyRef.current = null;
       return;
@@ -167,6 +180,8 @@ export default function QuizPlayScreen() {
       showAppError(res.errorMessage ?? 'Votre score n\'a pas pu être enregistré.', {
         title: 'Enregistrement',
       });
+    } else {
+      void invalidateAuthMeCache();
     }
 
     if (duelId) {

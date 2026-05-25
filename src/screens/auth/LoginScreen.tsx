@@ -29,7 +29,8 @@ import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
-import { fetchAuthMe } from '@services/auth/fetchAuthMe';
+import { mapLoginUserToAuthMe } from '@services/auth/mapLoginToAuthMe';
+import { getAuthMeFromStore } from '@services/auth/authMeRepository';
 import { loginGateway } from '@services/auth/loginGatewayInstance';
 import { socialAuthGateway } from '@services/auth/socialAuthGateway';
 import { useAuthStore } from '@stores/authStore';
@@ -99,8 +100,12 @@ export default function LoginScreen() {
     setFormError(null);
     setSubmitting(true);
     try {
-      const { accessToken, refreshToken } = await loginGateway.signIn({ email: trimmed, password });
-      await persistLoginAndSyncStore(accessToken, refreshToken);
+      const { accessToken, refreshToken, user } = await loginGateway.signIn({ email: trimmed, password });
+      await persistLoginAndSyncStore(
+        accessToken,
+        refreshToken,
+        user ? mapLoginUserToAuthMe(user) : null,
+      );
       router.replace(Routes.HOME);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Connexion impossible. Réessayez.');
@@ -120,7 +125,7 @@ export default function LoginScreen() {
             ? await socialAuthGateway.startGoogle()
             : await socialAuthGateway.startFacebook();
         await persistLoginAndSyncStore(accessToken);
-        const me = await fetchAuthMe();
+        const me = getAuthMeFromStore();
         if (!me) {
           await signOutAndSyncStore();
           throw new Error(

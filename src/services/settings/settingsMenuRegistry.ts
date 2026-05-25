@@ -62,7 +62,7 @@ export function getSettingsMenuEntries(): SettingsMenuEntry[] {
     {
       id: 'about',
       kind: 'link',
-      label: 'À propos de Quizzo',
+      label: 'À propos de Quizz+',
       icon: 'info',
       iconBackground: '#F3E5F5',
       iconColor: '#8E24AA',

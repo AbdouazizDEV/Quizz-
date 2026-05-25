@@ -15,6 +15,21 @@ const coverBodySchema = z.object({
   image_base64: z.string().min(40),
 });
 
+const personalInfoPatchSchema = z.object({
+  full_name: z.string().min(1).max(100).optional(),
+  username: z.string().min(2).max(50).optional(),
+  phone: z.string().max(32).nullable().optional(),
+  bio: z.string().max(500).nullable().optional(),
+  birth_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  country_code: z.string().min(2).max(3).nullable().optional(),
+  account_type_slug: z.string().max(50).nullable().optional(),
+  workplace_slug: z.string().max(50).nullable().optional(),
+});
+
 function bearerToken(c: { req: { header: (n: string) => string | undefined } }): string | null {
   const h = c.req.header('Authorization');
   if (!h?.startsWith('Bearer ')) return null;
@@ -246,5 +261,74 @@ export const usersRoutes = new Hono().get('/:userId/profile', async (c) => {
     if (updateAuthErr) return c.json({ error: updateAuthErr.message }, 500);
 
     return c.json({ ok: true, cover_url: coverUrl });
+  })
+  .patch('/me/personal-info', async (c) => {
+    const token = bearerToken(c);
+    if (!token) return c.json({ error: 'Authorization: Bearer <access_token> requis.' }, 401);
+    if (!hasServiceRoleKey()) return c.json(serviceRole503(), 503);
+
+    const parsed = personalInfoPatchSchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json({ error: 'Payload invalide', details: parsed.error.flatten() }, 400);
+    }
+
+    const userClient = createUserClient(token);
+    const { data: meData, error: meErr } = await userClient.auth.getUser();
+    const viewerId = meData.user?.id;
+    if (meErr || !viewerId || !meData.user) {
+      return c.json({ error: meErr?.message ?? 'Jeton invalide.' }, 401);
+    }
+
+    const patch = parsed.data;
+    const profilePatch: Record<string, unknown> = {};
+    if (patch.full_name !== undefined) profilePatch.full_name = patch.full_name;
+    if (patch.username !== undefined) profilePatch.username = patch.username;
+    if (patch.phone !== undefined) profilePatch.phone = patch.phone;
+    if (patch.bio !== undefined) profilePatch.bio = patch.bio;
+    if (patch.birth_date !== undefined) profilePatch.birth_date = patch.birth_date;
+    if (patch.account_type_slug !== undefined) profilePatch.account_type_slug = patch.account_type_slug;
+    if (patch.workplace_slug !== undefined) profilePatch.workplace_slug = patch.workplace_slug;
+
+    const admin = createServiceRoleClient();
+
+    if (Object.keys(profilePatch).length > 0) {
+      const { error: updErr } = await admin.from('profiles').update(profilePatch).eq('id', viewerId);
+      if (updErr) {
+        if (updErr.message.includes('duplicate') || updErr.code === '23505') {
+          return c.json({ error: 'Ce nom d’utilisateur est déjà pris.' }, 409);
+        }
+        return c.json({ error: updErr.message }, 500);
+      }
+    }
+
+    const previousMeta = (meData.user.user_metadata ?? {}) as Record<string, unknown>;
+    const metaPatch: Record<string, unknown> = { ...previousMeta };
+    if (patch.full_name !== undefined) metaPatch.full_name = patch.full_name;
+    if (patch.username !== undefined) metaPatch.username = patch.username;
+    if (patch.phone !== undefined) metaPatch.phone = patch.phone;
+    if (patch.birth_date !== undefined) metaPatch.birth_date = patch.birth_date;
+    if (patch.country_code !== undefined) metaPatch.country_code = patch.country_code;
+    if (patch.account_type_slug !== undefined) metaPatch.account_type = patch.account_type_slug;
+    if (patch.workplace_slug !== undefined) metaPatch.workplace = patch.workplace_slug;
+
+    const { error: authUpdErr } = await admin.auth.admin.updateUserById(viewerId, {
+      user_metadata: metaPatch,
+    });
+    if (authUpdErr) return c.json({ error: authUpdErr.message }, 500);
+
+    const { data: profile, error: profErr } = await admin
+      .from('profiles')
+      .select('*')
+      .eq('id', viewerId)
+      .maybeSingle();
+    if (profErr) return c.json({ error: profErr.message }, 500);
+
+    const { data: refreshedUser } = await admin.auth.admin.getUserById(viewerId);
+
+    return c.json({
+      ok: true,
+      user: refreshedUser.user ?? meData.user,
+      profile: profile ?? null,
+    });
   });
 
