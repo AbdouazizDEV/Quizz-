@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {
   Nunito_500Medium,
   Nunito_600SemiBold,
@@ -13,6 +21,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizCongratsFlowers } from '@components/ui/quiz/play/QuizCongratsFlowers';
+import { QuizCongratsLeaderboardRow } from '@components/ui/quiz/play/QuizCongratsLeaderboardRow';
 import { DefisRoutes } from '@constants/defisRoutes';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
@@ -52,6 +61,7 @@ export default function QuizCongratsScreen() {
   const reset = useQuizPlaySessionStore((s) => s.reset);
 
   const [leaderboard, setLeaderboard] = useState<QuizLeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
 
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -83,11 +93,24 @@ export default function QuizCongratsScreen() {
   }, [isMaxScore]);
 
   useEffect(() => {
-    if (!quizId) return;
+    if (!quizId) {
+      setLeaderboard([]);
+      setLeaderboardLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLeaderboardLoading(true);
     void (async () => {
       const port = getQuizLeaderboardPort();
-      setLeaderboard(await port.fetchLeaderboardForQuiz(quizId, 7));
+      const rows = await port.fetchLeaderboardForQuiz(quizId, 7);
+      if (!cancelled) {
+        setLeaderboard(rows);
+        setLeaderboardLoading(false);
+      }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [quizId]);
 
   const goCategory = useCallback(() => {
@@ -165,15 +188,17 @@ export default function QuizCongratsScreen() {
           Classement sur ce quiz
         </Text>
         <View style={[styles.list, { width: contentWidth }]}>
-          {leaderboard.map((row) => (
-            <View key={row.rank} style={styles.row}>
-              <Text style={[styles.rank, fonts.bold && { fontFamily: fonts.bold }]}>{row.rank}</Text>
-              <Text style={[styles.name, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-                {row.displayName}
-              </Text>
-              <Text style={[styles.pts, fonts.bold && { fontFamily: fonts.bold }]}>{row.score}</Text>
-            </View>
-          ))}
+          {leaderboardLoading ? (
+            <ActivityIndicator style={styles.listLoader} color="#1F2261" />
+          ) : leaderboard.length === 0 ? (
+            <Text style={[styles.listEmpty, fonts.medium && { fontFamily: fonts.medium }]}>
+              Aucun classement pour l’instant — sois le premier à terminer ce quiz !
+            </Text>
+          ) : (
+            leaderboard.map((row) => (
+              <QuizCongratsLeaderboardRow key={row.userId} entry={row} fonts={fonts} />
+            ))
+          )}
         </View>
 
         <View style={[styles.actions, { width: contentWidth }]}>
@@ -249,18 +274,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 8,
     zIndex: 1,
+    minHeight: 80,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EEE',
+  listLoader: { paddingVertical: 28 },
+  listEmpty: {
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    fontSize: 14,
+    color: '#616161',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  rank: { width: 32, fontSize: 16, color: '#212121' },
-  name: { flex: 1, fontSize: 16, color: '#212121' },
-  pts: { fontSize: 16, color: '#212121' },
   actions: {
     flexDirection: 'row',
     gap: 12,

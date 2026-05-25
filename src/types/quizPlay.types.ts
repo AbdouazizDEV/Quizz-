@@ -37,7 +37,9 @@ export interface QuizAnswerRecord {
 
 export interface QuizLeaderboardEntry {
   rank: number;
+  userId: string;
   displayName: string;
   score: number;
   avatarUrl: string | null;
+  isCurrentUser: boolean;
 }
