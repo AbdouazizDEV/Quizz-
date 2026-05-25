@@ -60,6 +60,7 @@ export function HomeSettingsDrawer({ visible, onClose, isVisitor = false }: Home
             onAfterLogout={onClose}
             fullWidth
             topPaddingOverride={16}
+            dismissBeforeNavigate
           />
         </Animated.View>
       </View>

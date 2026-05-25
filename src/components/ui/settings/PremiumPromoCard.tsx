@@ -11,9 +11,10 @@ import { EtoileMark } from './EtoileMark';
 
 interface PremiumPromoCardProps {
   fonts: ProfileFontFamilies;
+  onBeforeNavigate?: () => void;
 }
 
-export function PremiumPromoCard({ fonts }: PremiumPromoCardProps) {
+export function PremiumPromoCard({ fonts, onBeforeNavigate }: PremiumPromoCardProps) {
   const router = useRouter();
 
   return (
@@ -41,7 +42,10 @@ export function PremiumPromoCard({ fonts }: PremiumPromoCardProps) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Découvrir Premium"
-          onPress={() => router.push(Routes.PREMIUM_PLANS)}
+          onPress={() => {
+            onBeforeNavigate?.();
+            router.push(Routes.PREMIUM_PLANS);
+          }}
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.92 }]}
         >
           <Text style={[styles.ctaText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
