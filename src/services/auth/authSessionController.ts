@@ -3,6 +3,9 @@ import { useAuthStore } from '@stores/authStore';
 import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 import { syncSupabaseAuthSession } from '@services/supabase/syncSupabaseAuthSession';
 
+import type { AuthMeResponse } from '@sdk';
+import { clearAuthMeCache, loadAuthMe, setAuthMeCache } from '@services/auth/authMeRepository';
+
 import type { AuthBootstrapSnapshot } from './IAuthSessionService';
 import { authSessionService } from './authSessionServiceInstance';
 
@@ -16,6 +19,9 @@ export async function runAuthBootstrapAndSyncStore(): Promise<AuthBootstrapSnaps
     } catch {
       /* refresh token absent ou expiré : reconnexion requise pour les écritures Supabase */
     }
+    void loadAuthMe({ force: false });
+  } else {
+    await clearAuthMeCache();
   }
   return snapshot;
 }
@@ -24,10 +30,15 @@ export async function runAuthBootstrapAndSyncStore(): Promise<AuthBootstrapSnaps
 export async function persistLoginAndSyncStore(
   token: string,
   refreshToken?: string | null,
+  authMeSeed?: AuthMeResponse | null,
 ): Promise<void> {
   await authSessionService.saveAuthenticatedSession(token, refreshToken);
   useAuthStore.getState().adoptAuthenticatedSession(token);
   await syncSupabaseAuthSession(token, refreshToken);
+  if (authMeSeed) {
+    await setAuthMeCache(authMeSeed);
+  }
+  await loadAuthMe({ force: true });
 }
 
 /** Déconnexion : invalide la session côté API si possible, efface le stockage local et le store. */
@@ -43,6 +54,7 @@ export async function signOutAndSyncStore(): Promise<void> {
     }
   }
   await authSessionService.signOut();
+  await clearAuthMeCache();
   useOnboardingRegisterStore.getState().clear();
   useAuthStore.getState().clearSession();
 }

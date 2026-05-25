@@ -32,7 +32,7 @@ export function mapAuthMeToStatisticsScreenData(me: AuthMeResponse): StatisticsS
       points,
     },
     achievements: [
-      { id: 'a1', icon: 'quizzo', label: 'Quizzo', valueFormatted: String(quizzesDone) },
+      { id: 'a1', icon: 'quizzo', label: 'Quizz+', valueFormatted: String(quizzesDone) },
       {
         id: 'a2',
         icon: 'coin',

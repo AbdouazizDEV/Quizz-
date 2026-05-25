@@ -120,7 +120,7 @@ export default function HomeRefactoredScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void refetchAuthMe();
+      void refetchAuthMe({ force: false });
       void refetchLeaderboard();
       if (token?.trim()) {
         void (async () => {

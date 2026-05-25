@@ -1,4 +1,4 @@
-import { fetchAuthMe } from '@services/auth/fetchAuthMe';
+import { getCachedAuthMe, loadAuthMe } from '@services/auth/authMeRepository';
 import { useAuthStore } from '@stores/authStore';
 
 import type { IStatisticsDataProvider } from './IStatisticsDataProvider';
@@ -14,7 +14,7 @@ export class ApiStatisticsDataProvider implements IStatisticsDataProvider {
       return this.fallback.getStatistics(_userId);
     }
     try {
-      const me = await fetchAuthMe();
+      const me = (await getCachedAuthMe()) ?? (await loadAuthMe({ force: false }));
       if (!me?.user) {
         return this.fallback.getStatistics(_userId);
       }

@@ -30,7 +30,8 @@ import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgr
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
-import { fetchAuthMe } from '@services/auth/fetchAuthMe';
+import { getAuthMeFromStore } from '@services/auth/authMeRepository';
+import { mapLoginUserToAuthMe } from '@services/auth/mapLoginToAuthMe';
 import { socialAuthGateway } from '@services/auth/socialAuthGateway';
 import { Spacing } from '@constants/Spacing';
 import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
@@ -129,7 +130,11 @@ export default function RegisterScreen() {
       const token = data.session?.access_token;
       const refreshToken = data.session?.refresh_token;
       if (token && refreshToken) {
-        await persistLoginAndSyncStore(token, refreshToken);
+        await persistLoginAndSyncStore(
+          token,
+          refreshToken,
+          data.user ? mapLoginUserToAuthMe(data.user) : null,
+        );
         onboarding.clear();
         setShowSuccess(true);
         return;
@@ -158,7 +163,7 @@ export default function RegisterScreen() {
           ? await socialAuthGateway.startGoogle()
           : await socialAuthGateway.startFacebook();
       await persistLoginAndSyncStore(accessToken);
-      const me = await fetchAuthMe();
+      const me = getAuthMeFromStore();
       if (!me) {
         await signOutAndSyncStore();
         throw new Error(

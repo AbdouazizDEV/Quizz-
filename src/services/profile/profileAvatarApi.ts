@@ -1,4 +1,5 @@
 import { apiClient } from '@services/api/apiClient';
+import { invalidateAuthMeCache } from '@services/auth/authMeRepository';
 import { useAuthStore } from '@stores/authStore';
 
 export async function uploadMyAvatar(imageBase64: string): Promise<string> {
@@ -13,6 +14,7 @@ export async function uploadMyAvatar(imageBase64: string): Promise<string> {
   if (!avatar) {
     throw new Error("L'URL d'avatar est absente après upload.");
   }
+  await invalidateAuthMeCache();
   return avatar;
 }
 

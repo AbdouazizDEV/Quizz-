@@ -1,45 +1,42 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 
-import type { AuthMeResponse } from '@services/auth/fetchAuthMe';
-import { fetchAuthMe } from '@services/auth/fetchAuthMe';
+import type { AuthMeResponse } from '@sdk';
+import { invalidateAuthMeCache, loadAuthMe } from '@services/auth/authMeRepository';
+import { useAuthMeStore } from '@stores/authMeStore';
 import { useAuthStore } from '@stores/authStore';
 
 interface UseAuthMeResult {
   data: AuthMeResponse | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
+  refetch: (options?: { force?: boolean }) => Promise<void>;
 }
 
+/**
+ * Cache partagé (Zustand + SQLite) pour GET /auth/me.
+ * Les appels réseau sont dédupliqués et ignorés tant que le cache n’est pas expiré.
+ */
 export function useAuthMe(): UseAuthMeResult {
   const token = useAuthStore((s) => s.token);
-  const [data, setData] = useState<AuthMeResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const data = useAuthMeStore((s) => s.data);
+  const loading = useAuthMeStore((s) => s.loading);
+  const error = useAuthMeStore((s) => s.error);
 
-  const load = useCallback(async () => {
-    if (!useAuthStore.getState().token?.trim()) {
-      setData(null);
-      setLoading(false);
-      setError(null);
+  const refetch = useCallback(async (options?: { force?: boolean }) => {
+    if (options?.force) {
+      await invalidateAuthMeCache();
       return;
     }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchAuthMe();
-      setData(res);
-    } catch (e) {
-      setError(e instanceof Error ? e : new Error(String(e)));
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
+    await loadAuthMe({ force: false });
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [token, load]);
+    if (!token?.trim()) {
+      useAuthMeStore.getState().clear();
+      return;
+    }
+    void loadAuthMe({ force: false });
+  }, [token]);
 
-  return { data, loading, error, refetch: load };
+  return { data, loading, error, refetch };
 }

@@ -18,6 +18,7 @@ export {
 } from './competitionMutations';
 export { CHALLENGE_PARTICIPATION_INSERT } from './challengeMutations';
 export { offlineStore, OfflineStore } from './OfflineStore';
+export { ensureOfflineDatabaseReady } from './offlineDatabase';
 export { readWithOfflineCache, OfflineCacheMissError, isOfflineCacheMissError } from './offlineRead';
 export { fetchNetworkOnline, isNetworkOnline, subscribeNetworkOnline } from './networkStatus';
 export {

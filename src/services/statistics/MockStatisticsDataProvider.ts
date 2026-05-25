@@ -22,7 +22,7 @@ export class MockStatisticsDataProvider implements IStatisticsDataProvider {
         ],
       },
       achievements: [
-        { id: 'a1', icon: 'quizzo', label: 'Quizzo', valueFormatted: '85' },
+        { id: 'a1', icon: 'quizzo', label: 'Quizz+', valueFormatted: '85' },
         {
           id: 'a2',
           icon: 'coin',

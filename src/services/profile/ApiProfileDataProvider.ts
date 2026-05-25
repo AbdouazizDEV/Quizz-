@@ -1,5 +1,6 @@
 import type { ProfileScreenData } from '@app-types/profile.types';
 import { apiClient } from '@services/api/apiClient';
+import { getAuthMeFromStore, getCachedAuthMe } from '@services/auth/authMeRepository';
 import { profileScreenCacheKey, readWithOfflineCache } from '@services/offline';
 import { fetchNetworkOnline } from '@services/offline/networkStatus';
 import { useAuthStore } from '@stores/authStore';
@@ -100,19 +101,18 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
 async function resolveTargetUserId(userId?: string): Promise<string> {
   if (userId?.trim()) return userId.trim();
 
+  const fromMemory = getAuthMeFromStore()?.user?.id?.trim();
+  if (fromMemory) return fromMemory;
+
+  const fromCache = (await getCachedAuthMe())?.user?.id?.trim();
+  if (fromCache) return fromCache;
+
   const online = await fetchNetworkOnline();
   if (!online) {
     throw new Error('Profil indisponible hors ligne. Ouvrez votre profil une fois en ligne.');
   }
 
-  const token = useAuthStore.getState().token?.trim();
-  if (!token) throw new Error('Utilisateur non connecté.');
-  const { data } = await apiClient.get<{ user?: { id?: string } }>('/auth/me', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const id = data.user?.id?.trim();
-  if (!id) throw new Error('Impossible de résoudre le profil utilisateur.');
-  return id;
+  throw new Error('Impossible de résoudre le profil utilisateur. Reconnectez-vous.');
 }
 
 async function loadProfileFromApi(targetUserId: string, isExternal: boolean): Promise<ProfileScreenData> {

@@ -11,6 +11,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   /** Requis pour EAS Build / Play Store — à adapter si vous changez l’identifiant. */
   ios: {
     bundleIdentifier: 'com.quizzplus.app',
+    infoPlist: {
+      LSApplicationQueriesSchemes: ['whatsapp', 'fb', 'fbapi', 'fb-messenger-share-api'],
+    },
   },
   android: {
     package: 'com.quizzplus.app',
