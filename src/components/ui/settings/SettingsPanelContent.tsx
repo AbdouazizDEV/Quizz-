@@ -35,6 +35,8 @@ interface SettingsPanelContentProps {
   fullWidth?: boolean;
   /** Override padding top (sinon safe-area + thème). */
   topPaddingOverride?: number;
+  /** Fermer le drawer avant navigation (accueil). */
+  dismissBeforeNavigate?: boolean;
 }
 
 export function SettingsPanelContent({
@@ -44,6 +46,7 @@ export function SettingsPanelContent({
   isVisitor = false,
   fullWidth = false,
   topPaddingOverride,
+  dismissBeforeNavigate = false,
 }: SettingsPanelContentProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -70,6 +73,14 @@ export function SettingsPanelContent({
   );
 
   const menuEntries = useMemo(() => getSettingsMenuEntries(), []);
+
+  const navigateTo = useCallback(
+    (href: string) => {
+      if (dismissBeforeNavigate) onBack();
+      router.push(href);
+    },
+    [dismissBeforeNavigate, onBack, router],
+  );
 
   const openLogoutModal = useCallback(() => {
     setLogoutModalVisible(true);
@@ -149,12 +160,12 @@ export function SettingsPanelContent({
           icon={icon}
           iconBackground={entry.iconBackground}
           iconColor={entry.iconColor}
-          onPress={() => router.push(entry.href)}
+          onPress={() => navigateTo(entry.href)}
           fonts={fonts}
         />
       );
     },
-    [darkMode, fonts, isVisitor, onBack, openLogoutModal, router, setDarkMode],
+    [darkMode, fonts, isVisitor, navigateTo, onBack, openLogoutModal, router, setDarkMode],
   );
 
   return (
@@ -176,7 +187,10 @@ export function SettingsPanelContent({
           <SettingsLeadingHeader title={title} onBack={onBack} fonts={fonts} />
 
           <View style={styles.body}>
-            <PremiumPromoCard fonts={fonts} />
+            <PremiumPromoCard
+              fonts={fonts}
+              onBeforeNavigate={dismissBeforeNavigate ? onBack : undefined}
+            />
             <View style={styles.list}>{menuEntries.map(renderRow)}</View>
           </View>
         </View>

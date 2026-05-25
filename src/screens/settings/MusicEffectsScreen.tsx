@@ -149,11 +149,14 @@ export default function MusicEffectsScreen() {
 
       {pickerSlot && pickerMeta ? (
         <QuizSoundPickerModal
-          visible
+          visible={Boolean(pickerSlot)}
           title={pickerMeta.title}
           selectedId={sounds[pickerSlot]}
           onClose={() => setPickerSlot(null)}
-          onSelect={(id) => setSoundForSlot(pickerSlot, id)}
+          onSelect={(id) => {
+            setSoundForSlot(pickerSlot, id);
+            setPickerSlot(null);
+          }}
           fonts={fonts}
         />
       ) : null}

@@ -67,8 +67,8 @@ export function QuizSoundPickerModal({
                   <Pressable
                     style={({ pressed }) => [styles.rowMain, pressed && { opacity: 0.88 }]}
                     onPress={() => {
-                      onSelect(item.id);
                       onClose();
+                      onSelect(item.id);
                     }}
                   >
                     <Feather
