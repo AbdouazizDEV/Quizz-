@@ -105,16 +105,7 @@ async function computeUserRank(
 ): Promise<number | null> {
   if (userScore <= 0) return null;
 
-  const { data: allParticipations } = await supabase
-    .from('challenge_participations')
-    .select('user_id, score')
-    .eq('challenge_id', challengeId);
-
-  const totalsByUser = new Map<string, number>();
-  for (const row of allParticipations ?? []) {
-    const prev = totalsByUser.get(row.user_id) ?? 0;
-    totalsByUser.set(row.user_id, prev + (row.score ?? 0));
-  }
+  const { totalsByUser } = await aggregateChallengeScoresByUser(supabase, challengeId);
 
   const sorted = [...totalsByUser.entries()].sort((a, b) => b[1] - a[1]);
   const index = sorted.findIndex(([uid]) => uid === userId);
@@ -190,6 +181,48 @@ async function loadChallengeProgressFromSupabase(
   };
 }
 
+async function loadProfileDisplayNames(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const namesByUser = new Map<string, string>();
+  if (userIds.length === 0) return namesByUser;
+
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, username')
+    .in('id', userIds);
+
+  if (error) throw new Error(error.message);
+
+  for (const profile of profiles ?? []) {
+    const name = profile.full_name?.trim() || profile.username?.trim() || 'Joueur';
+    namesByUser.set(profile.id, name);
+  }
+  return namesByUser;
+}
+
+async function aggregateChallengeScoresByUser(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  challengeId: string,
+): Promise<{ totalsByUser: Map<string, number>; namesByUser: Map<string, string> }> {
+  const { data: participations, error } = await supabase
+    .from('challenge_participations')
+    .select('user_id, score')
+    .eq('challenge_id', challengeId);
+
+  if (error) throw new Error(error.message);
+
+  const totalsByUser = new Map<string, number>();
+  for (const row of participations ?? []) {
+    const prev = totalsByUser.get(row.user_id) ?? 0;
+    totalsByUser.set(row.user_id, prev + (row.score ?? 0));
+  }
+
+  const namesByUser = await loadProfileDisplayNames(supabase, [...totalsByUser.keys()]);
+  return { totalsByUser, namesByUser };
+}
+
 async function loadChallengeLeaderboardFromSupabase(
   challengeId: string,
   userId: string,
@@ -197,33 +230,15 @@ async function loadChallengeLeaderboardFromSupabase(
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error('Supabase non configuré');
 
-  const { data: challengeRow } = await supabase
+  const { data: challengeRow, error: challengeError } = await supabase
     .from('weekly_challenges')
     .select('title, ends_at, reward_text')
     .eq('id', challengeId)
     .single();
 
-  const { data: participations } = await supabase
-    .from('challenge_participations')
-    .select('user_id, score, profiles(full_name, username)')
-    .eq('challenge_id', challengeId);
+  if (challengeError) throw new Error(challengeError.message);
 
-  interface ParticipationRow {
-    user_id: string;
-    score: number;
-    profiles?: { full_name: string | null; username: string | null } | null;
-  }
-
-  const totalsByUser = new Map<string, number>();
-  const namesByUser = new Map<string, string>();
-
-  for (const row of (participations ?? []) as ParticipationRow[]) {
-    const prev = totalsByUser.get(row.user_id) ?? 0;
-    totalsByUser.set(row.user_id, prev + (row.score ?? 0));
-    const profile = row.profiles;
-    const name = profile?.full_name?.trim() || profile?.username?.trim() || 'Joueur';
-    namesByUser.set(row.user_id, name);
-  }
+  const { totalsByUser, namesByUser } = await aggregateChallengeScoresByUser(supabase, challengeId);
 
   const sorted = [...totalsByUser.entries()].sort((a, b) => b[1] - a[1]);
   const entries = sorted.map(([uid, totalScore], index) => ({

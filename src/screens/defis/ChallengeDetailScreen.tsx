@@ -1,10 +1,15 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { CountdownTimer } from '@components/atoms/CountdownTimer';
+import { ChallengeCompetitionHero } from '@components/ui/defis/challenge/ChallengeCompetitionHero';
+import { ChallengeQuizMissionRow } from '@components/ui/defis/challenge/ChallengeQuizMissionRow';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
 import { DefisSurfaceCard } from '@components/ui/defis/DefisSurfaceCard';
 import { DefisRoutes } from '@constants/defisRoutes';
+import { CHALLENGE_UI } from '@constants/challengeUiTheme';
 import { COLORS } from '@constants/Colors';
 import { buildQuizEntryHref } from '@constants/Routes';
 import { useChallenge } from '@hooks/defis/useChallenge';
@@ -37,9 +42,9 @@ export default function ChallengeDetailScreen() {
         quiz.scheduledDay,
       );
       router.push(buildQuizEntryHref(quiz.quizId, { challengeId }));
-    } catch (error) {
-      if (error instanceof ChallengeParticipationError) {
-        showAppError(error.message, { title: 'Challenge' });
+    } catch (err) {
+      if (err instanceof ChallengeParticipationError) {
+        showAppError(err.message, { title: 'Challenge' });
         return;
       }
       showAppError('Impossible de lancer ce quiz.', { title: 'Challenge' });
@@ -55,23 +60,35 @@ export default function ChallengeDetailScreen() {
           {error instanceof Error ? error.message : 'Impossible de charger ce challenge.'}
         </Text>
       ) : data ? (
-        <>
+        <Animated.View entering={FadeInDown.duration(350)} style={styles.content}>
           {!isOnline ? (
-            <Text style={styles.offlineHint}>
-              Données en cache — reconnectez-vous pour actualiser.
-            </Text>
-          ) : null}
-          <Text style={styles.title}>{data.challenge.title}</Text>
-          <CountdownTimer endsAt={data.challenge.endsAt} />
-          {data.challenge.rewardText ? (
-            <Text style={styles.reward}>🎁 {data.challenge.rewardText}</Text>
+            <View style={styles.offlineBanner}>
+              <Feather name="wifi-off" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.offlineHint}>Données en cache — reconnectez-vous pour actualiser.</Text>
+            </View>
           ) : null}
 
-          <DefisSurfaceCard>
+          <ChallengeCompetitionHero
+            title={data.challenge.title}
+            endsAt={data.challenge.endsAt}
+            rewardText={data.challenge.rewardText}
+            userRank={data.userRank}
+            userScore={data.userScore}
+            quizzesPlayed={data.quizzesPlayed}
+            totalQuizzes={data.totalQuizzes}
+          />
+
+          <View style={styles.sectionHead}>
+            <Feather name="layers" size={18} color={CHALLENGE_UI.navy} />
+            <Text style={styles.sectionTitle}>Missions quiz</Text>
+          </View>
+
+          <DefisSurfaceCard style={styles.missionsCard}>
             {data.dailyQuizzes.map((quiz, index) => (
-              <QuizDetailRow
+              <ChallengeQuizMissionRow
                 key={quiz.quizId}
                 quiz={quiz}
+                index={index}
                 isLast={index === data.dailyQuizzes.length - 1}
                 onStart={() => void onStartQuiz(quiz)}
               />
@@ -79,71 +96,33 @@ export default function ChallengeDetailScreen() {
           </DefisSurfaceCard>
 
           <Pressable
-            style={styles.secondaryBtn}
             onPress={() => router.push(DefisRoutes.challengeLeaderboard(challengeId))}
+            style={({ pressed }) => [pressed && { opacity: 0.9 }]}
           >
-            <Text style={styles.secondaryBtnText}>Voir le classement</Text>
+            <LinearGradient
+              colors={['#1F2261', '#2A3E8C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.leaderboardCta}
+            >
+              <View style={styles.leaderboardCtaLeft}>
+                <Feather name="bar-chart-2" size={22} color="#FFD54A" />
+                <View>
+                  <Text style={styles.leaderboardCtaTitle}>Voir le classement</Text>
+                  <Text style={styles.leaderboardCtaSub}>Comparez vos scores aux autres joueurs</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={22} color="#FFFFFF" />
+            </LinearGradient>
           </Pressable>
-        </>
+        </Animated.View>
       ) : null}
     </DefisPageShell>
   );
 }
 
-function QuizDetailRow({
-  quiz,
-  isLast,
-  onStart,
-}: {
-  quiz: DailyQuiz;
-  isLast: boolean;
-  onStart: () => void;
-}) {
-  const canPlay = quiz.isAvailable && !quiz.isPlayed;
-  const scheduledLabel = new Date(`${quiz.scheduledDay}T12:00:00`).toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-
-  return (
-    <View style={[styles.quizBlock, !isLast && styles.quizBorder]}>
-      <Text style={styles.quizTitle}>{quiz.title}</Text>
-      <Text style={styles.quizMeta}>
-        Difficulté {quiz.difficulty} · {quiz.maxScore / 3} questions
-      </Text>
-
-      {quiz.isPlayed ? (
-        <>
-          <Text style={styles.score}>Score : {quiz.userScore ?? 0} pts</Text>
-          <Text style={styles.hint}>Quiz terminé — pas de rejouer dans ce challenge.</Text>
-        </>
-      ) : null}
-
-      {!quiz.isAvailable ? (
-        <>
-          <Text style={styles.hint}>Disponible le {scheduledLabel}</Text>
-          <Pressable style={[styles.primaryBtn, styles.primaryBtnDisabled]} disabled>
-            <Text style={styles.primaryBtnText}>Disponible le {scheduledLabel}</Text>
-          </Pressable>
-        </>
-      ) : null}
-
-      {canPlay ? (
-        <>
-          <Text style={styles.warning}>
-            ⚠️ Vous ne pouvez jouer ce quiz qu&apos;une seule fois dans ce challenge.
-          </Text>
-          <Pressable style={styles.primaryBtn} onPress={onStart}>
-            <Text style={styles.primaryBtnText}>Commencer le quiz</Text>
-          </Pressable>
-        </>
-      ) : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
+  content: { gap: 18, width: '100%' },
   loader: { marginTop: 32 },
   error: {
     fontFamily: 'Nunito_600SemiBold',
@@ -152,75 +131,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 24,
   },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F5F5F5',
+    padding: 10,
+    borderRadius: 12,
+  },
   offlineHint: {
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginBottom: 8,
+    flex: 1,
   },
-  title: {
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: {
     fontFamily: 'Nunito_800ExtraBold',
-    fontSize: 22,
-    color: COLORS.textPrimary,
-  },
-  reward: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  quizBlock: { paddingVertical: 14, gap: 8 },
-  quizBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.separator,
-  },
-  quizTitle: {
-    fontFamily: 'Nunito_700Bold',
     fontSize: 16,
-    color: COLORS.textPrimary,
+    color: CHALLENGE_UI.navy,
   },
-  quizMeta: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 13,
-    color: COLORS.textSecondary,
+  missionsCard: {
+    borderColor: CHALLENGE_UI.heroBorder,
+    borderWidth: 1,
   },
-  score: {
+  leaderboardCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 18,
+    borderRadius: 18,
+    gap: 12,
+  },
+  leaderboardCtaLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
+  leaderboardCtaTitle: {
     fontFamily: 'Nunito_800ExtraBold',
-    fontSize: 18,
-    color: COLORS.primary,
+    fontSize: 16,
+    color: '#FFFFFF',
   },
-  hint: {
-    fontFamily: 'Nunito_400Regular',
-    fontSize: 13,
-    color: COLORS.textSecondary,
-  },
-  warning: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 13,
-    color: COLORS.warning,
-  },
-  primaryBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  primaryBtnDisabled: {
-    backgroundColor: COLORS.border,
-  },
-  primaryBtnText: {
-    fontFamily: 'Nunito_700Bold',
-    color: COLORS.textLight,
-    fontSize: 14,
-  },
-  secondaryBtn: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: COLORS.border,
-  },
-  secondaryBtnText: {
-    fontFamily: 'Nunito_700Bold',
-    color: COLORS.textSecondary,
-    fontSize: 14,
+  leaderboardCtaSub: {
+    fontFamily: 'Nunito_500Medium',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 2,
   },
 });
