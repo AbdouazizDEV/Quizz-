@@ -223,18 +223,24 @@ function DailyQuizRow({
   isLast: boolean;
   onPress: () => void;
 }) {
-  const icon = quiz.isPlayed ? '✓' : quiz.isAvailable ? '▶' : '🔒';
+  const icon = quiz.isPlayed ? '✓' : quiz.globallyCompleted ? '✓' : quiz.isAvailable ? '▶' : '🔒';
   const status = quiz.isPlayed
     ? `${quiz.userScore ?? 0}/${quiz.maxScore} pts`
-    : quiz.isAvailable
-      ? 'À jouer'
-      : 'Demain';
+    : quiz.globallyCompleted
+      ? 'Terminé'
+      : quiz.isAvailable
+        ? 'À jouer'
+        : 'Demain';
 
   return (
     <Pressable
-      style={[styles.quizRow, !isLast && styles.quizRowBorder, !quiz.isAvailable && styles.quizRowLocked]}
+      style={[
+        styles.quizRow,
+        !isLast && styles.quizRowBorder,
+        (!quiz.isAvailable || quiz.globallyCompleted) && styles.quizRowLocked,
+      ]}
       onPress={onPress}
-      disabled={!quiz.isAvailable && !quiz.isPlayed}
+      disabled={quiz.globallyCompleted || (!quiz.isAvailable && !quiz.isPlayed)}
     >
       <Text style={styles.quizIcon}>{icon}</Text>
       <Text style={styles.quizTitle}>{quiz.title}</Text>

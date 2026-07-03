@@ -14,6 +14,8 @@ interface CategoryQuizRowProps {
   fonts: ProfileFontFamilies;
   /** Quiz avec difficulté définie : cadenas pour les visiteurs (connexion requise). */
   lockedForVisitor?: boolean;
+  /** Quiz déjà terminé par le joueur connecté. */
+  completedByPlayer?: boolean;
   onPress?: () => void;
 }
 
@@ -22,10 +24,14 @@ export function CategoryQuizRow({
   fallbackThumbnailUri,
   fonts,
   lockedForVisitor,
+  completedByPlayer,
   onPress,
 }: CategoryQuizRowProps) {
   const uri = item.thumbnailUrl?.trim() || fallbackThumbnailUri;
   const meta = `${formatRelativeTimeFr(item.createdAt)} • ${formatCompactNumber(item.playCount)} joueurs`;
+  const isLocked = Boolean(lockedForVisitor);
+  const isCompleted = Boolean(completedByPlayer);
+  const isInteractive = Boolean(onPress) && !isCompleted;
 
   const rowContent = (
     <View style={styles.cardRow} collapsable={false}>
@@ -52,25 +58,25 @@ export function CategoryQuizRow({
     </View>
   );
 
-  if (onPress) {
+  if (isInteractive) {
     return (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
-          lockedForVisitor
+          isLocked
             ? `${item.title}, quiz réservé aux comptes connectés`
             : item.title
         }
-        accessibilityHint={lockedForVisitor ? 'Ouvre la connexion pour débloquer ce quiz' : undefined}
+        accessibilityHint={isLocked ? 'Ouvre la connexion pour débloquer ce quiz' : undefined}
         onPress={onPress}
         style={({ pressed }) => [
           styles.card,
-          lockedForVisitor && styles.cardLocked,
+          isLocked && styles.cardLocked,
           pressed && styles.pressed,
         ]}
       >
         {rowContent}
-        {lockedForVisitor ? (
+        {isLocked ? (
           <View
             style={[styles.lockedVeil, Platform.OS === 'android' ? styles.lockedVeilAndroid : null]}
             pointerEvents="none"
@@ -97,7 +103,63 @@ export function CategoryQuizRow({
     );
   }
 
-  return <View style={styles.card}>{rowContent}</View>;
+  return (
+    <View
+      accessibilityRole={isCompleted ? 'text' : undefined}
+      accessibilityLabel={
+        isCompleted
+          ? `${item.title}, quiz déjà terminé`
+          : isLocked
+            ? `${item.title}, quiz réservé aux comptes connectés`
+            : item.title
+      }
+      style={[styles.card, isLocked && styles.cardLocked, isCompleted && styles.cardCompleted]}
+    >
+      {rowContent}
+      {isLocked ? (
+        <View
+          style={[styles.lockedVeil, Platform.OS === 'android' ? styles.lockedVeilAndroid : null]}
+          pointerEvents="none"
+          collapsable={false}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <View style={[styles.filigranStripe, styles.filigranStripe1]} />
+          <View style={[styles.filigranStripe, styles.filigranStripe2]} />
+          <View style={[styles.filigranStripe, styles.filigranStripe3]} />
+          <View style={styles.lockedCenter}>
+            <View style={styles.lockCircle}>
+              <Feather name="lock" size={20} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.lockedTitle, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+              Connexion requise
+            </Text>
+            <Text style={[styles.lockedSubtitle, fonts.medium && { fontFamily: fonts.medium }]}>
+              Connectez-vous pour jouer à ce quiz
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      {isCompleted ? (
+        <View style={styles.completedVeil} pointerEvents="none" collapsable={false}>
+          <View style={styles.completedCenter}>
+            <View style={styles.completedCircle}>
+              <Feather name="check" size={20} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.completedTitle, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+              Terminé
+            </Text>
+            {item.playerBestScore != null ? (
+              <Text style={[styles.completedSubtitle, fonts.medium && { fontFamily: fonts.medium }]}>
+                {item.maxScore != null && item.maxScore > 0
+                  ? `${item.playerBestScore}/${item.maxScore} pts`
+                  : `${item.playerBestScore} pts`}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -122,6 +184,11 @@ const styles = StyleSheet.create({
   cardLocked: {
     borderWidth: 1,
     borderColor: 'rgba(33, 33, 33, 0.08)',
+  },
+  cardCompleted: {
+    borderWidth: 1,
+    borderColor: 'rgba(33, 33, 33, 0.06)',
+    backgroundColor: '#F7F7F7',
   },
   lockedVeil: {
     ...StyleSheet.absoluteFillObject,
@@ -185,6 +252,42 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '500',
     color: '#616161',
+    textAlign: 'center',
+  },
+  completedVeil: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9,
+    backgroundColor: 'rgba(245, 245, 245, 0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 14,
+  },
+  completedCenter: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 16,
+    maxWidth: '88%',
+  },
+  completedCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(117, 117, 117, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  completedTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#616161',
+    textAlign: 'center',
+  },
+  completedSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: '#9E9E9E',
     textAlign: 'center',
   },
   thumbWrap: {

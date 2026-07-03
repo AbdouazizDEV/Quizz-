@@ -24,6 +24,8 @@ export interface DailyQuiz {
   isAvailable: boolean;
   isPlayed: boolean;
   canReplay: boolean;
+  /** Terminé au score max en dehors du challenge (mode libre). */
+  globallyCompleted?: boolean;
 }
 
 export interface ChallengeProgress {

@@ -17,6 +17,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryQuizRow } from '@components/ui/categories/CategoryQuizRow';
@@ -60,6 +61,12 @@ export default function CategoryDetailScreen() {
   const { data, loading, error, refetch } = useCategoryDetail(slug, sort);
   const token = useAuthStore((s) => s.token);
 
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
+
   const coverUri = useMemo(() => (slug ? getCategoryCoverUrl(slug) : ''), [slug]);
 
   const onBack = useCallback(() => {
@@ -79,7 +86,8 @@ export default function CategoryDetailScreen() {
   }, []);
 
   const onPressQuiz = useCallback(
-    (quizId: string, difficultyLevel: string | null) => {
+    (quizId: string, difficultyLevel: string | null, isCompletedByPlayer?: boolean) => {
+      if (isCompletedByPlayer) return;
       if (lacksAuthToken(token) && isQuizDifficultyDefined(difficultyLevel)) {
         router.push(Routes.LOGIN);
         return;
@@ -163,7 +171,12 @@ export default function CategoryDetailScreen() {
                     lockedForVisitor={
                       lacksAuthToken(token) && isQuizDifficultyDefined(q.difficultyLevel)
                     }
-                    onPress={() => onPressQuiz(q.id, q.difficultyLevel)}
+                    completedByPlayer={q.isCompletedByPlayer}
+                    onPress={
+                      q.isCompletedByPlayer
+                        ? undefined
+                        : () => onPressQuiz(q.id, q.difficultyLevel, q.isCompletedByPlayer)
+                    }
                   />
                 ))
               )}

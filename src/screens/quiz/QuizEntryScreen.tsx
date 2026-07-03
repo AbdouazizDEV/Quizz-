@@ -154,7 +154,12 @@ export default function QuizEntryScreen() {
             if (cancelled) return;
 
             if (!status.canReplay) {
-              setError('Score maximum déjà atteint sur ce quiz. Rejeu indisponible.');
+              const competitive = Boolean(duelId?.trim() || challengeId?.trim());
+              setError(
+                competitive
+                  ? 'Vous avez déjà terminé ce quiz. Il n’est pas rejouable en duel ou challenge.'
+                  : 'Score maximum déjà atteint sur ce quiz. Rejeu indisponible.',
+              );
               return;
             }
 

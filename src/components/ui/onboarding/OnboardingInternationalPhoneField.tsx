@@ -10,7 +10,7 @@ interface OnboardingInternationalPhoneFieldProps {
   onChangeCountry: (country: ICountry) => void;
   onChangePhoneNumber: (phone: string) => void;
   defaultCountry: string;
-  defaultPhoneNumber?: string;
+  placeholder?: string;
   labelFontFamily?: string;
 }
 
@@ -20,7 +20,7 @@ export function OnboardingInternationalPhoneField({
   onChangeCountry,
   onChangePhoneNumber,
   defaultCountry,
-  defaultPhoneNumber,
+  placeholder = '77 123 45 67',
   labelFontFamily,
 }: OnboardingInternationalPhoneFieldProps) {
   return (
@@ -34,7 +34,6 @@ export function OnboardingInternationalPhoneField({
       <View style={styles.fieldInner}>
         <PhoneInput
           defaultCountry={defaultCountry as ICountry['cca2']}
-          defaultPhoneNumber={defaultPhoneNumber}
           country={country}
           onChangeCountry={onChangeCountry}
           onChangePhoneNumber={onChangePhoneNumber}
@@ -47,7 +46,9 @@ export function OnboardingInternationalPhoneField({
             input: styles.phoneInput,
             callingCode: styles.callingCode,
             divider: styles.divider,
+            placeholder: styles.phonePlaceholder,
           }}
+          placeholder={placeholder}
         />
         <View style={styles.underline} />
       </View>
@@ -96,6 +97,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '700',
     color: '#212121',
+  },
+  phonePlaceholder: {
+    color: '#9CA3AF',
   },
   underline: {
     width: '100%',

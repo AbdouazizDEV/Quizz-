@@ -20,6 +20,8 @@ export const Routes = {
   PROFILE: '/(tabs)/profile',
   STATISTICS: '/statistics',
   NETWORK: '/network',
+  /** Scanner le QR profil d’un autre joueur (demande d’ami). */
+  FRIEND_SCAN: '/friend-scan',
   SETTINGS: '/settings',
   SETTINGS_PERSONAL: '/settings/personal-info',
   SETTINGS_NOTIFICATIONS: '/settings/notifications',

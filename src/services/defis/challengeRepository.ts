@@ -7,6 +7,7 @@ import {
   readWithOfflineCache,
 } from '@services/offline';
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
+import { fetchFullyCompletedQuizIdSet } from '@services/quiz/replay/quizReplayService';
 
 import type {
   ChallengeLeaderboard,
@@ -146,10 +147,14 @@ async function loadChallengeProgressFromSupabase(
   );
 
   const today = todayDateString();
+  const quizIds = ((quizRows ?? []) as WeeklyChallengeQuizRow[]).map((row) => row.quiz_id);
+  const globallyCompletedIds = await fetchFullyCompletedQuizIdSet(userId, quizIds);
+
   const dailyQuizzes: DailyQuiz[] = ((quizRows ?? []) as WeeklyChallengeQuizRow[]).map((row) => {
     const userScore = participationByQuiz.get(row.quiz_id) ?? null;
     const isPlayed = userScore !== null;
-    const isAvailable = row.scheduled_day <= today;
+    const globallyCompleted = globallyCompletedIds.has(row.quiz_id);
+    const isAvailable = row.scheduled_day <= today && !globallyCompleted;
     const maxScore = (row.quizzes?.total_questions ?? 10) * 3;
 
     return {
@@ -163,6 +168,7 @@ async function loadChallengeProgressFromSupabase(
       isAvailable,
       isPlayed,
       canReplay: false,
+      globallyCompleted,
     };
   });
 

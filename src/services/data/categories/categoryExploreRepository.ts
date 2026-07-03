@@ -4,6 +4,7 @@ import type {
   CategoryQuizListItem,
   QuizSortMode,
 } from '@app-types/categoryExplore.types';
+import { buildReplayStatus } from '@services/quiz/replay/quizReplayService';
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 
 function aggregateQuizCountsByCategory(
@@ -274,20 +275,24 @@ function mapQuizRow(row: {
   play_count: number;
   created_at: string;
   difficulty_level: string | null;
+  points_per_question?: number | null;
   questions?: { count: number }[] | null;
 }): CategoryQuizListItem {
   const fromRelation =
     Array.isArray(row.questions) && row.questions.length > 0 && typeof row.questions[0]?.count === 'number'
       ? row.questions[0].count
       : null;
+  const questionCount = fromRelation ?? row.total_questions;
+  const pointsPerQuestion = row.points_per_question ?? 1;
   return {
     id: row.id,
     title: row.title,
     thumbnailUrl: row.thumbnail_url,
-    questionCount: fromRelation ?? row.total_questions,
+    questionCount,
     playCount: row.play_count,
     createdAt: row.created_at,
     difficultyLevel: row.difficulty_level ?? null,
+    maxScore: Math.max(0, questionCount * pointsPerQuestion),
   };
 }
 
@@ -295,10 +300,89 @@ function sortQuizzes(items: CategoryQuizListItem[], mode: QuizSortMode): Categor
   const copy = [...items];
   if (mode === 'newest') {
     copy.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return copy;
+  } else {
+    copy.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
   }
-  copy.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
-  return copy;
+
+  const available = copy.filter((item) => !item.isCompletedByPlayer);
+  const completed = copy.filter((item) => item.isCompletedByPlayer);
+  return [...available, ...completed];
+}
+
+interface PlayerQuizProgress {
+  bestScore: number;
+  maxScore: number;
+}
+
+async function fetchPlayerQuizProgress(
+  client: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  quizzes: CategoryQuizListItem[],
+): Promise<Map<string, PlayerQuizProgress>> {
+  const quizIds = quizzes.map((q) => q.id);
+  if (quizIds.length === 0) return new Map();
+
+  const { data: authData } = await client.auth.getUser();
+  const userId = authData.user?.id;
+  if (!userId) return new Map();
+
+  const maxScoreByQuizId = new Map(quizzes.map((q) => [q.id, q.maxScore ?? 0]));
+  const progress = new Map<string, PlayerQuizProgress>();
+
+  const { data: scoreRows } = await client
+    .from('user_quiz_scores')
+    .select('quiz_id, best_score, max_score')
+    .eq('user_id', userId)
+    .in('quiz_id', quizIds);
+
+  for (const row of scoreRows ?? []) {
+    if (!row.quiz_id) continue;
+    const quizMax = maxScoreByQuizId.get(row.quiz_id) ?? 0;
+    progress.set(row.quiz_id, {
+      bestScore: row.best_score ?? 0,
+      maxScore: Math.max(quizMax, row.max_score ?? 0),
+    });
+  }
+
+  const missingIds = quizIds.filter((id) => !progress.has(id));
+  if (missingIds.length === 0) return progress;
+
+  const { data: sessionRows } = await client
+    .from('quiz_sessions')
+    .select('quiz_id, score')
+    .eq('user_id', userId)
+    .eq('is_completed', true)
+    .in('quiz_id', missingIds);
+
+  for (const row of sessionRows ?? []) {
+    if (!row.quiz_id || progress.has(row.quiz_id)) continue;
+    progress.set(row.quiz_id, {
+      bestScore: row.score ?? 0,
+      maxScore: maxScoreByQuizId.get(row.quiz_id) ?? 0,
+    });
+  }
+
+  return progress;
+}
+
+function enrichQuizzesWithPlayerProgress(
+  items: CategoryQuizListItem[],
+  playerProgress: Map<string, PlayerQuizProgress>,
+): CategoryQuizListItem[] {
+  if (playerProgress.size === 0) return items;
+  return items.map((item) => {
+    const entry = playerProgress.get(item.id);
+    if (!entry) return item;
+
+    const maxScore = Math.max(item.maxScore ?? 0, entry.maxScore);
+    const status = buildReplayStatus(entry.bestScore, maxScore);
+
+    return {
+      ...item,
+      maxScore,
+      playerBestScore: entry.bestScore,
+      isCompletedByPlayer: status.isComplete,
+    };
+  });
 }
 
 export async function fetchCategoryDetailBySlug(
@@ -351,7 +435,7 @@ export async function fetchCategoryDetailBySlug(
 
   const { data: quizRows, error: qErr } = await client
     .from('quizzes')
-    .select('id, title, thumbnail_url, total_questions, play_count, created_at, difficulty_level, questions(count)')
+    .select('id, title, thumbnail_url, total_questions, play_count, created_at, difficulty_level, points_per_question, questions(count)')
     .in('category_id', categoryIds)
     .eq('is_published', true);
 
@@ -359,7 +443,10 @@ export async function fetchCategoryDetailBySlug(
     return { category: { ...mainCategory, quizCount: 0 }, quizzes: [] };
   }
 
-  const quizzes = sortQuizzes((quizRows ?? []).map(mapQuizRow), sort);
+  const mapped = (quizRows ?? []).map(mapQuizRow);
+  const playerProgress = await fetchPlayerQuizProgress(client, mapped);
+  const enriched = enrichQuizzesWithPlayerProgress(mapped, playerProgress);
+  const quizzes = sortQuizzes(enriched, sort);
 
   const header: CategoryExploreItem = { ...mainCategory, quizCount: quizzes.length };
 

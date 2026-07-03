@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { UnderlineLabeledField } from '@components/ui/auth/UnderlineLabeledField';
 import { WalkthroughActionButton } from '@components/ui/walkthrough/WalkthroughActionButton';
+import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
@@ -50,7 +51,7 @@ export default function LoginScreen() {
     Nunito_400Regular,
   });
 
-  const [email, setEmail] = useState('awa.thiepp@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [secure, setSecure] = useState(true);
@@ -231,6 +232,7 @@ export default function LoginScreen() {
                 label="Email"
                 value={email}
                 onChangeText={setEmail}
+                placeholder={AUTH_FORM_PLACEHOLDERS.email}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}
@@ -241,6 +243,7 @@ export default function LoginScreen() {
                 label="Mot de passe"
                 value={password}
                 onChangeText={setPassword}
+                placeholder={AUTH_FORM_PLACEHOLDERS.password}
                 secureTextEntry={secure}
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}

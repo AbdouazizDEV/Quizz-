@@ -9,11 +9,17 @@ import { offlineStore } from '@services/offline/OfflineStore';
 import type { OfflineMutationResult } from '@services/offline/types';
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 import { ensureSupabaseAuthSession } from '@services/supabase/syncSupabaseAuthSession';
+import { isQuizFullyCompletedByPlayer } from '@services/quiz/replay/quizReplayService';
 import { useAuthStore } from '@stores/authStore';
 
 export class ChallengeParticipationError extends Error {
   constructor(
-    public readonly code: 'ALREADY_PLAYED' | 'NOT_YET_AVAILABLE' | 'NOT_CONFIGURED' | 'OFFLINE_NO_CACHE',
+    public readonly code:
+      | 'ALREADY_PLAYED'
+      | 'NOT_YET_AVAILABLE'
+      | 'NOT_CONFIGURED'
+      | 'OFFLINE_NO_CACHE'
+      | 'GLOBALLY_COMPLETED',
     message: string,
   ) {
     super(message);
@@ -46,6 +52,13 @@ async function assertCanParticipateOnline(
     );
   }
 
+  if (await isQuizFullyCompletedByPlayer(userId, quizId)) {
+    throw new ChallengeParticipationError(
+      'GLOBALLY_COMPLETED',
+      'Vous avez déjà terminé ce quiz. Il n’est pas rejouable en challenge.',
+    );
+  }
+
   const today = new Date().toISOString().split('T')[0];
   if (scheduledDay > today) {
     throw new ChallengeParticipationError(
@@ -73,6 +86,13 @@ async function assertCanParticipateFromCache(
     throw new ChallengeParticipationError(
       'ALREADY_PLAYED',
       'Vous avez déjà joué ce quiz dans ce challenge.',
+    );
+  }
+
+  if (cachedQuiz.globallyCompleted) {
+    throw new ChallengeParticipationError(
+      'GLOBALLY_COMPLETED',
+      'Vous avez déjà terminé ce quiz. Il n’est pas rejouable en challenge.',
     );
   }
 

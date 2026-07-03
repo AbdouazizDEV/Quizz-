@@ -18,6 +18,12 @@ export interface CategoryQuizListItem {
   createdAt: string;
   /** `null` = pas de palier (visiteurs autorisés côté app). */
   difficultyLevel: string | null;
+  /** Le joueur connecté a atteint le score maximum sur ce quiz. */
+  isCompletedByPlayer?: boolean;
+  /** Meilleur score enregistré pour ce joueur. */
+  playerBestScore?: number | null;
+  /** Score maximum possible sur ce quiz. */
+  maxScore?: number;
 }
 
 export type QuizSortMode = 'default' | 'newest';

@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { onboardingColumn } from '@constants/layout';
 import { Spacing } from '@constants/Spacing';
 import { getCountryByCca2 } from 'rn-international-phone-number';
@@ -48,11 +49,11 @@ export default function CreateAccountProfileScreen() {
     Nunito_600SemiBold,
   });
 
-  const [fullName, setFullName] = useState('Andrew Ainsley');
-  const [birthDate, setBirthDate] = useState(() => new Date(1995, 11, 12));
+  const [fullName, setFullName] = useState('');
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
 
   const initialCountry = useMemo(() => {
-    const c = getCountryByCca2('US') ?? getCountryByCca2('FR');
+    const c = getCountryByCca2('SN') ?? getCountryByCca2('FR') ?? getCountryByCca2('US');
     if (!c) {
       throw new Error('Country data unavailable');
     }
@@ -63,13 +64,17 @@ export default function CreateAccountProfileScreen() {
   const [phoneValue, setPhoneValue] = useState('');
   const setProfile = useOnboardingRegisterStore((s) => s.setProfile);
 
-  const ageLabel = useMemo(() => String(computeAge(birthDate)), [birthDate]);
+  const ageLabel = useMemo(() => (birthDate ? String(computeAge(birthDate)) : ''), [birthDate]);
 
   const handleBack = () => {
     router.back();
   };
 
   const handleContinue = () => {
+    if (!birthDate) {
+      Alert.alert('Profil incomplet', 'Indiquez votre date de naissance.');
+      return;
+    }
     const y = birthDate.getFullYear();
     const m = String(birthDate.getMonth() + 1).padStart(2, '0');
     const d = String(birthDate.getDate()).padStart(2, '0');
@@ -143,6 +148,7 @@ export default function CreateAccountProfileScreen() {
                 label="Nom complet"
                 value={fullName}
                 onChangeText={setFullName}
+                placeholder={AUTH_FORM_PLACEHOLDERS.fullName}
                 labelFontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
                 valueFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
               />
@@ -151,6 +157,7 @@ export default function CreateAccountProfileScreen() {
                 label="Date de naissance"
                 value={birthDate}
                 onChange={setBirthDate}
+                placeholder={AUTH_FORM_PLACEHOLDERS.birthDate}
                 labelFontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
                 valueFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
               />
@@ -163,7 +170,7 @@ export default function CreateAccountProfileScreen() {
                   setPhoneValue(value);
                 }}
                 defaultCountry={selectedCountry.cca2}
-                defaultPhoneNumber="5551234567"
+                placeholder={AUTH_FORM_PLACEHOLDERS.phone}
                 labelFontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
               />
 

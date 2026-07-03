@@ -1,14 +1,39 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useMemo, useState, type ComponentProps } from 'react';
+import {
+  Animated as RNAnimated,
+  Image,
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+  type ViewStyle,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import QRCode from 'react-native-qrcode-svg';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+
+import { Routes } from '@constants/Routes';
+import { shareFriendProfile } from '@services/network/shareFriendProfile';
+import { buildFriendQrProfile, encodeFriendQrDeepLink } from '@utils/friendQrPayload';
 
 /** Largeur de référence (iPhone 11 / Pixel) — en dessous, les tailles diminuent. */
 const REF_WIDTH = 390;
 
 interface HomeHeaderCardProps {
-  glowOpacity: Animated.Value;
+  glowOpacity: RNAnimated.Value;
   progress: number;
+  userId?: string;
   /** Initiale(s) dans l’avatar. */
   avatarInitial?: string;
   /** Photo réelle de l'utilisateur (fallback sur initiale si absente). */
@@ -25,14 +50,43 @@ interface HomeHeaderCardProps {
   streakOrDaysLabel?: string;
   progressLabelLeft?: string;
   progressLabelRight?: string;
-  notificationCount?: number;
-  onPressNotifications?: () => void;
   onPressAvatar?: () => void;
+}
+
+function QrActionButton({
+  icon,
+  label,
+  onPress,
+  variant = 'primary',
+}: {
+  icon: ComponentProps<typeof Feather>['name'];
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary';
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.actionBtn,
+        variant === 'secondary' ? styles.actionBtnSecondary : styles.actionBtnPrimary,
+        pressed && styles.actionBtnPressed,
+      ]}
+    >
+      <Feather name={icon} size={18} color={variant === 'secondary' ? '#FFFFFF' : '#2A2D5E'} />
+      <Text style={[styles.actionBtnText, variant === 'secondary' && styles.actionBtnTextSecondary]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
 export function HomeHeaderCard({
   glowOpacity,
   progress,
+  userId,
   avatarInitial = 'A',
   avatarUri,
   displayNameWithEmoji = 'Joueur 👋',
@@ -42,11 +96,14 @@ export function HomeHeaderCard({
   streakOrDaysLabel = '0 jour',
   progressLabelLeft = 'Niv. 1',
   progressLabelRight = 'Niv. 2',
-  notificationCount = 0,
-  onPressNotifications,
   onPressAvatar,
 }: HomeHeaderCardProps) {
+  const router = useRouter();
   const { width, fontScale: systemFontScale } = useWindowDimensions();
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [faceHeights, setFaceHeights] = useState({ front: 0, back: 0 });
+  const flipProgress = useSharedValue(0);
+  const containerHeight = useSharedValue(0);
 
   const sizes = useMemo(() => {
     const widthRatio = Math.min(1.08, Math.max(0.78, width / REF_WIDTH));
@@ -59,9 +116,6 @@ export function HomeHeaderCard({
       nameLine: s(31),
       avatar: s(18),
       avatarBox: s(44),
-      bellIcon: s(17),
-      bellBox: s(40),
-      bellDot: s(7),
       scoreLabel: s(13),
       scoreValue: s(38),
       scoreValueLine: s(42),
@@ -71,17 +125,91 @@ export function HomeHeaderCard({
       metaIcon: s(15),
       progressLabel: s(12),
       progressTrack: Math.max(6, s(7)),
+      backTitle: s(16),
+      backHint: s(12),
+      qrSize: Math.max(96, Math.min(128, Math.round(width * 0.28))),
     };
   }, [width, systemFontScale]);
 
-  return (
-    <LinearGradient
-      colors={['#2A2D5E', '#3B3F7A']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.headerCard}
-    >
-      <Animated.View style={[styles.glowCircle, { opacity: glowOpacity }]} />
+  const qrProfile = useMemo(() => {
+    if (!userId?.trim()) return null;
+    const displayName = displayNameWithEmoji.replace(/\s*👋\s*$/, '').trim() || 'Joueur';
+    const score = Number.parseInt(totalScoreDisplay.replace(/\s/g, ''), 10);
+    return buildFriendQrProfile({
+      userId,
+      displayName,
+      totalScore: Number.isFinite(score) ? score : 0,
+      levelLabel,
+    });
+  }, [displayNameWithEmoji, levelLabel, totalScoreDisplay, userId]);
+
+  const qrValue = useMemo(
+    () => (qrProfile ? encodeFriendQrDeepLink(qrProfile) : ''),
+    [qrProfile],
+  );
+
+  const onFrontLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const height = Math.ceil(event.nativeEvent.layout.height);
+      if (height <= 0) return;
+      setFaceHeights((prev) => ({ ...prev, front: height }));
+      if (!isFlipped) containerHeight.value = height;
+    },
+    [containerHeight, isFlipped],
+  );
+
+  const onBackLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = Math.ceil(event.nativeEvent.layout.height);
+    if (height <= 0) return;
+    setFaceHeights((prev) => ({ ...prev, back: height }));
+  }, []);
+
+  const toggleFlip = useCallback(() => {
+    const next = !isFlipped;
+    const targetHeight = next
+      ? faceHeights.back || faceHeights.front
+      : faceHeights.front || faceHeights.back;
+
+    setIsFlipped(next);
+    flipProgress.value = withTiming(next ? 1 : 0, { duration: 620 });
+    if (targetHeight > 0) {
+      containerHeight.value = withTiming(targetHeight, { duration: 620 });
+    }
+  }, [containerHeight, faceHeights.back, faceHeights.front, flipProgress, isFlipped]);
+
+  const flipSceneStyle = useAnimatedStyle(() => {
+    if (containerHeight.value <= 0) return {};
+    return { height: containerHeight.value };
+  });
+
+  const flipContainerStyle = useAnimatedStyle(() => {
+    const rotateY = `${interpolate(flipProgress.value, [0, 1], [0, 180])}deg`;
+    if (Platform.OS === 'web') {
+      return { transform: [{ rotateY }] };
+    }
+    return {
+      transform: [{ perspective: 1200 }, { rotateY }],
+    };
+  });
+
+  const onShareProfile = useCallback(async () => {
+    if (!qrProfile) return;
+    try {
+      await shareFriendProfile(qrProfile);
+    } catch {
+      if (qrValue) {
+        await Share.share({ message: qrValue, title: 'Mon profil Quizz+' });
+      }
+    }
+  }, [qrProfile, qrValue]);
+
+  const onScanFriend = useCallback(() => {
+    router.push(Routes.FRIEND_SCAN);
+  }, [router]);
+
+  const cardFace = (
+    <>
+      <RNAnimated.View style={[styles.glowCircle, { opacity: glowOpacity }]} />
       <View style={styles.headerTopRow}>
         <Pressable
           style={[styles.avatar, { width: sizes.avatarBox, height: sizes.avatarBox, borderRadius: sizes.avatarBox / 2 }]}
@@ -94,41 +222,28 @@ export function HomeHeaderCard({
             <Text style={[styles.avatarText, { fontSize: sizes.avatar }]}>{avatarInitial}</Text>
           )}
         </Pressable>
-        <View style={styles.headerIdentity}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Afficher mon QR profil"
+          onPress={toggleFlip}
+          style={styles.headerIdentity}
+        >
           <Text style={[styles.headerGreeting, { fontSize: sizes.greeting }]}>Bonjour</Text>
-          <Text
-            style={[
-              styles.headerName,
-              { fontSize: sizes.name, lineHeight: sizes.nameLine },
-            ]}
-          >
+          <Text style={[styles.headerName, { fontSize: sizes.name, lineHeight: sizes.nameLine }]}>
             {displayNameWithEmoji}
           </Text>
-        </View>
-        <Pressable
-          style={[styles.bellBadge, { width: sizes.bellBox, height: sizes.bellBox, borderRadius: sizes.bellBox * 0.33 }]}
-          onPress={onPressNotifications}
-          accessibilityRole="button"
-        >
-          <Feather name="bell" size={sizes.bellIcon} color="#FFFFFF" />
-          <View style={[styles.bellDot, { width: sizes.bellDot, height: sizes.bellDot, borderRadius: sizes.bellDot / 2, top: sizes.bellDot * 1.2, right: sizes.bellDot * 1.4 }]} />
-          {notificationCount > 0 ? (
-            <View style={styles.notificationBadgeOnBell}>
-              <Text style={styles.notificationBadgeText}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
-            </View>
-          ) : null}
         </Pressable>
       </View>
 
-      <View style={styles.scoreCard}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Afficher mon QR profil"
+        onPress={toggleFlip}
+        style={({ pressed }) => [styles.scoreCard, pressed && styles.scoreCardPressed]}
+      >
         <View style={styles.scoreMain}>
           <Text style={[styles.scoreLabel, { fontSize: sizes.scoreLabel }]}>Ton score</Text>
-          <Text
-            style={[
-              styles.scoreValue,
-              { fontSize: sizes.scoreValue, lineHeight: sizes.scoreValueLine },
-            ]}
-          >
+          <Text style={[styles.scoreValue, { fontSize: sizes.scoreValue, lineHeight: sizes.scoreValueLine }]}>
             {totalScoreDisplay}
           </Text>
           <Text style={[styles.scoreLevel, { fontSize: sizes.level }]}>{levelLabel}</Text>
@@ -140,7 +255,9 @@ export function HomeHeaderCard({
           </View>
           <View style={styles.metaItem}>
             <Feather name="clock" size={sizes.metaIcon} color="#FF7A4D" />
-            <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>{streakOrDaysLabel}</Text>
+            <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>
+              {streakOrDaysLabel}
+            </Text>
           </View>
         </View>
         <View style={styles.progressLabels}>
@@ -150,12 +267,108 @@ export function HomeHeaderCard({
         <View style={[styles.progressTrack, { height: sizes.progressTrack }]}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
         </View>
+      </Pressable>
+    </>
+  );
+
+  const backFace = (
+    <View style={styles.backPressable}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Retourner à la carte score"
+        onPress={toggleFlip}
+        style={({ pressed }) => [styles.backTapArea, pressed && styles.backPressablePressed]}
+      >
+        <Text style={[styles.backTitle, { fontSize: sizes.backTitle }]}>Mon profil Quizz+</Text>
+        <Text style={[styles.backHint, { fontSize: sizes.backHint }]}>
+          Scanne ce QR pour m’ajouter en ami
+        </Text>
+
+        <View style={styles.qrWrap}>
+          {qrProfile && qrValue ? (
+            <QRCode value={qrValue} size={sizes.qrSize} backgroundColor="#FFFFFF" color="#1F2347" />
+          ) : (
+            <View style={[styles.qrPlaceholder, { width: sizes.qrSize, height: sizes.qrSize }]}>
+              <Feather name="user-x" size={28} color="#9CA3CF" />
+              <Text style={styles.qrPlaceholderText}>Connecte-toi pour afficher ton QR</Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+
+      <View style={styles.actionRow}>
+        <QrActionButton icon="share-2" label="Partager" onPress={() => void onShareProfile()} />
+        <QrActionButton icon="maximize" label="Scanner" onPress={onScanFriend} variant="secondary" />
       </View>
-    </LinearGradient>
+    </View>
+  );
+
+  return (
+    <Animated.View style={[styles.flipScene, flipSceneStyle]}>
+      <Animated.View
+        style={[
+          styles.flipCard,
+          Platform.OS === 'web' ? webFlipCardStyle : undefined,
+          flipContainerStyle,
+        ]}
+      >
+        <View
+          style={[styles.cardFace, Platform.OS === 'web' ? webCardFaceStyle : undefined]}
+          pointerEvents={isFlipped ? 'none' : 'auto'}
+          onLayout={onFrontLayout}
+        >
+          <LinearGradient
+            colors={['#2A2D5E', '#3B3F7A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerCard}
+          >
+            {cardFace}
+          </LinearGradient>
+        </View>
+
+        <View
+          style={[styles.cardFace, styles.cardFaceBack, Platform.OS === 'web' ? webCardFaceStyle : undefined]}
+          pointerEvents={isFlipped ? 'auto' : 'none'}
+          onLayout={onBackLayout}
+        >
+          <LinearGradient
+            colors={['#252856', '#343878']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerCard}
+          >
+            {backFace}
+          </LinearGradient>
+        </View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
+const webFlipCardStyle = { transformStyle: 'preserve-3d' } as ViewStyle;
+const webCardFaceStyle = { transformStyle: 'preserve-3d' } as ViewStyle;
+
 const styles = StyleSheet.create({
+  flipScene: {
+    width: '100%',
+    ...(Platform.OS === 'web' ? { perspective: 1200 } : {}),
+  },
+  flipCard: {
+    width: '100%',
+    position: 'relative',
+  },
+  cardFace: {
+    width: '100%',
+    backfaceVisibility: 'hidden',
+  },
+  cardFaceBack: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    transform: [{ rotateY: '180deg' }],
+  },
   headerCard: {
     borderRadius: 24,
     borderWidth: 1,
@@ -202,21 +415,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
   },
-  bellBadge: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bellDot: {
-    position: 'absolute',
-    backgroundColor: '#FF7A4D',
-  },
   scoreCard: {
     borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     padding: 14,
+  },
+  scoreCardPressed: {
+    opacity: 0.92,
   },
   scoreMain: {
     gap: 2,
@@ -243,24 +450,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  notificationBadgeOnBell: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 9,
-    backgroundColor: '#FF4D4F',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 12,
-  },
   metaText: {
     color: '#FFFFFF',
     fontWeight: '700',
@@ -283,5 +472,75 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     backgroundColor: '#F5D24A',
+  },
+  backPressable: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  backTapArea: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backPressablePressed: {
+    opacity: 0.94,
+  },
+  backTitle: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  backHint: {
+    color: '#C8CFF8',
+    textAlign: 'center',
+  },
+  qrWrap: {
+    padding: 8,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  qrPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  qrPlaceholderText: {
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  actionRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionBtnPrimary: {
+    backgroundColor: '#F5D24A',
+  },
+  actionBtnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  actionBtnPressed: {
+    opacity: 0.82,
+  },
+  actionBtnText: {
+    color: '#2A2D5E',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  actionBtnTextSecondary: {
+    color: '#FFFFFF',
   },
 });
