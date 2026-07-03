@@ -211,46 +211,214 @@ type ImportQuestion = {
   options: { id: string; label: string }[];
   correct_option_id: string;
   explanation: string | null;
-  subcategory: string | null;
+  category: string;
+  subcategory: string;
   tags: string[] | null;
-  difficulty_label: string | null;
+  difficulty_label: string;
 };
 
+function normalizeImportLabel(value: string | null | undefined): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
 function parseSpreadsheet(fileName: string, bytes: ArrayBuffer): ImportQuestion[] {
-  const wb = XLSX.read(Buffer.from(bytes), { type: 'buffer' });
-  const first = wb.Sheets[wb.SheetNames[0] ?? ''];
-  if (!first) return [];
+  if (!bytes.byteLength) {
+    throw new Error('Fichier vide ou illisible.');
+  }
+  let wb: XLSX.WorkBook;
+  try {
+    wb = XLSX.read(Buffer.from(bytes), { type: 'buffer' });
+  } catch {
+    throw new Error('Fichier Excel/CSV invalide ou illisible.');
+  }
+  const sheetName = wb.SheetNames[0];
+  if (!sheetName) {
+    throw new Error('Fichier vide ou sans feuille de calcul.');
+  }
+  const first = wb.Sheets[sheetName];
+  if (!first) {
+    throw new Error('Fichier vide ou sans feuille de calcul.');
+  }
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(first, { defval: '' });
+  if (!rows.length) {
+    throw new Error(`Aucune ligne valide trouvée dans ${fileName}.`);
+  }
   const out: ImportQuestion[] = [];
-  for (const row of rows) {
+  const skipped: string[] = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i]!;
+    const rowNum = i + 2;
     const question = String(row.question ?? row.Question ?? '').trim();
     if (!question) continue;
-    const options = [row.answer_1, row.answer_2, row.answer_3, row.answer_4].map((v, i) => ({
-      id: ['A', 'B', 'C', 'D'][i] as string,
+    const options = [row.answer_1, row.answer_2, row.answer_3, row.answer_4].map((v, idx) => ({
+      id: ['A', 'B', 'C', 'D'][idx] as string,
       label: String(v ?? '').trim(),
     }));
-    if (options.some((o) => !o.label)) continue;
-    const rawCorrect = String(row.correct_answer ?? row.correctAnswer ?? '').trim().toUpperCase();
-    const correct =
-      rawCorrect && /^[1-4]$/.test(rawCorrect)
-        ? (['A', 'B', 'C', 'D'][Number(rawCorrect) - 1] as string)
-        : rawCorrect;
-    if (!['A', 'B', 'C', 'D'].includes(correct)) continue;
+    if (options.some((o) => !o.label)) {
+      skipped.push(`ligne ${rowNum}: réponses A–D incomplètes`);
+      continue;
+    }
+    const rawCorrect = String(row.correct_answer ?? row.correctAnswer ?? '').trim();
+    const rawCorrectUpper = rawCorrect.toUpperCase();
+    let correct: string | null = null;
+    if (/^[1-4]$/.test(rawCorrectUpper)) {
+      correct = ['A', 'B', 'C', 'D'][Number(rawCorrectUpper) - 1] as string;
+    } else if (['A', 'B', 'C', 'D'].includes(rawCorrectUpper)) {
+      correct = rawCorrectUpper;
+    } else if (rawCorrect) {
+      const matchIdx = options.findIndex(
+        (o) => o.label.localeCompare(rawCorrect, undefined, { sensitivity: 'accent' }) === 0,
+      );
+      if (matchIdx >= 0) correct = options[matchIdx]!.id;
+    }
+    if (!correct) {
+      skipped.push(`ligne ${rowNum}: correct_answer invalide (attendu A–D, 1–4 ou libellé d'une réponse)`);
+      continue;
+    }
+    const difficulty = String(row.difficulty ?? '').trim();
+    const category = String(row.category ?? row.Category ?? '').trim();
+    const subcategory = String(row.subcategory ?? row.Subcategory ?? '').trim();
+    if (!difficulty) {
+      skipped.push(`ligne ${rowNum}: difficulty manquante`);
+      continue;
+    }
+    if (!category) {
+      skipped.push(`ligne ${rowNum}: category manquante`);
+      continue;
+    }
+    if (!subcategory) {
+      skipped.push(`ligne ${rowNum}: subcategory manquante`);
+      continue;
+    }
     const rawTags = String(row.tags ?? '').trim();
     out.push({
       question_text: question,
       options,
       correct_option_id: correct,
       explanation: String(row.explanation ?? row.fun_fact ?? '').trim() || null,
-      subcategory: String(row.subcategory ?? '').trim() || null,
-      tags: rawTags ? rawTags.split(/[,;]/).map((t) => t.trim()).filter(Boolean) : null,
-      difficulty_label: String(row.difficulty ?? '').trim() || null,
+      category,
+      subcategory,
+      tags: rawTags ? rawTags.split(/[,;|]/).map((t) => t.trim()).filter(Boolean) : null,
+      difficulty_label: difficulty,
     });
   }
   if (!out.length) {
-    throw new Error(`Aucune ligne valide trouvée dans ${fileName}.`);
+    const detail = skipped.length ? ` Détail : ${skipped.slice(0, 5).join(' ; ')}.` : '';
+    throw new Error(`Aucune ligne valide trouvée dans ${fileName}.${detail}`);
   }
   return out;
+}
+
+function validateImportHomogeneity(
+  questions: ImportQuestion[],
+): { ok: true } | { ok: false; message: string } {
+  const difficulties = new Set(questions.map((q) => normalizeDifficulty(q.difficulty_label)));
+  if (difficulties.size > 1) {
+    return {
+      ok: false,
+      message: 'Toutes les lignes doivent avoir la même difficulty.',
+    };
+  }
+  const categories = new Set(questions.map((q) => normalizeImportLabel(q.category)));
+  if (categories.size > 1) {
+    return {
+      ok: false,
+      message: 'Toutes les lignes doivent avoir la même category.',
+    };
+  }
+  const subcategories = new Set(questions.map((q) => normalizeImportLabel(q.subcategory)));
+  if (subcategories.size > 1) {
+    return {
+      ok: false,
+      message: 'Toutes les lignes doivent avoir la même subcategory.',
+    };
+  }
+  return { ok: true };
+}
+
+function validateImportMatchesQuiz(
+  questions: ImportQuestion[],
+  quizDifficulty: string | null,
+  categoryName: string,
+  subcategoryName: string,
+): { ok: true } | { ok: false; message: string } {
+  const first = questions[0]!;
+  const expectedDifficulty = normalizeDifficulty(quizDifficulty);
+  const fileDifficulty = normalizeDifficulty(first.difficulty_label);
+  if (expectedDifficulty && fileDifficulty !== expectedDifficulty) {
+    return {
+      ok: false,
+      message: `La difficulty du fichier (${first.difficulty_label}) ne correspond pas au quiz (${quizDifficulty}).`,
+    };
+  }
+  const expectedCategory = normalizeImportLabel(categoryName);
+  const fileCategory = normalizeImportLabel(first.category);
+  if (fileCategory !== expectedCategory) {
+    return {
+      ok: false,
+      message: `La category du fichier (« ${first.category} ») ne correspond pas au quiz (« ${categoryName} »).`,
+    };
+  }
+  const expectedSubcategory = normalizeImportLabel(subcategoryName);
+  const fileSubcategory = normalizeImportLabel(first.subcategory);
+  if (fileSubcategory !== expectedSubcategory) {
+    return {
+      ok: false,
+      message: `La subcategory du fichier (« ${first.subcategory} ») ne correspond pas au quiz (« ${subcategoryName} »).`,
+    };
+  }
+  return { ok: true };
+}
+
+async function loadQuizImportContext(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  quizId: string,
+): Promise<
+  | {
+      ok: true;
+      quiz: {
+        id: string;
+        difficulty_level: string | null;
+        category_id: string | null;
+        subcategory_id: string | null;
+      };
+      categoryName: string;
+      subcategoryName: string;
+    }
+  | { ok: false; message: string; status: 400 | 404 | 500 }
+> {
+  const { data: quiz, error: quizErr } = await admin
+    .from('quizzes')
+    .select('id, difficulty_level, category_id, subcategory_id')
+    .eq('id', quizId)
+    .maybeSingle();
+  if (quizErr) return { ok: false, message: quizErr.message, status: 500 };
+  if (!quiz) return { ok: false, message: 'Quiz introuvable.', status: 404 };
+  if (!quiz.category_id || !quiz.subcategory_id) {
+    return { ok: false, message: 'Le quiz n’a pas de catégorie ou sous-catégorie associée.', status: 400 };
+  }
+  const [{ data: category, error: catErr }, { data: subcategory, error: subErr }] = await Promise.all([
+    admin.from('categories').select('name').eq('id', quiz.category_id).maybeSingle(),
+    admin.from('subcategories').select('name').eq('id', quiz.subcategory_id).maybeSingle(),
+  ]);
+  if (catErr) return { ok: false, message: catErr.message, status: 500 };
+  if (subErr) return { ok: false, message: subErr.message, status: 500 };
+  if (!category?.name) return { ok: false, message: 'Catégorie du quiz introuvable.', status: 500 };
+  if (!subcategory?.name) return { ok: false, message: 'Sous-catégorie du quiz introuvable.', status: 500 };
+  return {
+    ok: true,
+    quiz,
+    categoryName: category.name,
+    subcategoryName: subcategory.name,
+  };
+}
+
+function logQuestionInsertError(error: unknown): void {
+  if (process.env.NODE_ENV === 'production') return;
+  console.error('[backoffice] questions.insert failed:', error);
 }
 
 async function ensureSubcategoryBelongsToCategory(
@@ -546,7 +714,7 @@ export const backofficeRoutes = new Hono()
     const body = await c.req.parseBody();
     const filePart = body.file;
     if (!(filePart instanceof File)) {
-      return c.json(jsonError('Fichier requis (champ form-data: file).'), 400);
+      return c.json(jsonError('Fichier requis (champ form-data: file).', 400), 400);
     }
     const title = String(body.title ?? '').trim();
     if (!title) return c.json(jsonError('title requis.'), 400);
@@ -557,7 +725,15 @@ export const backofficeRoutes = new Hono()
     }
     const difficultyLevel = normalizeDifficulty(String(body.difficulty_level ?? '').trim() || null);
     const theme = String(body.theme ?? '').trim() || null;
-    const questions = parseSpreadsheet(filePart.name, await filePart.arrayBuffer());
+    let questions: ImportQuestion[];
+    try {
+      questions = parseSpreadsheet(filePart.name, await filePart.arrayBuffer());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Fichier invalide.';
+      return c.json(jsonError(message, 400), 400);
+    }
+    const homogeneity = validateImportHomogeneity(questions);
+    if (!homogeneity.ok) return c.json(jsonError(homogeneity.message, 400), 400);
     const admin = createServiceRoleClient();
     const subOk = await ensureSubcategoryBelongsToCategory(admin, categoryId, subcategoryId);
     if (!subOk.ok) return c.json(jsonError(subOk.message, 400), 400);
@@ -604,6 +780,7 @@ export const backofficeRoutes = new Hono()
       }));
       const { error: insErr } = await admin.from('questions').insert(payload);
       if (insErr) {
+        logQuestionInsertError(insErr);
         const mapped = mapQuestionInsertError(insErr);
         return c.json(jsonError(mapped.message, mapped.status), mapped.status);
       }
@@ -616,17 +793,23 @@ export const backofficeRoutes = new Hono()
     const body = await c.req.parseBody();
     const filePart = body.file;
     if (!(filePart instanceof File)) {
-      return c.json(jsonError('Fichier requis (champ form-data: file).'), 400);
+      return c.json(jsonError('Fichier requis (champ form-data: file).', 400), 400);
     }
     const admin = createServiceRoleClient();
-    const { data: quiz, error: quizErr } = await admin
-      .from('quizzes')
-      .select('id, difficulty_level')
-      .eq('id', param.data.quizId)
-      .maybeSingle();
-    if (quizErr) return c.json(jsonError(quizErr.message, 500), 500);
-    if (!quiz) return c.json(jsonError('Quiz introuvable.', 404), 404);
-    const questions = parseSpreadsheet(filePart.name, await filePart.arrayBuffer());
+    const quizCtx = await loadQuizImportContext(admin, param.data.quizId);
+    if (!quizCtx.ok) return c.json(jsonError(quizCtx.message, quizCtx.status), quizCtx.status);
+    const { quiz, categoryName, subcategoryName } = quizCtx;
+    let questions: ImportQuestion[];
+    try {
+      questions = parseSpreadsheet(filePart.name, await filePart.arrayBuffer());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Fichier invalide.';
+      return c.json(jsonError(message, 400), 400);
+    }
+    const homogeneity = validateImportHomogeneity(questions);
+    if (!homogeneity.ok) return c.json(jsonError(homogeneity.message, 400), 400);
+    const match = validateImportMatchesQuiz(questions, quiz.difficulty_level, categoryName, subcategoryName);
+    if (!match.ok) return c.json(jsonError(match.message, 400), 400);
     const lvl = await getDifficultyMaxQuestions(admin, quiz.difficulty_level);
     if (!lvl.ok) return c.json(jsonError(lvl.message, 400), 400);
     const cnt = await getQuizQuestionCount(admin, quiz.id);
@@ -653,10 +836,22 @@ export const backofficeRoutes = new Hono()
     }));
     const { error: insErr } = await admin.from('questions').insert(payload);
     if (insErr) {
+      logQuestionInsertError(insErr);
       const mapped = mapQuestionInsertError(insErr);
       return c.json(jsonError(mapped.message, mapped.status), mapped.status);
     }
-    return c.json({ ok: true, quiz_id: quiz.id, imported_questions: questions.length }, 201);
+    const newTotal = cnt.count + questions.length;
+    const { error: updateErr } = await admin
+      .from('quizzes')
+      .update({ total_questions: newTotal })
+      .eq('id', quiz.id);
+    if (updateErr) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[backoffice] quizzes.total_questions update failed:', updateErr);
+      }
+      return c.json(jsonError(updateErr.message, 500), 500);
+    }
+    return c.json({ ok: true, quiz_id: quiz.id, imported_questions: questions.length, total_questions: newTotal }, 201);
   })
   // Questions CRUD
   .get('/quizzes/:quizId/questions', async (c) => {
