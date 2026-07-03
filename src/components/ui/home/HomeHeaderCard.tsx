@@ -182,13 +182,33 @@ export function HomeHeaderCard({
     return { height: containerHeight.value };
   });
 
+  const useNativeFlip = Platform.OS !== 'web';
+
   const flipContainerStyle = useAnimatedStyle(() => {
+    if (useNativeFlip) return {};
     const rotateY = `${interpolate(flipProgress.value, [0, 1], [0, 180])}deg`;
-    if (Platform.OS === 'web') {
-      return { transform: [{ rotateY }] };
-    }
+    return { transform: [{ rotateY }] };
+  });
+
+  const frontFaceStyle = useAnimatedStyle(() => {
+    if (!useNativeFlip) return {};
+    const rotateY = interpolate(flipProgress.value, [0, 1], [0, 180]);
+    const showFront = flipProgress.value < 0.5;
     return {
-      transform: [{ perspective: 1200 }, { rotateY }],
+      transform: [{ perspective: 1200 }, { rotateY: `${rotateY}deg` }],
+      opacity: showFront ? 1 : 0,
+      zIndex: showFront ? 2 : 0,
+    };
+  });
+
+  const backFaceStyle = useAnimatedStyle(() => {
+    if (!useNativeFlip) return {};
+    const rotateY = interpolate(flipProgress.value, [0, 1], [180, 360]);
+    const showBack = flipProgress.value >= 0.5;
+    return {
+      transform: [{ perspective: 1200 }, { rotateY: `${rotateY}deg` }],
+      opacity: showBack ? 1 : 0,
+      zIndex: showBack ? 2 : 0,
     };
   });
 
@@ -312,8 +332,12 @@ export function HomeHeaderCard({
           flipContainerStyle,
         ]}
       >
-        <View
-          style={[styles.cardFace, Platform.OS === 'web' ? webCardFaceStyle : undefined]}
+        <Animated.View
+          style={[
+            styles.cardFace,
+            useNativeFlip ? frontFaceStyle : undefined,
+            Platform.OS === 'web' ? webCardFaceStyle : undefined,
+          ]}
           pointerEvents={isFlipped ? 'none' : 'auto'}
           onLayout={onFrontLayout}
         >
@@ -325,10 +349,15 @@ export function HomeHeaderCard({
           >
             {cardFace}
           </LinearGradient>
-        </View>
+        </Animated.View>
 
-        <View
-          style={[styles.cardFace, styles.cardFaceBack, Platform.OS === 'web' ? webCardFaceStyle : undefined]}
+        <Animated.View
+          style={[
+            styles.cardFace,
+            styles.cardFaceBack,
+            useNativeFlip ? backFaceStyle : undefined,
+            Platform.OS === 'web' ? webCardFaceStyle : undefined,
+          ]}
           pointerEvents={isFlipped ? 'auto' : 'none'}
           onLayout={onBackLayout}
         >
@@ -340,7 +369,7 @@ export function HomeHeaderCard({
           >
             {backFace}
           </LinearGradient>
-        </View>
+        </Animated.View>
       </Animated.View>
     </Animated.View>
   );
@@ -367,7 +396,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    transform: [{ rotateY: '180deg' }],
+    ...(Platform.OS === 'web' ? { transform: [{ rotateY: '180deg' }] } : {}),
   },
   headerCard: {
     borderRadius: 24,

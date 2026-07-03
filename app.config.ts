@@ -41,5 +41,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         cameraPermission: 'Quizz+ utilise la caméra pour scanner le QR code d’un ami.',
       },
     ],
+    [
+      'expo-build-properties',
+      {
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          buildArchs: ['armeabi-v7a', 'arm64-v8a'],
+        },
+      },
+    ],
   ],
 });
