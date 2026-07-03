@@ -32,7 +32,7 @@ export class MockProfileDataProvider implements IProfileDataProvider {
         { id: 'quizzo', valueLabel: String(quizTotalCount), caption: 'Quiz' },
         { id: 'plays', valueLabel: formatCompactNumber(plays), caption: 'Parties' },
         { id: 'players', valueLabel: formatCompactNumber(players), caption: 'Joueurs' },
-        { id: 'collections', valueLabel: String(collections), caption: 'Collections' },
+        { id: 'collections', valueLabel: String(collections), caption: 'Trophées' },
         { id: 'followers', valueLabel: formatCompactNumber(followers), caption: 'Abonnés' },
         { id: 'following', valueLabel: String(following), caption: 'Abonnements' },
       ],

@@ -21,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryQuizRow } from '@components/ui/categories/CategoryQuizRow';
+import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { ProfileQuizzListHeader } from '@components/ui/profile/ProfileQuizzListHeader';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import type { QuizSortMode } from '@app-types/categoryExplore.types';
@@ -30,6 +31,8 @@ import { useCategoryDetail } from '@hooks/useCategoryDetail';
 import { getCategoryCoverUrl } from '@utils/categoryCoverUrl';
 import { useAuthStore } from '@stores/authStore';
 import { isQuizDifficultyDefined, lacksAuthToken } from '@services/auth/visitorAccessPolicy';
+
+const BOTTOM_NAV_HEIGHT = 86;
 
 export default function CategoryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -106,6 +109,7 @@ export default function CategoryDetailScreen() {
         <View style={[styles.centered, { paddingTop: insets.top }]}>
           <Text style={styles.errorText}>Catégorie introuvable.</Text>
         </View>
+        <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
       </View>
     );
   }
@@ -133,7 +137,7 @@ export default function CategoryDetailScreen() {
             {
               paddingTop: insets.top + 16,
               paddingHorizontal: Spacing.screenHorizontal,
-              paddingBottom: 48 + insets.bottom,
+              paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 32,
               gap: 20,
             },
           ]}
@@ -184,6 +188,8 @@ export default function CategoryDetailScreen() {
           </View>
         </ScrollView>
       ) : null}
+
+      <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
     </View>
   );
 }

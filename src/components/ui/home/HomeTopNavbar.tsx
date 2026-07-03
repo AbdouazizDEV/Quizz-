@@ -50,23 +50,28 @@ export function HomeTopNavbar({
   notificationCount = 0,
   titleFontFamily,
 }: HomeTopNavbarProps) {
+  const hasNotifications = notificationCount > 0;
+
   return (
     <View style={styles.root}>
-      <View style={styles.brand}>
+      <View style={styles.side}>
         <NavIconButton icon="menu" label="Menu" onPress={onPressMenu} />
+      </View>
+
+      <View style={styles.center} pointerEvents="none">
         <QuizzoLogoMark size={28} />
         <Text style={[styles.title, titleFontFamily ? { fontFamily: titleFontFamily } : undefined]}>
           Quizz+
         </Text>
       </View>
 
-      <View style={styles.actions}>
-        <NavIconButton icon="search" label="Rechercher" onPress={onPressSearch} />
+      <View style={[styles.side, styles.sideRight]}>
+        {/* <NavIconButton icon="search" label="Rechercher" onPress={onPressSearch} /> */}
         <NavIconButton
-          icon={notificationCount > 0 ? 'bell' : 'bell-off'}
-          label="Notifications"
+          icon="bell"
+          label={hasNotifications ? `Notifications (${notificationCount})` : 'Notifications'}
           onPress={onPressNotifications}
-          badge={notificationCount}
+          badge={hasNotifications ? notificationCount : undefined}
         />
       </View>
     </View>
@@ -80,13 +85,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    gap: 16,
   },
-  brand: {
+  side: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    minHeight: 38,
+  },
+  sideRight: {
+    justifyContent: 'flex-end',
+    gap: 20,
+  },
+  center: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     minHeight: 38,
   },
   title: {
@@ -94,12 +108,6 @@ const styles = StyleSheet.create({
     lineHeight: 38,
     fontWeight: '700',
     color: '#212121',
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 20,
   },
   iconBtn: {
     width: 28,
