@@ -706,8 +706,45 @@ export const backofficeRoutes = new Hono()
     const param = uuidParam.safeParse(c.req.param());
     if (!param.success) return c.json(jsonError('Paramètre invalide', 400, param.error.flatten()), 400);
     const admin = createServiceRoleClient();
-    const { error } = await admin.from('quizzes').delete().eq('id', param.data.id);
-    if (error) return c.json(jsonError(error.message, 500), 500);
+    const quizId = param.data.id;
+
+    const { data: quiz, error: quizErr } = await admin
+      .from('quizzes')
+      .select('id')
+      .eq('id', quizId)
+      .maybeSingle();
+    if (quizErr) return c.json(jsonError(quizErr.message, 500), 500);
+    if (!quiz) return c.json(jsonError('Quiz introuvable.', 404), 404);
+
+    // Nettoyage explicite des dépendances sans ON DELETE CASCADE (avant migration éventuelle).
+    const dependents: { table: string; error: { message: string } | null }[] = [];
+    const sessionsDel = await admin.from('quiz_sessions').delete().eq('quiz_id', quizId);
+    dependents.push({ table: 'quiz_sessions', error: sessionsDel.error });
+    const challengesDel = await admin.from('challenges').delete().eq('quiz_id', quizId);
+    dependents.push({ table: 'challenges', error: challengesDel.error });
+
+    for (const dep of dependents) {
+      if (dep.error) {
+        return c.json(
+          jsonError(`Impossible de supprimer les données liées (${dep.table}): ${dep.error.message}`, 500),
+          500,
+        );
+      }
+    }
+
+    const { error } = await admin.from('quizzes').delete().eq('id', quizId);
+    if (error) {
+      if (error.message.includes('foreign key') || error.code === '23503') {
+        return c.json(
+          jsonError(
+            'Ce quiz est encore référencé par d’autres données. Appliquez la migration quiz_delete_cascade puis réessayez.',
+            409,
+          ),
+          409,
+        );
+      }
+      return c.json(jsonError(error.message, 500), 500);
+    }
     return c.json({ ok: true });
   })
   .post('/quizzes/import', async (c) => {
