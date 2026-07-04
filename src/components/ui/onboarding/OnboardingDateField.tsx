@@ -2,14 +2,13 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useState } from 'react';
 import {
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,8 +17,9 @@ import { onboardingColumn } from '@constants/layout';
 
 interface OnboardingDateFieldProps {
   label: string;
-  value: Date;
+  value: Date | null;
   onChange: (date: Date) => void;
+  placeholder?: string;
   maximumDate?: Date;
   minimumDate?: Date;
   labelFontFamily?: string;
@@ -47,22 +47,23 @@ export function OnboardingDateField({
   label,
   value,
   onChange,
+  placeholder = 'JJ/MM/AAAA',
   maximumDate = new Date(),
   minimumDate = DEFAULT_MIN,
   labelFontFamily,
   valueFontFamily,
 }: OnboardingDateFieldProps) {
   const insets = useSafeAreaInsets();
-  const webDateInputRef = useRef<TextInput>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const pickerSeed = value ?? maximumDate;
+  const [draft, setDraft] = useState(pickerSeed);
 
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    setDraft(value ?? maximumDate);
+  }, [value, maximumDate]);
 
   const openPicker = () => {
-    setDraft(value);
+    setDraft(value ?? maximumDate);
     setPickerOpen(true);
   };
 
@@ -84,7 +85,11 @@ export function OnboardingDateField({
   const isWeb = Platform.OS === 'web';
 
   const applyPickedDate = (iso: string) => {
-    const next = new Date(`${iso}T12:00:00`);
+    const trimmed = iso.trim();
+    if (!trimmed) {
+      return;
+    }
+    const next = new Date(`${trimmed}T12:00:00`);
     if (Number.isNaN(next.getTime())) {
       return;
     }
@@ -94,24 +99,10 @@ export function OnboardingDateField({
     onChange(next);
   };
 
-  /** Ouvre le sélecteur natif (Chrome : showPicker, Safari / autres : focus + click). */
-  const openWebNativeDatePicker = () => {
-    const node = webDateInputRef.current as unknown as HTMLInputElement | null;
-    if (!node) {
-      return;
-    }
-    try {
-      const picker = node.showPicker as (() => void) | undefined;
-      if (typeof picker === 'function') {
-        picker.call(node);
-        return;
-      }
-    } catch {
-      /* showPicker peut lever si non autorisé */
-    }
-    node.focus();
-    node.click();
-  };
+  const displayValue = value ? formatFr(value) : placeholder;
+  const displayStyle = value
+    ? [styles.value, valueFontFamily ? { fontFamily: valueFontFamily } : { fontWeight: '700' as const }]
+    : [styles.value, styles.placeholder, valueFontFamily ? { fontFamily: valueFontFamily } : { fontWeight: '700' as const }];
 
   return (
     <View style={[styles.fieldOuter, onboardingColumn]}>
@@ -124,44 +115,42 @@ export function OnboardingDateField({
       <View style={styles.fieldInner}>
         {isWeb ? (
           <View style={styles.webFieldWrap}>
-            <TextInput
-              ref={webDateInputRef}
-              value={toIsoDateOnly(value)}
-              onChangeText={applyPickedDate}
-              style={styles.webHiddenNativeInput}
-              {...({
-                type: 'date',
-                min: toIsoDateOnly(minimumDate),
-                max: toIsoDateOnly(maximumDate),
-              } as Record<string, string>)}
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Choisir la date de naissance"
-              onPress={openWebNativeDatePicker}
-              style={styles.webPressableRow}
-            >
-              <Text
-                style={[
-                  styles.value,
-                  valueFontFamily ? { fontFamily: valueFontFamily } : { fontWeight: '700' },
-                ]}
-              >
-                {formatFr(value)}
-              </Text>
+            {createElement('input', {
+              type: 'date',
+              value: value ? toIsoDateOnly(value) : '',
+              min: toIsoDateOnly(minimumDate),
+              max: toIsoDateOnly(maximumDate),
+              onChange: (event: { target: { value: string } }) => {
+                applyPickedDate(event.target.value);
+              },
+              'aria-label': 'Choisir la date de naissance',
+              style: {
+                flex: 1,
+                width: '100%',
+                fontSize: 16,
+                lineHeight: '22px',
+                color: '#212121',
+                paddingTop: 4,
+                paddingBottom: 4,
+                paddingRight: 32,
+                paddingLeft: 0,
+                border: 'none',
+                background: 'transparent',
+                outline: 'none',
+                cursor: 'pointer',
+                fontFamily: valueFontFamily,
+                fontWeight: valueFontFamily ? undefined : 700,
+                minHeight: 44,
+                boxSizing: 'border-box',
+              },
+            })}
+            <View style={styles.webCalendarIcon} pointerEvents="none">
               <Feather name="calendar" size={20} color="#FFD700" />
-            </Pressable>
+            </View>
           </View>
         ) : (
           <Pressable onPress={openPicker} style={styles.valueRow}>
-            <Text
-              style={[
-                styles.value,
-                valueFontFamily ? { fontFamily: valueFontFamily } : { fontWeight: '700' },
-              ]}
-            >
-              {formatFr(value)}
-            </Text>
+            <Text style={displayStyle}>{displayValue}</Text>
             <Feather name="calendar" size={20} color="#FFD700" />
           </Pressable>
         )}
@@ -251,26 +240,21 @@ const styles = StyleSheet.create({
     padding: 0,
     margin: 0,
   },
+  placeholder: {
+    color: '#9CA3AF',
+  },
   webFieldWrap: {
     width: '100%',
     minHeight: 44,
     position: 'relative',
-  },
-  /** Input HTML natif hors écran — ouverture via showPicker() / click() au tap sur la ligne. */
-  webHiddenNativeInput: {
-    position: 'absolute',
-    width: 120,
-    height: 40,
-    opacity: 0,
-    left: -9999,
-    top: 0,
-  },
-  webPressableRow: {
-    width: '100%',
-    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+  },
+  webCalendarIcon: {
+    position: 'absolute',
+    right: 0,
+    top: '50%',
+    marginTop: -10,
   },
   underline: {
     width: '100%',

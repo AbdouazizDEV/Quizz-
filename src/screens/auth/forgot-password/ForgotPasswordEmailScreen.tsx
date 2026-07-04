@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UnderlineLabeledField } from '@components/ui/auth/UnderlineLabeledField';
 import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingContinueBar';
+import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { ForgotPasswordFlowTheme } from '@constants/forgotPasswordFlowTheme';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
@@ -133,6 +134,7 @@ export default function ForgotPasswordEmailScreen() {
               label="Email"
               value={email}
               onChangeText={setEmail}
+              placeholder={AUTH_FORM_PLACEHOLDERS.email}
               keyboardType="email-address"
               autoCapitalize="none"
               labelFontFamily={fonts.semi}

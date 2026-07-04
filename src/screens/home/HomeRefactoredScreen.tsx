@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +20,7 @@ import { HomeDailyCategoriesSection } from '@components/ui/home/HomeDailyCategor
 import { HomeHeaderCard } from '@components/ui/home/HomeHeaderCard';
 import { HomeFriendRequestsSheet } from '@components/ui/home/HomeFriendRequestsSheet';
 import { HomeSettingsDrawer } from '@components/ui/home/HomeSettingsDrawer';
+import { HomeTopNavbar } from '@components/ui/home/HomeTopNavbar';
 import { HomeInsightCarousel, type HomeInsightItem } from '@components/ui/home/HomeInsightCarousel';
 import {
   HomeLeaderboardSection,
@@ -29,6 +29,8 @@ import {
 import { HomeRewardsSection } from '@components/ui/home/HomeRewardsSection';
 import { HomeSectionTitle } from '@components/ui/home/HomeSectionTitle';
 import { buildUserProfileHref, Routes } from '@constants/Routes';
+import { DefisRoutes } from '@constants/defisRoutes';
+import type { HomeActionTileId } from '@constants/homeActionTiles';
 import { Spacing } from '@constants/Spacing';
 import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthMe } from '@hooks/useAuthMe';
@@ -102,20 +104,6 @@ export default function HomeRefactoredScreen() {
   const isVisitor = useMemo(
     () => isVisitorSession({ token, hasRegisteredAccount }),
     [token, hasRegisteredAccount],
-  );
-
-  const edgeSwipeOpenDrawer = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) =>
-          g.dx > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
-        onPanResponderRelease: (_, g) => {
-          if (g.dx > 40 || (g.vx > 0.35 && g.dx > 18)) {
-            setSettingsDrawerVisible(true);
-          }
-        },
-      }),
-    [],
   );
 
   useFocusEffect(
@@ -195,6 +183,35 @@ export default function HomeRefactoredScreen() {
     router.push(Routes.PLAYERS);
   }, [router]);
 
+  const goToProfile = useCallback(() => {
+    router.push(Routes.PROFILE);
+  }, [router]);
+
+  const goToSearch = useCallback(() => {
+    router.push(Routes.CATEGORIES);
+  }, [router]);
+
+  const goToDefisTile = useCallback(
+    (tileId: HomeActionTileId) => {
+      switch (tileId) {
+        case 'challenge':
+          router.push(DefisRoutes.challengeList);
+          break;
+        case 'tournament':
+          router.push(DefisRoutes.tournoiList);
+          break;
+        case 'duel':
+          router.push(DefisRoutes.duelHub);
+          break;
+      }
+    },
+    [router],
+  );
+
+  const openSettingsMenu = useCallback(() => {
+    setSettingsDrawerVisible(true);
+  }, []);
+
   useEffect(() => {
     const nativeDriver = Platform.OS !== 'web';
     const pulse = Animated.loop(
@@ -242,6 +259,7 @@ export default function HomeRefactoredScreen() {
     const loadingPlaceholders = Boolean(token?.trim()) && meLoading;
 
     return {
+      userId: me?.user?.id,
       avatarInitial: initials,
       avatarUri: getUserAvatarUri(
         me?.user?.id ?? 'me',
@@ -287,9 +305,17 @@ export default function HomeRefactoredScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.column, { maxWidth: contentWidth }]}>
+          <HomeTopNavbar
+            notificationCount={friendRequests.length}
+            onPressSearch={goToSearch}
+            onPressNotifications={() => void openFriendRequests()}
+            onPressMenu={openSettingsMenu}
+          />
+
           <HomeHeaderCard
             glowOpacity={glowAnim}
             progress={headerVm.progress}
+            userId={headerVm.userId}
             avatarInitial={headerVm.avatarInitial}
             avatarUri={headerVm.avatarUri}
             displayNameWithEmoji={headerVm.displayNameWithEmoji}
@@ -299,9 +325,7 @@ export default function HomeRefactoredScreen() {
             streakOrDaysLabel={headerVm.streakOrDaysLabel}
             progressLabelLeft={headerVm.progressLabelLeft}
             progressLabelRight={headerVm.progressLabelRight}
-            notificationCount={friendRequests.length}
-            onPressNotifications={() => void openFriendRequests()}
-            onPressAvatar={() => setSettingsDrawerVisible(true)}
+            onPressAvatar={goToProfile}
           />
 
           <View style={styles.section}>
@@ -324,7 +348,7 @@ export default function HomeRefactoredScreen() {
             />
           </View>
 
-          <HomeActionTiles onTilePress={() => router.push(Routes.DEFIS)} />
+          <HomeActionTiles onTilePress={goToDefisTile} />
 
           <Pressable style={styles.section} onPress={goToScoreboard} accessibilityRole="button">
             <HomeSectionTitle
@@ -344,18 +368,6 @@ export default function HomeRefactoredScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <View
-        style={[
-          styles.edgeSwipeZone,
-          {
-            top: insets.top,
-            bottom: BOTTOM_NAV_HEIGHT + insets.bottom,
-          },
-        ]}
-        {...edgeSwipeOpenDrawer.panHandlers}
-        collapsable={false}
-      />
 
       <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
 
@@ -379,13 +391,6 @@ export default function HomeRefactoredScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
   bgGradient: { ...StyleSheet.absoluteFillObject },
-  /** Zone fine sur le bord gauche : glissement vers la droite ouvre le panneau paramètres (comme l’avatar). */
-  edgeSwipeZone: {
-    position: 'absolute',
-    left: 0,
-    width: 32,
-    zIndex: 6,
-  },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center' },
   column: { width: '100%', gap: 22 },

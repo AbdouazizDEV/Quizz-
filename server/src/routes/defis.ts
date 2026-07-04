@@ -249,25 +249,60 @@ function computeDuelPhase(
 
 async function pickRandomPublishedQuiz(
   admin: ReturnType<typeof createServiceRoleClient>,
+  excludeQuizIds: string[] = [],
 ): Promise<{ id: string; title: string; total_questions: number | null } | null> {
-  const { count, error: countErr } = await admin
-    .from('quizzes')
-    .select('id', { count: 'exact', head: true })
-    .eq('is_published', true);
+  let query = admin.from('quizzes').select('id', { count: 'exact', head: true }).eq('is_published', true);
+  if (excludeQuizIds.length > 0) {
+    const excludeFilter = `(${excludeQuizIds.map((id) => `"${id}"`).join(',')})`;
+    query = query.not('id', 'in', excludeFilter);
+  }
+
+  const { count, error: countErr } = await query;
 
   if (countErr || !count || count === 0) return null;
 
   const offset = Math.floor(Math.random() * count);
-  const { data, error } = await admin
+  let dataQuery = admin
     .from('quizzes')
     .select('id, title, total_questions')
     .eq('is_published', true)
     .order('id', { ascending: true })
-    .range(offset, offset)
-    .maybeSingle();
+    .range(offset, offset);
+  if (excludeQuizIds.length > 0) {
+    const excludeFilter = `(${excludeQuizIds.map((id) => `"${id}"`).join(',')})`;
+    dataQuery = dataQuery.not('id', 'in', excludeFilter);
+  }
+
+  const { data, error } = await dataQuery.maybeSingle();
 
   if (error || !data?.id) return null;
   return data;
+}
+
+async function fetchFullyCompletedQuizIdsForUsers(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  userIds: string[],
+): Promise<string[]> {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+
+  const { data: rows, error } = await admin
+    .from('user_quiz_scores')
+    .select('quiz_id, best_score, max_score, user_id')
+    .in('user_id', uniqueIds);
+
+  if (error || !rows?.length) return [];
+
+  const completed = new Set<string>();
+  for (const row of rows) {
+    if (!row.quiz_id) continue;
+    const max = row.max_score ?? 0;
+    const best = row.best_score ?? 0;
+    if (max > 0 && best >= max) {
+      completed.add(row.quiz_id);
+    }
+  }
+  return [...completed];
 }
 
 async function fetchUserDuels(
@@ -500,8 +535,17 @@ export const defisRoutes = new Hono()
       return c.json({ error: 'Un duel est déjà en attente avec cet ami.' }, 409);
     }
 
-    const quiz = await pickRandomPublishedQuiz(admin);
-    if (!quiz?.id) return c.json({ error: 'Aucun quiz disponible pour le duel.' }, 503);
+    const completedQuizIds = await fetchFullyCompletedQuizIdsForUsers(admin, [
+      challengerId,
+      challengedId,
+    ]);
+    const quiz = await pickRandomPublishedQuiz(admin, completedQuizIds);
+    if (!quiz?.id) {
+      return c.json(
+        { error: 'Aucun quiz éligible pour ce duel (quiz déjà terminés par un des joueurs).' },
+        503,
+      );
+    }
 
     const expiresAt = duelExpiresAtIso();
     const questionsCount = Math.min(DUEL_QUESTIONS_COUNT, quiz.total_questions ?? DUEL_QUESTIONS_COUNT);

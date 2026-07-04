@@ -19,12 +19,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryExploreGridCard } from '@components/ui/categories/CategoryExploreGridCard';
+import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
 import { useAuthStore } from '@stores/authStore';
 import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
+
+const BOTTOM_NAV_HEIGHT = 86;
 
 export default function TopCategoriesScreen() {
   const insets = useSafeAreaInsets();
@@ -115,7 +118,7 @@ export default function TopCategoriesScreen() {
             {
               paddingTop: insets.top + 16,
               paddingHorizontal: Spacing.screenHorizontal,
-              paddingBottom: 48 + insets.bottom,
+              paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 32,
               gap: 28,
             },
           ]}
@@ -148,6 +151,8 @@ export default function TopCategoriesScreen() {
           </View>
         </ScrollView>
       )}
+
+      <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
     </View>
   );
 }

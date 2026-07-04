@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingContinueBar';
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
+import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
@@ -44,6 +45,15 @@ const PLACEHOLDER_COLOR = '#8E8E93';
 function formatRegisterApiError(raw: string | undefined): string {
   if (!raw) return 'Impossible de finaliser l’inscription. Réessayez.';
   const lower = raw.toLowerCase();
+  if (
+    lower.includes('database error creating new user') ||
+    lower.includes('database error saving new user')
+  ) {
+    return 'Impossible de créer le profil (pseudo ou téléphone déjà utilisé). Essayez un autre nom d’utilisateur.';
+  }
+  if (lower.includes('user already registered') || lower.includes('already been registered')) {
+    return 'Cette adresse e-mail est déjà utilisée. Connectez-vous ou réinitialisez votre mot de passe.';
+  }
   if (lower.includes('rate limit') || lower.includes('too many')) {
     return 'Limite Supabase atteinte : trop d’e-mails ou de tentatives. Attendez ~1 h, ou testez avec une autre adresse (ex. alias +test@gmail.com). Vérifiez aussi Auth → Rate Limits dans le dashboard.';
   }
@@ -62,9 +72,9 @@ export default function RegisterScreen() {
     Nunito_400Regular,
   });
 
-  const [username, setUsername] = useState('Awa thiépp');
-  const [email, setEmail] = useState('awa.thiepp@gmail.com');
-  const [password, setPassword] = useState('mypassword123');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [secure, setSecure] = useState(true);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -333,7 +343,7 @@ export default function RegisterScreen() {
                     styles.fieldInput,
                     fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
                   ]}
-                  placeholder="Votre nom d'utilisateur"
+                  placeholder={AUTH_FORM_PLACEHOLDERS.username}
                   placeholderTextColor={PLACEHOLDER_COLOR}
                   autoCapitalize="none"
                 />
@@ -356,7 +366,7 @@ export default function RegisterScreen() {
                     styles.fieldInput,
                     fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
                   ]}
-                  placeholder="Votre email"
+                  placeholder={AUTH_FORM_PLACEHOLDERS.email}
                   placeholderTextColor={PLACEHOLDER_COLOR}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -383,7 +393,7 @@ export default function RegisterScreen() {
                       fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
                     ]}
                     secureTextEntry={secure}
-                    placeholder="Votre mot de passe"
+                    placeholder={AUTH_FORM_PLACEHOLDERS.password}
                     placeholderTextColor={PLACEHOLDER_COLOR}
                     autoCapitalize="none"
                   />

@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UnderlineLabeledField } from '@components/ui/auth/UnderlineLabeledField';
 import { PasswordResetSuccessModal } from '@components/ui/auth/forgot-password/PasswordResetSuccessModal';
 import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingContinueBar';
+import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { AUTH_MESSAGES } from '@constants/auth.messages';
 import { ForgotPasswordFlowTheme } from '@constants/forgotPasswordFlowTheme';
 import { onboardingColumn } from '@constants/layout';
@@ -164,6 +165,7 @@ export default function ForgotPasswordNewPasswordScreen() {
                 label="Créer un nouveau mot de passe"
                 value={form.newPassword}
                 onChangeText={setNewPassword}
+                placeholder={AUTH_FORM_PLACEHOLDERS.newPassword}
                 secureTextEntry={secureA}
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}
@@ -185,6 +187,7 @@ export default function ForgotPasswordNewPasswordScreen() {
                 label="Confirmer un nouveau mot de passe"
                 value={form.confirmPassword}
                 onChangeText={setConfirmPassword}
+                placeholder={AUTH_FORM_PLACEHOLDERS.confirmPassword}
                 secureTextEntry={secureB}
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}

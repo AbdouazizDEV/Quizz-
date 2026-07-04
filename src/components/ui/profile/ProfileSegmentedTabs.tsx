@@ -7,7 +7,7 @@ import type { ProfileFontFamilies } from './ProfileFonts';
 
 const TABS: { id: ProfileTabId; label: string }[] = [
   { id: 'quizzo', label: 'Mes quiz' },
-  { id: 'collections', label: 'Collections' },
+  { id: 'collections', label: 'Trophées' },
   { id: 'about', label: 'À propos' },
 ];
 

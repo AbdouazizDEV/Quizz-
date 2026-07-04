@@ -15,6 +15,7 @@ interface ChallengeQuizMissionRowProps {
 
 function statusForQuiz(quiz: DailyQuiz): 'done' | 'locked' | 'ready' {
   if (quiz.isPlayed) return 'done';
+  if (quiz.globallyCompleted) return 'locked';
   if (!quiz.isAvailable) return 'locked';
   return 'ready';
 }
@@ -55,7 +56,11 @@ export function ChallengeQuizMissionRow({ quiz, index, isLast, onStart }: Challe
       {status === 'locked' ? (
         <View style={styles.lockedRow}>
           <Feather name="lock" size={16} color={COLORS.textSecondary} />
-          <Text style={styles.lockedText}>Disponible le {scheduledLabel}</Text>
+          <Text style={styles.lockedText}>
+            {quiz.globallyCompleted
+              ? 'Quiz déjà terminé — non rejouable en challenge'
+              : `Disponible le ${scheduledLabel}`}
+          </Text>
         </View>
       ) : null}
 

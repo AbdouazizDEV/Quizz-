@@ -61,3 +61,52 @@ export async function fetchQuizReplayStatus(
   const bestFromSessions = sessionRows?.[0]?.score ?? 0;
   return buildReplayStatus(bestFromSessions, maxScore);
 }
+
+/** Quiz dont le joueur a déjà atteint le score maximum (mode libre). */
+export async function isQuizFullyCompletedByPlayer(
+  userId: string,
+  quizId: string,
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client || !userId.trim() || !quizId.trim()) return false;
+
+  const { data: quiz } = await client
+    .from('quizzes')
+    .select('total_questions, points_per_question')
+    .eq('id', quizId)
+    .maybeSingle();
+
+  const maxScore = Math.max(0, (quiz?.total_questions ?? 0) * (quiz?.points_per_question ?? 1));
+  const status = await fetchQuizReplayStatus(userId, quizId, maxScore);
+  return status.isComplete;
+}
+
+/** IDs des quiz déjà terminés au score max par le joueur. */
+export async function fetchFullyCompletedQuizIdSet(
+  userId: string,
+  quizIds?: string[],
+): Promise<Set<string>> {
+  const client = getSupabaseClient();
+  if (!client || !userId.trim()) return new Set();
+
+  let query = client
+    .from('user_quiz_scores')
+    .select('quiz_id, best_score, max_score')
+    .eq('user_id', userId);
+
+  if (quizIds?.length) {
+    query = query.in('quiz_id', quizIds);
+  }
+
+  const { data: rows } = await query;
+  const completed = new Set<string>();
+  for (const row of rows ?? []) {
+    if (!row.quiz_id) continue;
+    const max = row.max_score ?? 0;
+    const best = row.best_score ?? 0;
+    if (max > 0 && best >= max) {
+      completed.add(row.quiz_id);
+    }
+  }
+  return completed;
+}

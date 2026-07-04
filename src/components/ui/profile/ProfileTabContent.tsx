@@ -19,7 +19,7 @@ export function ProfileTabContent({ tab, quizTotalCount, quizzes, fonts }: Profi
     return (
       <View style={styles.placeholder}>
         <Text style={[styles.placeholderText, fonts.medium && { fontFamily: fonts.medium }]}>
-          Vos collections apparaîtront ici.
+          Vos trophées apparaîtront ici.
         </Text>
       </View>
     );

@@ -145,6 +145,29 @@ function fallbackUsernameFromUser(
   return `user-${user.id.slice(0, 8)}`;
 }
 
+function mapRegistrationError(message: string | undefined, code?: string): string {
+  const raw = message?.trim() ?? '';
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes('database error creating new user') ||
+    lower.includes('database error saving new user')
+  ) {
+    return 'Impossible de créer le profil (pseudo ou téléphone déjà utilisé). Essayez un autre nom d’utilisateur.';
+  }
+  if (lower.includes('user already registered') || lower.includes('already been registered')) {
+    return 'Cette adresse e-mail est déjà utilisée. Connectez-vous ou réinitialisez votre mot de passe.';
+  }
+  if (lower.includes('rate limit') || lower.includes('too many')) {
+    return 'Trop de tentatives. Réessayez dans quelques minutes.';
+  }
+  if (!raw) {
+    return code === 'AuthApiError'
+      ? 'Inscription impossible. Vérifiez vos informations ou réessayez plus tard.'
+      : 'Inscription impossible.';
+  }
+  return raw;
+}
+
 export const authRoutes = new Hono()
   .post('/register', async (c) => {
     const parsed = registerBody.safeParse(await c.req.json());
@@ -165,7 +188,7 @@ export const authRoutes = new Hono()
     } = body;
 
     const userMetadata = pickDefinedMetadata({
-      username,
+      username: username.trim(),
       full_name,
       account_type,
       workplace,
@@ -184,7 +207,13 @@ export const authRoutes = new Hono()
         user_metadata: userMetadata,
       });
       if (createErr || !created.user) {
-        return c.json({ error: createErr?.message ?? 'Création utilisateur impossible.', code: createErr?.name }, 400);
+        return c.json(
+          {
+            error: mapRegistrationError(createErr?.message, createErr?.name),
+            code: createErr?.name,
+          },
+          400,
+        );
       }
 
       const anon = createAnonAuthClient();
@@ -219,7 +248,7 @@ export const authRoutes = new Hono()
       options: { data: userMetadata },
     });
     if (error) {
-      return c.json({ error: error.message, code: error.name }, 400);
+      return c.json({ error: mapRegistrationError(error.message, error.name), code: error.name }, 400);
     }
     return c.json({
       user: data.user,

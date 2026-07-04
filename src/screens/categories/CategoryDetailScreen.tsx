@@ -17,9 +17,11 @@ import {
 } from '@expo-google-fonts/nunito';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryQuizRow } from '@components/ui/categories/CategoryQuizRow';
+import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { ProfileQuizzListHeader } from '@components/ui/profile/ProfileQuizzListHeader';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import type { QuizSortMode } from '@app-types/categoryExplore.types';
@@ -29,6 +31,8 @@ import { useCategoryDetail } from '@hooks/useCategoryDetail';
 import { getCategoryCoverUrl } from '@utils/categoryCoverUrl';
 import { useAuthStore } from '@stores/authStore';
 import { isQuizDifficultyDefined, lacksAuthToken } from '@services/auth/visitorAccessPolicy';
+
+const BOTTOM_NAV_HEIGHT = 86;
 
 export default function CategoryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -60,6 +64,12 @@ export default function CategoryDetailScreen() {
   const { data, loading, error, refetch } = useCategoryDetail(slug, sort);
   const token = useAuthStore((s) => s.token);
 
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
+
   const coverUri = useMemo(() => (slug ? getCategoryCoverUrl(slug) : ''), [slug]);
 
   const onBack = useCallback(() => {
@@ -79,7 +89,8 @@ export default function CategoryDetailScreen() {
   }, []);
 
   const onPressQuiz = useCallback(
-    (quizId: string, difficultyLevel: string | null) => {
+    (quizId: string, difficultyLevel: string | null, isCompletedByPlayer?: boolean) => {
+      if (isCompletedByPlayer) return;
       if (lacksAuthToken(token) && isQuizDifficultyDefined(difficultyLevel)) {
         router.push(Routes.LOGIN);
         return;
@@ -98,6 +109,7 @@ export default function CategoryDetailScreen() {
         <View style={[styles.centered, { paddingTop: insets.top }]}>
           <Text style={styles.errorText}>Catégorie introuvable.</Text>
         </View>
+        <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
       </View>
     );
   }
@@ -125,7 +137,7 @@ export default function CategoryDetailScreen() {
             {
               paddingTop: insets.top + 16,
               paddingHorizontal: Spacing.screenHorizontal,
-              paddingBottom: 48 + insets.bottom,
+              paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + 32,
               gap: 20,
             },
           ]}
@@ -163,7 +175,12 @@ export default function CategoryDetailScreen() {
                     lockedForVisitor={
                       lacksAuthToken(token) && isQuizDifficultyDefined(q.difficultyLevel)
                     }
-                    onPress={() => onPressQuiz(q.id, q.difficultyLevel)}
+                    completedByPlayer={q.isCompletedByPlayer}
+                    onPress={
+                      q.isCompletedByPlayer
+                        ? undefined
+                        : () => onPressQuiz(q.id, q.difficultyLevel, q.isCompletedByPlayer)
+                    }
                   />
                 ))
               )}
@@ -171,6 +188,8 @@ export default function CategoryDetailScreen() {
           </View>
         </ScrollView>
       ) : null}
+
+      <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
     </View>
   );
 }

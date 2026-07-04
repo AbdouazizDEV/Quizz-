@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { DuelMatchHero } from '@components/ui/defis/DuelMatchHero';
 import { DefisPageShell } from '@components/ui/defis/DefisPageShell';
@@ -19,6 +20,7 @@ import { DefisRoutes } from '@constants/defisRoutes';
 import { buildQuizEntryHref } from '@constants/Routes';
 import { useAuthMe } from '@hooks/useAuthMe';
 import { isDuelResultReady, useDuelQuery } from '@hooks/defis/useDuelQuery';
+import { isQuizFullyCompletedByPlayer } from '@services/quiz/replay/quizReplayService';
 import { useAppError } from '@providers/AppErrorProvider';
 import { resolveRouteParamId } from '@utils/resolveRouteParamId';
 
@@ -129,6 +131,11 @@ export default function DuelDetailScreen() {
   const ctaPulse = useSharedValue(1);
 
   const { data: duel, isLoading, isError, error, refetch } = useDuelQuery(duelId);
+  const { data: quizFullyCompleted = false } = useQuery({
+    queryKey: ['quiz-fully-completed', userId, duel?.quizId],
+    enabled: Boolean(userId && duel?.quizId),
+    queryFn: () => isQuizFullyCompletedByPlayer(userId, duel!.quizId),
+  });
 
   useEffect(() => {
     if (!isError) return;
@@ -161,6 +168,7 @@ export default function DuelDetailScreen() {
   const canPlay =
     duel &&
     !duel.isExpired &&
+    !quizFullyCompleted &&
     duel.quizId &&
     ((duel.challengerId === userId &&
       (duel.status === 'pending' || duel.status === 'accepted') &&
@@ -278,6 +286,14 @@ export default function DuelDetailScreen() {
           </AnimatedPressable>
           <Text style={styles.ctaHint}>Prêt ? Chaque seconde compte !</Text>
         </Animated.View>
+      ) : null}
+
+      {duel && !canPlay && !duel.isExpired && quizFullyCompleted && myQuizScore === null ? (
+        <View style={styles.expiredBanner}>
+          <Text style={styles.expiredText}>
+            Vous avez déjà terminé ce quiz. Il n’est pas rejouable en duel.
+          </Text>
+        </View>
       ) : null}
 
       {showResultCta ? (

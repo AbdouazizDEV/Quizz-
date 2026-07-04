@@ -79,7 +79,7 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
       { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quiz' },
       { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Parties' },
       { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Joueurs' },
-      { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Collections' },
+      { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Trophées' },
       { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'Abonnés' },
       { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
     ],

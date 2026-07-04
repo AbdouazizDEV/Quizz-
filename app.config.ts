@@ -29,5 +29,27 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: '23a2334f-26a5-4ae1-9911-56fcbed0ca9c',
     },
   },
-  plugins: ['expo-router', 'expo-font', 'expo-secure-store', '@react-native-community/datetimepicker', 'expo-sqlite'],
+  plugins: [
+    'expo-router',
+    'expo-font',
+    'expo-secure-store',
+    '@react-native-community/datetimepicker',
+    'expo-sqlite',
+    [
+      'expo-camera',
+      {
+        cameraPermission: 'Quizz+ utilise la caméra pour scanner le QR code d’un ami.',
+      },
+    ],
+    [
+      'expo-build-properties',
+      {
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          buildArchs: ['armeabi-v7a', 'arm64-v8a'],
+        },
+      },
+    ],
+  ],
 });

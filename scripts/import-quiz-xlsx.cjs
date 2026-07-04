@@ -23,9 +23,12 @@
  * Important pour npm : un seul `--` puis le chemin. Mauvais exemple :
  *   npm run quiz:import-excel -- ../npm run …   ← invalide
  *
+ * Template standard : quiz-import/TEMPLATE_import_quiz.xlsx
+ *   (régénérer avec : npm run quiz:import-template)
+ *
  * Convention : un fichier par catégorie, nom = slug Supabase (ex. geographie.xlsx → slug geographie).
- * Feuille 1 : colonnes question, answer_1..answer_4, correct_answer (1-4 ou A-D),
- *             fun_fact, difficulty (Z0–Z3 / A1–A3 ou libellé), subcategory, tags.
+ * Feuille « Questions » : colonnes question, answer_1..answer_4, correct_answer (1-4 ou A-D),
+ *             fun_fact, difficulty (Z0–Z3 / A1–A3 ou libellé), category, subcategory, tags.
  *
  * Un ou plusieurs quiz sont créés par couple (catégorie du fichier, difficulty) :
  *   Z0 (Facile) → max 10 questions par quiz (découpage automatique si plus),
@@ -226,7 +229,9 @@ async function main() {
     console.log('Import d’un seul fichier :', resolvedInput);
   } else if (stat.isDirectory()) {
     workDir = resolvedInput;
-    files = fs.readdirSync(workDir).filter((f) => f.endsWith('.xlsx') && !f.startsWith('~'));
+    files = fs.readdirSync(workDir).filter(
+      (f) => f.endsWith('.xlsx') && !f.startsWith('~') && !f.startsWith('TEMPLATE_'),
+    );
   } else {
     console.error('Chemin invalide (ni dossier ni fichier) :', resolvedInput);
     process.exit(1);
