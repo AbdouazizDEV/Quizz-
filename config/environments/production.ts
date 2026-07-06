@@ -1,9 +1,13 @@
 import { getSupabaseEnvFromProcess } from '../supabaseEnv';
+import { inviteWebBaseFromApiUrl } from '../inviteWebBase';
+
+const API_BASE_URL = 'https://quizzplus-api.onrender.com/api/v1';
 
 export const productionConfig = {
   ENV: 'production' as const,
   /** API Node déployée sur Render (`server/`). */
-  API_BASE_URL: 'https://quizzplus-api.onrender.com/api/v1',
+  API_BASE_URL,
+  INVITE_WEB_BASE_URL: inviteWebBaseFromApiUrl(API_BASE_URL),
   //API_BASE_URL: 'http://localhost:3000/api/v1',
   WS_URL: 'wss://quizzplus-api.onrender.com',
   TIMEOUT_MS: 30_000,

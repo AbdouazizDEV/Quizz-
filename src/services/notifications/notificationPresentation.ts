@@ -22,6 +22,8 @@ export function getNotificationVisual(type: string): NotificationVisual {
       return { icon: 'x-circle', iconBackground: '#FFEBEE', iconColor: '#C62828', accent: '#E53935' };
     case 'duel_completed':
       return { icon: 'award', iconBackground: '#FFF8E1', iconColor: '#F9A825', accent: '#FFB703' };
+    case 'duel_score':
+      return { icon: 'bell', iconBackground: '#F3E5F5', iconColor: '#8E24AA', accent: '#7B1FA2' };
     case 'admin_notice':
       return { icon: 'bell', iconBackground: '#FCE4EC', iconColor: '#D81B60', accent: '#AD1457' };
     default:

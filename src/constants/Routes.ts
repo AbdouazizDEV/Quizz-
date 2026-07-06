@@ -22,6 +22,8 @@ export const Routes = {
   NETWORK: '/network',
   /** Scanner le QR profil d’un autre joueur (demande d’ami). */
   FRIEND_SCAN: '/friend-scan',
+  /** Deep link / pont HTTPS : invitation ami (?d=…). */
+  FRIEND_INVITE: '/friend',
   SETTINGS: '/settings',
   SETTINGS_PERSONAL: '/settings/personal-info',
   SETTINGS_NOTIFICATIONS: '/settings/notifications',

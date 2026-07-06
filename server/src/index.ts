@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import { buildAuthEmailBridgeHtml } from './authEmailBridgeHtml.js';
+import { buildFriendInviteBridgeHtml } from './friendInviteBridgeHtml.js';
 import { getEnv, hasServiceRoleKey } from './lib/env.js';
 import { loadEnvFiles } from './loadEnv.js';
 import { authRoutes } from './routes/auth.js';
@@ -22,6 +23,12 @@ const app = new Hono();
 app.get('/', (c) => {
   const target = process.env.AUTH_DEEP_LINK_TARGET?.trim() || 'quizzplus://auth/callback';
   return c.html(buildAuthEmailBridgeHtml(target));
+});
+
+/** Pont : lien HTTPS partageable (WhatsApp) → deep link quizzplus://friend?d=… */
+app.get('/friend', (c) => {
+  const target = process.env.FRIEND_DEEP_LINK_TARGET?.trim() || 'quizzplus://friend';
+  return c.html(buildFriendInviteBridgeHtml(target));
 });
 
 app.use('/api/v1/*', async (c, next) => {

@@ -1,11 +1,14 @@
+import { useRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
 
 import type { AppNotification } from '@app-types/notification.types';
 import {
   formatNotificationTime,
   getNotificationVisual,
 } from '@services/notifications/notificationPresentation';
+import { isNotificationPressable } from '@services/notifications/notificationActions';
 
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
 
@@ -16,7 +19,16 @@ interface NotificationListItemProps {
   onPress: () => void;
   onAcceptFriend?: () => void;
   onRejectFriend?: () => void;
-  onDelete?: () => void;
+  onDeleteRequest?: () => void;
+}
+
+function DeleteSwipeAction() {
+  return (
+    <View style={styles.swipeDelete}>
+      <Feather name="trash-2" size={20} color="#FFFFFF" />
+      <Text style={styles.swipeDeleteText}>Supprimer</Text>
+    </View>
+  );
 }
 
 export function NotificationListItem({
@@ -26,25 +38,15 @@ export function NotificationListItem({
   onPress,
   onAcceptFriend,
   onRejectFriend,
-  onDelete,
+  onDeleteRequest,
 }: NotificationListItemProps) {
+  const swipeRef = useRef<Swipeable>(null);
   const visual = getNotificationVisual(item.type);
   const isFriendRequest = item.type === 'friend_request' && !item.isRead;
+  const pressable = isNotificationPressable(item);
 
-  const Wrapper = isFriendRequest ? View : Pressable;
-  const wrapperProps = isFriendRequest
-    ? { style: [styles.card, !item.isRead && styles.cardUnread] }
-    : {
-        onPress,
-        style: ({ pressed }: { pressed: boolean }) => [
-          styles.card,
-          !item.isRead && styles.cardUnread,
-          pressed && { opacity: 0.92 },
-        ],
-      };
-
-  return (
-    <Wrapper {...wrapperProps}>
+  const cardContent = (
+    <>
       <View style={[styles.iconBubble, { backgroundColor: visual.iconBackground }]}>
         <Feather name={visual.icon} size={20} color={visual.iconColor} />
       </View>
@@ -91,13 +93,39 @@ export function NotificationListItem({
           </View>
         ) : null}
       </View>
+    </>
+  );
 
-      {onDelete ? (
-        <Pressable hitSlop={8} onPress={onDelete} style={styles.deleteHit}>
-          <Feather name="trash-2" size={18} color="#BDBDBD" />
-        </Pressable>
-      ) : null}
-    </Wrapper>
+  const card = isFriendRequest || !pressable ? (
+    <View style={[styles.card, !item.isRead && styles.cardUnread]}>{cardContent}</View>
+  ) : (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, !item.isRead && styles.cardUnread, pressed && { opacity: 0.92 }]}
+    >
+      {cardContent}
+    </Pressable>
+  );
+
+  if (!onDeleteRequest) {
+    return card;
+  }
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderLeftActions={DeleteSwipeAction}
+      renderRightActions={DeleteSwipeAction}
+      overshootLeft={false}
+      overshootRight={false}
+      friction={2}
+      onSwipeableOpen={() => {
+        swipeRef.current?.close();
+        onDeleteRequest();
+      }}
+    >
+      {card}
+    </Swipeable>
   );
 }
 
@@ -144,5 +172,19 @@ const styles = StyleSheet.create({
   rejectBtn: { backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: '#E0E0E0' },
   actionTxt: { fontSize: 14, fontWeight: '700', color: '#1F2261' },
   actionTxtMuted: { fontSize: 14, fontWeight: '700', color: '#616161' },
-  deleteHit: { padding: 4, marginTop: 2 },
+  swipeDelete: {
+    width: 108,
+    marginVertical: 1,
+    borderRadius: 18,
+    backgroundColor: '#FF4D4F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+  },
+  swipeDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

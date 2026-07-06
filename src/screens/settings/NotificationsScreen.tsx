@@ -20,11 +20,14 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
+import { NotificationDeleteConfirmModal } from '@components/ui/settings/NotificationDeleteConfirmModal';
 import { NotificationFilterChips } from '@components/ui/settings/NotificationFilterChips';
 import { NotificationListItem } from '@components/ui/settings/NotificationListItem';
+import { NotificationMessageModal } from '@components/ui/settings/NotificationMessageModal';
 import { SettingsLeadingHeader } from '@components/ui/settings/SettingsLeadingHeader';
 import { Routes } from '@constants/Routes';
 import { SettingsScreenTheme } from '@constants/settingsScreenTheme';
+import { useNotificationInteractions } from '@hooks/useNotificationInteractions';
 import { useNotifications } from '@hooks/useNotifications';
 import { getNetworkHorizontalPadding } from '@utils/networkResponsiveLayout';
 
@@ -52,6 +55,19 @@ export default function NotificationsScreen() {
     acceptFriend,
     rejectFriend,
   } = useNotifications();
+  const {
+    messageItem,
+    deleteTarget,
+    deleteBusy,
+    handlePress,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+    closeMessage,
+  } = useNotificationInteractions({
+    markRead,
+    remove,
+  });
 
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -72,13 +88,6 @@ export default function NotificationsScreen() {
     if (router.canGoBack()) router.back();
     else router.replace(Routes.SETTINGS);
   }, [router]);
-
-  const onItemPress = useCallback(
-    async (id: string, isRead: boolean) => {
-      if (!isRead) await markRead(id);
-    },
-    [markRead],
-  );
 
   return (
     <View style={styles.root}>
@@ -149,7 +158,7 @@ export default function NotificationsScreen() {
                   item={item}
                   fonts={fonts}
                   busy={actionId === item.id}
-                  onPress={() => void onItemPress(item.id, item.isRead)}
+                  onPress={() => void handlePress(item)}
                   onAcceptFriend={
                     item.type === 'friend_request' && !item.isRead
                       ? () => void acceptFriend(item.id)
@@ -160,7 +169,7 @@ export default function NotificationsScreen() {
                       ? () => void rejectFriend(item.id)
                       : undefined
                   }
-                  onDelete={() => void remove(item.id)}
+                  onDeleteRequest={() => requestDelete(item)}
                 />
               ))}
             </View>
@@ -172,6 +181,15 @@ export default function NotificationsScreen() {
           ) : null}
         </View>
       </ScrollView>
+
+      <NotificationMessageModal item={messageItem} fonts={fonts} onClose={closeMessage} />
+      <NotificationDeleteConfirmModal
+        item={deleteTarget}
+        busy={deleteBusy || actionId === deleteTarget?.id}
+        fonts={fonts}
+        onCancel={cancelDelete}
+        onConfirm={() => void confirmDelete()}
+      />
     </View>
   );
 }

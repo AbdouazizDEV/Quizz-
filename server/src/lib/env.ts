@@ -12,6 +12,7 @@ const envSchema = z.object({
   OTP_PEPPER: z.string().min(16),
   RESET_TOKEN_SECRET: z.string().min(16),
   AUTH_DEEP_LINK_TARGET: z.string().min(1).default('quizzplus://auth/callback'),
+  FRIEND_DEEP_LINK_TARGET: z.string().min(1).default('quizzplus://friend'),
   GOOGLE_OAUTH_REDIRECT_URL: z.string().url(),
   FACEBOOK_OAUTH_REDIRECT_URL: z.string().url().optional(),
   CORS_ORIGINS: z.string().optional(),
