@@ -12,7 +12,10 @@ function readId(data: Record<string, unknown>, key: string): string | null {
 }
 
 export function getNotificationPressAction(item: AppNotification): NotificationPressAction {
-  if (item.type === 'friend_request' && !item.isRead) {
+  if (
+    (item.type === 'friend_request' || item.type === 'duel_request') &&
+    !item.isRead
+  ) {
     return { kind: 'none' };
   }
 

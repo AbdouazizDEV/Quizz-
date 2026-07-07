@@ -9,6 +9,7 @@ import {
   getNotificationVisual,
 } from '@services/notifications/notificationPresentation';
 import { isNotificationPressable } from '@services/notifications/notificationActions';
+import { isPendingDuelRequest } from '@services/notifications/duelNotificationHelpers';
 
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
 
@@ -19,6 +20,8 @@ interface NotificationListItemProps {
   onPress: () => void;
   onAcceptFriend?: () => void;
   onRejectFriend?: () => void;
+  onAcceptDuel?: () => void;
+  onRejectDuel?: () => void;
   onDeleteRequest?: () => void;
 }
 
@@ -38,11 +41,14 @@ export function NotificationListItem({
   onPress,
   onAcceptFriend,
   onRejectFriend,
+  onAcceptDuel,
+  onRejectDuel,
   onDeleteRequest,
 }: NotificationListItemProps) {
   const swipeRef = useRef<Swipeable>(null);
   const visual = getNotificationVisual(item.type);
   const isFriendRequest = item.type === 'friend_request' && !item.isRead;
+  const isDuelRequest = isPendingDuelRequest(item);
   const pressable = isNotificationPressable(item);
 
   const cardContent = (
@@ -92,11 +98,34 @@ export function NotificationListItem({
             </Pressable>
           </View>
         ) : null}
+
+        {isDuelRequest && onAcceptDuel && onRejectDuel ? (
+          <View style={styles.actions}>
+            <Pressable
+              style={[styles.actionBtn, styles.acceptBtn]}
+              onPress={onAcceptDuel}
+              disabled={busy}
+            >
+              {busy ? (
+                <ActivityIndicator color="#1F2261" size="small" />
+              ) : (
+                <Text style={[styles.actionTxt, fonts.semiBold && { fontFamily: fonts.semiBold }]}>Accepter</Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={[styles.actionBtn, styles.rejectBtn]}
+              onPress={onRejectDuel}
+              disabled={busy}
+            >
+              <Text style={[styles.actionTxtMuted, fonts.semiBold && { fontFamily: fonts.semiBold }]}>Refuser</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </>
   );
 
-  const card = isFriendRequest || !pressable ? (
+  const card = isFriendRequest || isDuelRequest || !pressable ? (
     <View style={[styles.card, !item.isRead && styles.cardUnread]}>{cardContent}</View>
   ) : (
     <Pressable

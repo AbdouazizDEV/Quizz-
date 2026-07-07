@@ -195,12 +195,13 @@ export default function QuizPlayScreen() {
           await queryClient.invalidateQueries({ queryKey: ['duels-recent'] });
           await queryClient.invalidateQueries({ queryKey: ['duels-pending-list'] });
           await queryClient.invalidateQueries({ queryKey: ['duels-recent-list'] });
+          void invalidateAuthMeCache();
         }
       } catch (error) {
-        showAppError(
-          error instanceof Error ? error.message : 'Score duel non enregistré.',
-          { title: 'Duel' },
-        );
+        const message = error instanceof Error ? error.message : 'Score duel non enregistré.';
+        if (!message.includes('déjà joué') && !message.includes('déjà terminé')) {
+          showAppError(message, { title: 'Duel' });
+        }
       }
     }
 
@@ -244,7 +245,7 @@ export default function QuizPlayScreen() {
   const total = payload.questions.length;
   const maxSessionPoints = total * (payload.quiz.pointsPerQuestion ?? 1);
   const revealed = feedbackPhase !== 'idle';
-  const imageUri = payload.quiz.thumbnailUrl;
+  const questionImageUri = question.imageUrl ?? null;
 
   return (
     <View style={styles.root}>
@@ -278,7 +279,7 @@ export default function QuizPlayScreen() {
 
           <View style={[styles.body, { gap: 24 }]}>
             <QuizQuestionHeader
-              imageUri={imageUri}
+              imageUri={questionImageUri}
               questionText={question.questionText}
               fonts={fonts}
             />

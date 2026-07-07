@@ -135,8 +135,8 @@ export default function DuelResultScreen() {
         ? 'Vous avez refusé ce défi.'
         : `${opponentName} a refusé votre défi.`
       : won
-        ? '+15 pts de récompense'
-        : '+5 pts pour la participation';
+        ? '+5 pts bonus duel (score quiz déjà compté)'
+        : 'Score quiz compté dans ton total';
 
   return (
     <DefisPageShell title="Résultat">

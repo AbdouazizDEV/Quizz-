@@ -1,3 +1,4 @@
+import type { AppNotification } from '@app-types/notification.types';
 import { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -26,13 +27,16 @@ import { NotificationListItem } from '@components/ui/settings/NotificationListIt
 import { NotificationMessageModal } from '@components/ui/settings/NotificationMessageModal';
 import { SettingsLeadingHeader } from '@components/ui/settings/SettingsLeadingHeader';
 import { Routes } from '@constants/Routes';
+import { DefisRoutes } from '@constants/defisRoutes';
 import { SettingsScreenTheme } from '@constants/settingsScreenTheme';
 import { useNotificationInteractions } from '@hooks/useNotificationInteractions';
 import { useNotifications } from '@hooks/useNotifications';
+import { useAppError } from '@providers/AppErrorProvider';
 import { getNetworkHorizontalPadding } from '@utils/networkResponsiveLayout';
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { showAppError } = useAppError();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const horizontalPad = useMemo(() => getNetworkHorizontalPadding(width), [width]);
@@ -54,6 +58,8 @@ export default function NotificationsScreen() {
     remove,
     acceptFriend,
     rejectFriend,
+    acceptDuel,
+    rejectDuel,
   } = useNotifications();
   const {
     messageItem,
@@ -88,6 +94,33 @@ export default function NotificationsScreen() {
     if (router.canGoBack()) router.back();
     else router.replace(Routes.SETTINGS);
   }, [router]);
+
+  const onAcceptDuel = useCallback(
+    async (item: AppNotification) => {
+      try {
+        const duelId = await acceptDuel(item);
+        router.push(DefisRoutes.duelDetail(duelId) as never);
+      } catch (error) {
+        showAppError(error instanceof Error ? error.message : "Impossible d'accepter le duel.", {
+          title: 'Duel',
+        });
+      }
+    },
+    [acceptDuel, router, showAppError],
+  );
+
+  const onRejectDuel = useCallback(
+    async (item: AppNotification) => {
+      try {
+        await rejectDuel(item);
+      } catch (error) {
+        showAppError(error instanceof Error ? error.message : 'Impossible de refuser le duel.', {
+          title: 'Duel',
+        });
+      }
+    },
+    [rejectDuel, showAppError],
+  );
 
   return (
     <View style={styles.root}>
@@ -167,6 +200,16 @@ export default function NotificationsScreen() {
                   onRejectFriend={
                     item.type === 'friend_request' && !item.isRead
                       ? () => void rejectFriend(item.id)
+                      : undefined
+                  }
+                  onAcceptDuel={
+                    item.type === 'duel_request' && !item.isRead
+                      ? () => void onAcceptDuel(item)
+                      : undefined
+                  }
+                  onRejectDuel={
+                    item.type === 'duel_request' && !item.isRead
+                      ? () => void onRejectDuel(item)
                       : undefined
                   }
                   onDeleteRequest={() => requestDelete(item)}

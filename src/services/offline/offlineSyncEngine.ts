@@ -108,15 +108,27 @@ async function executeSupabaseMutation(mutation: QueuedMutation): Promise<void> 
 
   if (mutation.url === QUIZ_SESSION_COMPLETE) {
     const payload = body as QuizSessionMutationBody;
-    const { error } = await supabase.from('quiz_sessions').insert({
-      user_id: payload.user_id,
-      quiz_id: payload.quiz_id,
-      score: payload.score,
-      answers: payload.answers,
-      is_completed: payload.is_completed,
-      completed_at: payload.completed_at,
-    });
-    if (error) throw new Error(error.message);
+    const { data: inserted, error: insertErr } = await supabase
+      .from('quiz_sessions')
+      .insert({
+        user_id: payload.user_id,
+        quiz_id: payload.quiz_id,
+        score: payload.score,
+        answers: payload.answers,
+        is_completed: false,
+      })
+      .select('id')
+      .single();
+    if (insertErr || !inserted?.id) throw new Error(insertErr?.message ?? 'Insertion session impossible.');
+
+    const { error: updateErr } = await supabase
+      .from('quiz_sessions')
+      .update({
+        is_completed: payload.is_completed,
+        completed_at: payload.completed_at,
+      })
+      .eq('id', inserted.id);
+    if (updateErr) throw new Error(updateErr.message);
     return;
   }
 

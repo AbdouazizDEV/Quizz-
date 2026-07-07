@@ -30,6 +30,7 @@ import {
 } from '@components/ui/home/HomeLeaderboardSection';
 import { HomeRewardsSection } from '@components/ui/home/HomeRewardsSection';
 import { HomeSectionTitle } from '@components/ui/home/HomeSectionTitle';
+import type { AppNotification } from '@app-types/notification.types';
 import { buildUserProfileHref, Routes } from '@constants/Routes';
 import { DefisRoutes } from '@constants/defisRoutes';
 import type { HomeActionTileId } from '@constants/homeActionTiles';
@@ -107,6 +108,8 @@ export default function HomeRefactoredScreen() {
     remove: removeNotification,
     acceptFriend,
     rejectFriend,
+    acceptDuel,
+    rejectDuel,
   } = useNotifications();
   const {
     messageItem,
@@ -150,6 +153,34 @@ export default function HomeRefactoredScreen() {
       });
     }
   }, [refreshNotifications, showAppError, token]);
+
+  const onAcceptDuelNotification = useCallback(
+    async (item: AppNotification) => {
+      try {
+        const duelId = await acceptDuel(item);
+        setNotificationsVisible(false);
+        router.push(DefisRoutes.duelDetail(duelId) as never);
+      } catch (error) {
+        showAppError(error instanceof Error ? error.message : "Impossible d'accepter le duel.", {
+          title: 'Duel',
+        });
+      }
+    },
+    [acceptDuel, router, showAppError],
+  );
+
+  const onRejectDuelNotification = useCallback(
+    async (item: AppNotification) => {
+      try {
+        await rejectDuel(item);
+      } catch (error) {
+        showAppError(error instanceof Error ? error.message : 'Impossible de refuser le duel.', {
+          title: 'Duel',
+        });
+      }
+    },
+    [rejectDuel, showAppError],
+  );
 
   const topThreeCategories = useMemo(() => allCategories.slice(0, 3), [allCategories]);
 
@@ -374,6 +405,8 @@ export default function HomeRefactoredScreen() {
         onDeleteRequest={requestDelete}
         onAcceptFriend={(id) => void acceptFriend(id)}
         onRejectFriend={(id) => void rejectFriend(id)}
+        onAcceptDuel={(item) => void onAcceptDuelNotification(item)}
+        onRejectDuel={(item) => void onRejectDuelNotification(item)}
         onSeeAll={() => {
           setNotificationsVisible(false);
           router.push(Routes.SETTINGS_NOTIFICATIONS);

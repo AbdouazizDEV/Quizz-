@@ -206,6 +206,11 @@ export async function apiSubmitDuelScore(duelId: string, score: number): Promise
     if (!data.item) throw new Error('Réponse serveur invalide.');
     return mapItem(data.item);
   } catch (error) {
+    const message = extractApiError(error, '');
+    if (message.includes('déjà joué') || message.includes('déjà terminé')) {
+      const existing = await apiFetchDuelById(duelId);
+      if (existing) return existing;
+    }
     throw new Error(extractApiError(error, "Impossible d'enregistrer votre score de duel."));
   }
 }

@@ -12,6 +12,8 @@ export interface QuizPlayQuestion {
   correctOptionId: string;
   explanation: string | null;
   orderIndex: number;
+  /** Illustration dédiée à la question (colonne Supabase à brancher plus tard). */
+  imageUrl?: string | null;
 }
 
 export interface QuizPlayMeta {

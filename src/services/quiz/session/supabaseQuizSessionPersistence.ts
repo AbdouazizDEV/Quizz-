@@ -113,14 +113,41 @@ export class SupabaseQuizSessionPersistence implements IQuizSessionPersistence {
         quiz_id: params.quizId,
         score: params.earnedPoints,
         answers: answersJson,
-        is_completed: true,
-        completed_at: completedAt,
+        is_completed: false,
       }),
     });
     if (!insertRes.ok) {
       let message = 'Insertion session impossible.';
       try {
         const body = (await insertRes.json()) as { message?: string };
+        if (body.message) message = body.message;
+      } catch {
+        // ignore parse error
+      }
+      throw new Error(message);
+    }
+    const insertedRows = (await insertRes.json()) as Array<{ id: string }>;
+    const insertedId = insertedRows[0]?.id;
+    if (!insertedId) {
+      throw new Error('Session créée sans identifiant.');
+    }
+
+    const updateRes = await fetch(`${supabaseUrl}/rest/v1/quiz_sessions?id=eq.${insertedId}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        is_completed: true,
+        completed_at: completedAt,
+      }),
+    });
+    if (!updateRes.ok) {
+      let message = 'Finalisation de session impossible.';
+      try {
+        const body = (await updateRes.json()) as { message?: string };
         if (body.message) message = body.message;
       } catch {
         // ignore parse error

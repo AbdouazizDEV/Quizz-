@@ -24,6 +24,8 @@ interface HomeNotificationsSheetProps {
   onDeleteRequest: (item: AppNotification) => void;
   onAcceptFriend: (id: string) => void;
   onRejectFriend: (id: string) => void;
+  onAcceptDuel: (item: AppNotification) => void;
+  onRejectDuel: (item: AppNotification) => void;
   onSeeAll: () => void;
 }
 
@@ -39,6 +41,8 @@ export function HomeNotificationsSheet({
   onDeleteRequest,
   onAcceptFriend,
   onRejectFriend,
+  onAcceptDuel,
+  onRejectDuel,
   onSeeAll,
 }: HomeNotificationsSheetProps) {
   return (
@@ -101,6 +105,16 @@ export function HomeNotificationsSheet({
                   onRejectFriend={
                     item.type === 'friend_request' && !item.isRead
                       ? () => onRejectFriend(item.id)
+                      : undefined
+                  }
+                  onAcceptDuel={
+                    item.type === 'duel_request' && !item.isRead
+                      ? () => onAcceptDuel(item)
+                      : undefined
+                  }
+                  onRejectDuel={
+                    item.type === 'duel_request' && !item.isRead
+                      ? () => onRejectDuel(item)
                       : undefined
                   }
                   onDeleteRequest={() => onDeleteRequest(item)}

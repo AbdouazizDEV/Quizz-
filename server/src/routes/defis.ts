@@ -29,6 +29,47 @@ const duelListQuerySchema = z.object({
 });
 
 const DUEL_FETCH_BUFFER = 500;
+const DUEL_WINNER_BONUS = 5;
+const LEVEL_ORDER = ['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3'] as const;
+
+function lowerLevelCode(a: string, b: string): string {
+  const ia = LEVEL_ORDER.indexOf(a as (typeof LEVEL_ORDER)[number]);
+  const ib = LEVEL_ORDER.indexOf(b as (typeof LEVEL_ORDER)[number]);
+  const safeA = ia >= 0 ? ia : 0;
+  const safeB = ib >= 0 ? ib : 0;
+  return LEVEL_ORDER[Math.min(safeA, safeB)] ?? 'Z0';
+}
+
+async function resolveDuelDifficultyForPlayers(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  userIdA: string,
+  userIdB: string,
+): Promise<string> {
+  const { data } = await admin
+    .from('profiles')
+    .select('id, level_code')
+    .in('id', [userIdA, userIdB]);
+  const levels = (data ?? []).map((p) => p.level_code?.trim() || 'Z0');
+  if (levels.length < 2) return levels[0] ?? 'Z0';
+  return lowerLevelCode(levels[0], levels[1]);
+}
+
+async function awardDuelWinnerBonus(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  winnerId: string | null,
+): Promise<void> {
+  if (!winnerId) return;
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('total_score')
+    .eq('id', winnerId)
+    .maybeSingle();
+  const next = (profile?.total_score ?? 0) + DUEL_WINNER_BONUS;
+  await admin
+    .from('profiles')
+    .update({ total_score: next, updated_at: new Date().toISOString() })
+    .eq('id', winnerId);
+}
 
 type DuelPhase =
   | 'needs_your_acceptance'
@@ -250,8 +291,12 @@ function computeDuelPhase(
 async function pickRandomPublishedQuiz(
   admin: ReturnType<typeof createServiceRoleClient>,
   excludeQuizIds: string[] = [],
+  difficultyLevel?: string | null,
 ): Promise<{ id: string; title: string; total_questions: number | null } | null> {
   let query = admin.from('quizzes').select('id', { count: 'exact', head: true }).eq('is_published', true);
+  if (difficultyLevel?.trim()) {
+    query = query.eq('difficulty_level', difficultyLevel.trim());
+  }
   if (excludeQuizIds.length > 0) {
     const excludeFilter = `(${excludeQuizIds.map((id) => `"${id}"`).join(',')})`;
     query = query.not('id', 'in', excludeFilter);
@@ -268,6 +313,9 @@ async function pickRandomPublishedQuiz(
     .eq('is_published', true)
     .order('id', { ascending: true })
     .range(offset, offset);
+  if (difficultyLevel?.trim()) {
+    dataQuery = dataQuery.eq('difficulty_level', difficultyLevel.trim());
+  }
   if (excludeQuizIds.length > 0) {
     const excludeFilter = `(${excludeQuizIds.map((id) => `"${id}"`).join(',')})`;
     dataQuery = dataQuery.not('id', 'in', excludeFilter);
@@ -539,10 +587,13 @@ export const defisRoutes = new Hono()
       challengerId,
       challengedId,
     ]);
-    const quiz = await pickRandomPublishedQuiz(admin, completedQuizIds);
+    const duelDifficulty = await resolveDuelDifficultyForPlayers(admin, challengerId, challengedId);
+    const quiz = await pickRandomPublishedQuiz(admin, completedQuizIds, duelDifficulty);
     if (!quiz?.id) {
       return c.json(
-        { error: 'Aucun quiz éligible pour ce duel (quiz déjà terminés par un des joueurs).' },
+        {
+          error: `Aucun quiz publié au niveau ${duelDifficulty} pour ce duel (quiz déjà terminés exclus).`,
+        },
         503,
       );
     }
@@ -768,6 +819,14 @@ export const defisRoutes = new Hono()
       return c.json({ error: 'Accès refusé.' }, 403);
     }
 
+    const isChallenger = duel.challenger_id === viewerId;
+    const myExistingScore = isChallenger ? duel.challenger_score : duel.challenged_score;
+
+    if (myExistingScore !== null) {
+      const profiles = await loadPlayerProfiles(admin, [duel.challenger_id, duel.challenged_id]);
+      return c.json({ item: mapDuelRow(duel, profiles, viewerId) });
+    }
+
     if (isDuelPastExpiry(duel.expires_at)) {
       await admin.from('challenges').update({ status: 'expired' }).eq('id', duel.id);
       return c.json({ error: 'Ce duel a expiré.' }, 410);
@@ -777,16 +836,8 @@ export const defisRoutes = new Hono()
       return c.json({ error: 'Ce duel est déjà terminé.' }, 409);
     }
 
-    const isChallenger = duel.challenger_id === viewerId;
     if (!isChallenger && duel.status !== 'accepted') {
       return c.json({ error: 'Acceptez le duel avant de jouer.' }, 409);
-    }
-
-    if (isChallenger && duel.challenger_score !== null) {
-      return c.json({ error: 'Vous avez déjà joué ce duel.' }, 409);
-    }
-    if (!isChallenger && duel.challenged_score !== null) {
-      return c.json({ error: 'Vous avez déjà joué ce duel.' }, 409);
     }
 
     const score = parsedBody.data.score;
@@ -817,6 +868,14 @@ export const defisRoutes = new Hono()
       .single();
 
     if (updErr || !updated) return c.json({ error: updErr?.message ?? 'Mise à jour impossible.' }, 500);
+
+    if (bothPlayed) {
+      try {
+        await awardDuelWinnerBonus(admin, updated.winner_id);
+      } catch {
+        /* le duel reste valide même si le bonus échoue */
+      }
+    }
 
     const opponentId = isChallenger ? duel.challenged_id : duel.challenger_id;
     const playerName = await profileDisplayName(admin, viewerId);

@@ -20,6 +20,7 @@ function mapQuestion(row: {
     correctOptionId: row.correct_option_id,
     explanation: row.explanation,
     orderIndex: row.order_index,
+    imageUrl: null,
   };
 }
 
