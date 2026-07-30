@@ -27,6 +27,7 @@ import { invalidateAuthMeCache } from '@services/auth/authMeRepository';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
 import { triggerQuizCorrectFeedback } from '@services/quiz/play/triggerQuizCorrectFeedback';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
+import { pointsForDifficulty } from '@domain/quiz/difficultyPoints';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAppError } from '@providers/AppErrorProvider';
 
@@ -156,12 +157,12 @@ export default function QuizPlayScreen() {
       if (timeLeft <= 0 || !question || !payload) return;
       if (useQuizPlaySessionStore.getState().feedbackPhase !== 'idle') return;
       const isCorrect = optionId === question.correctOptionId;
-      const pts = payload.quiz.pointsPerQuestion;
+      const pts = pointsForDifficulty(question.difficulty);
       const correctLabel =
         question.options.find((o) => o.id === question.correctOptionId)?.label ?? '—';
       selectOption(optionId, isCorrect, pts, correctLabel);
     },
-    [question, payload, selectOption, timeLeft],
+    [question, selectOption, timeLeft],
   );
 
   const onContinueAfterFeedback = useCallback(async () => {
@@ -243,7 +244,10 @@ export default function QuizPlayScreen() {
   }
 
   const total = payload.questions.length;
-  const maxSessionPoints = total * (payload.quiz.pointsPerQuestion ?? 1);
+  const maxSessionPoints = payload.questions.reduce(
+    (sum, q) => sum + pointsForDifficulty(q.difficulty),
+    0,
+  );
   const revealed = feedbackPhase !== 'idle';
   const questionImageUri = question.imageUrl ?? null;
 

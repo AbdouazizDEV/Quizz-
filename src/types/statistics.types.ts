@@ -30,4 +30,7 @@ export interface AchievementStat {
 export interface StatisticsScreenData {
   weekly: WeeklySeriesSummary;
   achievements: AchievementStat[];
+  /** Ratio 0–1 pour le diagramme circulaire de performance. */
+  performanceRatio: number;
+  performanceLabel: string;
 }

@@ -162,3 +162,63 @@ export async function sendPasswordResetOtpEmail(toEmail: string, code: string): 
   });
 }
 
+/** E-mail générique (trésorier, alertes paiement…). */
+export async function sendTransactionalEmail(
+  toEmail: string,
+  subject: string,
+  text: string,
+  html?: string,
+): Promise<void> {
+  if (!isEmailDeliveryConfigured()) {
+    throw new Error(
+      'Expédition non configurée : définissez RESEND_API_KEY + SMTP_FROM, ou SMTP complet.',
+    );
+  }
+  const env = getEnv();
+  const safeHtml = html ?? `<pre style="font-family:sans-serif;white-space:pre-wrap;">${text}</pre>`;
+
+  if (env.RESEND_API_KEY?.trim()) {
+    await sendViaResend(toEmail, subject, text, safeHtml);
+    return;
+  }
+
+  if (smtpBlockedOnCurrentHost() && hasFullSmtpConfig()) {
+    throw new Error(RENDER_SMTP_HINT);
+  }
+
+  await getTransporter().sendMail({
+    from: env.SMTP_FROM,
+    to: toEmail,
+    subject,
+    text,
+    html: safeHtml,
+  });
+}
+
+export async function notifyTreasurerPayment(input: {
+  kind: 'deposit' | 'withdrawal';
+  userId: string;
+  amountLabel: string;
+  methodLabel: string;
+  reference?: string;
+}): Promise<{ sent: boolean; reason?: string }> {
+  const to = process.env.TREASURER_EMAIL?.trim();
+  if (!to) return { sent: false, reason: 'TREASURER_EMAIL non configuré.' };
+  if (!isEmailDeliveryConfigured()) {
+    return { sent: false, reason: 'Mailer non configuré.' };
+  }
+
+  const kindLabel = input.kind === 'deposit' ? 'Dépôt' : 'Retrait';
+  const subject = `Quizz+ · ${kindLabel} ${input.amountLabel}`;
+  const text =
+    `${kindLabel} sur compte de paiement\n\n` +
+    `Utilisateur: ${input.userId}\n` +
+    `Montant: ${input.amountLabel}\n` +
+    `Méthode: ${input.methodLabel}\n` +
+    (input.reference ? `Réf: ${input.reference}\n` : '') +
+    `\n— Quizz+`;
+
+  await sendTransactionalEmail(to, subject, text);
+  return { sent: true };
+}
+

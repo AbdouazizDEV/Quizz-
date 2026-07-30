@@ -1,5 +1,6 @@
 import type { AppNotification } from '@app-types/notification.types';
 import { DefisRoutes } from '@constants/defisRoutes';
+import { Routes } from '@constants/Routes';
 
 export type NotificationPressAction =
   | { kind: 'message' }
@@ -32,6 +33,14 @@ export function getNotificationPressAction(item: AppNotification): NotificationP
   if (challengeId) {
     return { kind: 'navigate', href: DefisRoutes.challengeDetail(challengeId) };
   }
+
+  if (item.type === 'ranking_update') {
+    return { kind: 'navigate', href: DefisRoutes.hub };
+  }
+
+    if (item.type === 'streak_reminder') {
+      return { kind: 'navigate', href: Routes.HOME };
+    }
 
   if (item.type === 'admin_notice' || item.type === 'duel_admin') {
     return { kind: 'message' };

@@ -45,10 +45,10 @@ import { useNotificationInteractions } from '@hooks/useNotificationInteractions'
 import { getUserAvatarUri } from '@utils/getUserAvatarUri';
 import {
   elapsedDaysSince,
-  estimateLevelProgress,
   firstNameFromDisplay,
   formatJoursLabel,
   formatLevelCodeLabel,
+  getLevelProgressDetail,
   initialsFromName,
   levelCodeFromScore,
   levelProgressEndpoints,
@@ -270,7 +270,8 @@ export default function HomeRefactoredScreen() {
     const initials = initialsFromName(display || first);
     const score = profile?.total_score ?? 0;
     const levelCode = levelCodeFromScore(score);
-    const progress = estimateLevelProgress(score);
+    const progressDetail = getLevelProgressDetail(score);
+    const progress = progressDetail.progress;
     const { left, right } = levelProgressEndpoints(score);
     const streak = profile?.streak_days ?? 0;
     const createdAt = typeof userRaw?.created_at === 'string' ? userRaw.created_at : undefined;
@@ -294,6 +295,8 @@ export default function HomeRefactoredScreen() {
       streakOrDaysLabel: loadingPlaceholders ? '···' : clockLabel,
       progressLabelLeft: left,
       progressLabelRight: right,
+      pointsRemainingLabel: loadingPlaceholders ? '···' : progressDetail.remainingLabel,
+      progressPercentLabel: loadingPlaceholders ? '' : `${progressDetail.percent}%`,
       progress,
     };
   }, [me, meLoading, token]);
@@ -347,6 +350,8 @@ export default function HomeRefactoredScreen() {
             streakOrDaysLabel={headerVm.streakOrDaysLabel}
             progressLabelLeft={headerVm.progressLabelLeft}
             progressLabelRight={headerVm.progressLabelRight}
+            pointsRemainingLabel={headerVm.pointsRemainingLabel}
+            progressPercentLabel={headerVm.progressPercentLabel}
             onPressAvatar={goToProfile}
           />
 

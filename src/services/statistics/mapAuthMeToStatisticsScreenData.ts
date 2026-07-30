@@ -23,35 +23,35 @@ export function mapAuthMeToStatisticsScreenData(me: AuthMeResponse): StatisticsS
   const points = buildWeeklyPoints(profile);
   const maxVal = Math.max(...points.map((p) => p.value), 100);
   const weekSum = points.reduce((a, p) => a + p.value, 0);
+  const performanceRatio = Math.min(
+    0.97,
+    0.38 + Math.min(quizzesDone, 50) / 90 + Math.min(streak, 21) / 60 + Math.min(totalScore, 2000) / 5000,
+  );
 
   return {
     weekly: {
-      label: 'Points cette semaine',
-      totalPointsFormatted: `${formatInt(weekSum)} Pt`,
+      label: 'Cette semaine',
+      totalPointsFormatted: `${formatInt(weekSum)} pts`,
       yMax: Math.max(100, Math.ceil(maxVal / 100) * 100),
       points,
     },
+    performanceRatio,
+    performanceLabel: 'Score',
     achievements: [
-      { id: 'a1', icon: 'quizzo', label: 'Quizz+', valueFormatted: String(quizzesDone) },
+      { id: 'a1', icon: 'quizzo', label: 'Quiz joués', valueFormatted: String(quizzesDone) },
       {
         id: 'a2',
         icon: 'coin',
-        label: 'Points totaux',
+        label: 'Points',
         valueFormatted: formatInt(totalScore),
       },
-      { id: 'a3', icon: 'flame', label: 'Série (jours)', valueFormatted: String(streak) },
+      { id: 'a3', icon: 'flame', label: 'Série', valueFormatted: `${streak} j` },
       { id: 'a4', icon: 'medal', label: 'Niveau', valueFormatted: profile?.level_code ?? 'Z0' },
       {
         id: 'a5',
         icon: 'target',
         label: 'Jours actifs',
         valueFormatted: String(daysActive),
-      },
-      {
-        id: 'a6',
-        icon: 'clock',
-        label: 'Premium',
-        valueFormatted: profile?.is_premium ? 'Oui' : 'Non',
       },
     ],
   };

@@ -20,6 +20,12 @@ export const Routes = {
   PROFILE: '/(tabs)/profile',
   STATISTICS: '/statistics',
   NETWORK: '/network',
+  /** Hub Gains : classement, récompenses, cash prizes. */
+  GAINS: '/gains',
+  GAINS_HOW: '/gains/comment-gagner',
+  GAINS_PRIZES: '/gains/prix',
+  GAINS_REWARDS: '/gains/recompenses',
+  GAINS_MY: '/gains/mes-gains',
   /** Scanner le QR profil d’un autre joueur (demande d’ami). */
   FRIEND_SCAN: '/friend-scan',
   /** Deep link / pont HTTPS : invitation ami (?d=…). */

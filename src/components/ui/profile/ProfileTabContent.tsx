@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ProfileQuizListItem, ProfileTabId } from '@app-types/profile.types';
 import { ProfileTheme } from '@constants/profileTheme';
@@ -6,6 +7,8 @@ import { ProfileTheme } from '@constants/profileTheme';
 import type { ProfileFontFamilies } from './ProfileFonts';
 import { ProfileQuizCard } from './ProfileQuizCard';
 import { ProfileQuizzListHeader } from './ProfileQuizzListHeader';
+
+const INITIAL_VISIBLE = 10;
 
 interface ProfileTabContentProps {
   tab: ProfileTabId;
@@ -15,6 +18,16 @@ interface ProfileTabContentProps {
 }
 
 export function ProfileTabContent({ tab, quizTotalCount, quizzes, fonts }: ProfileTabContentProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const visibleQuizzes = useMemo(() => {
+    if (expanded) return quizzes;
+    return quizzes.slice(0, INITIAL_VISIBLE);
+  }, [expanded, quizzes]);
+
+  const hasMore = quizzes.length > INITIAL_VISIBLE;
+  const displayCount = Math.max(quizTotalCount, quizzes.length);
+
   if (tab === 'collections') {
     return (
       <View style={styles.placeholder}>
@@ -35,16 +48,35 @@ export function ProfileTabContent({ tab, quizTotalCount, quizzes, fonts }: Profi
     );
   }
 
-  const title = `${quizTotalCount} quiz`;
+  const title = `${displayCount} quiz`;
 
   return (
     <View style={styles.quizzPanel}>
       <ProfileQuizzListHeader title={title} sortLabel="Plus récents" fonts={fonts} />
-      <View style={styles.list}>
-        {quizzes.map((q) => (
-          <ProfileQuizCard key={q.id} item={q} fonts={fonts} />
-        ))}
-      </View>
+      {visibleQuizzes.length === 0 ? (
+        <View style={styles.placeholder}>
+          <Text style={[styles.placeholderText, fonts.medium && { fontFamily: fonts.medium }]}>
+            Aucune partie récente à afficher pour le moment.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.list}>
+          {visibleQuizzes.map((q) => (
+            <ProfileQuizCard key={q.id} item={q} fonts={fonts} />
+          ))}
+        </View>
+      )}
+      {hasMore ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setExpanded((v) => !v)}
+          style={({ pressed }) => [styles.seeMoreBtn, pressed && { opacity: 0.88 }]}
+        >
+          <Text style={[styles.seeMoreText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+            {expanded ? 'Réduire' : 'Voir plus'}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -56,6 +88,20 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
+  },
+  seeMoreBtn: {
+    marginTop: 12,
+    alignSelf: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFB703',
+    borderRadius: 100,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+  },
+  seeMoreText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2261',
   },
   placeholder: {
     paddingVertical: 32,
