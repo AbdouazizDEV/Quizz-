@@ -1,4 +1,4 @@
-import { pointsForDifficulty, type QuestionDifficulty } from './difficultyPoints';
+import { pointsForDifficulty, type QuestionDifficulty } from './difficultyPoints.js';
 
 export interface ScoreAnswerInput {
   questionId: string;

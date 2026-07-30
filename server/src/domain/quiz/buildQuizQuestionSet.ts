@@ -4,8 +4,8 @@ import {
   warmupEasyCount,
   type QuestionDifficulty,
   type QuizLevelKind,
-} from './difficultyPoints';
-import { createSeededRandom, pickNWithSeed, seedFromString, shuffleWithSeed } from './seededRandom';
+} from './difficultyPoints.js';
+import { createSeededRandom, pickNWithSeed, seedFromString, shuffleWithSeed } from './seededRandom.js';
 
 export interface QuestionSetItem {
   id: string;
@@ -75,23 +75,23 @@ export function buildQuizQuestionSet<T extends QuestionSetItem>(
   const hardPool = byDiff('hard');
 
   const warmup = pickNWithSeed(easyPool, warmupCount, random);
-  const warmupIds = new Set(warmup.map((q) => q.id));
+  const warmupIds = new Set(warmup.map((q: T) => q.id));
 
   const remainingNeeded = total - warmup.length;
   const targetPool =
     quizLevelKind === 'easy'
-      ? easyPool.filter((q) => !warmupIds.has(q.id))
+      ? easyPool.filter((q: T) => !warmupIds.has(q.id))
       : quizLevelKind === 'medium'
-        ? mediumPool.filter((q) => !warmupIds.has(q.id))
-        : hardPool.filter((q) => !warmupIds.has(q.id));
+        ? mediumPool.filter((q: T) => !warmupIds.has(q.id))
+        : hardPool.filter((q: T) => !warmupIds.has(q.id));
 
   let rest = pickNWithSeed(targetPool, remainingNeeded, random);
 
   // Si la banque cible est insuffisante, compléter depuis le reste du pool.
   if (rest.length < remainingNeeded) {
-    const used = new Set([...warmupIds, ...rest.map((q) => q.id)]);
+    const used = new Set([...warmupIds, ...rest.map((q: T) => q.id)]);
     const filler = pickNWithSeed(
-      pool.filter((q) => !used.has(q.id)),
+      pool.filter((q: T) => !used.has(q.id)),
       remainingNeeded - rest.length,
       random,
     );
