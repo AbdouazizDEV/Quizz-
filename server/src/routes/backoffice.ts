@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 
 import { getEnv, hasServiceRoleKey } from '../lib/env.js';
 import { uploadCoverToCloudinary } from '../lib/cloudinary.js';
+import { broadcastNotification } from '../lib/notify.js';
 import { createServiceRoleClient } from '../lib/supabaseClients.js';
 
 type JsonRecord = Record<string, unknown>;
@@ -1035,6 +1036,17 @@ export const backofficeRoutes = new Hono()
       .select('*')
       .single();
     if (error) return c.json(jsonError(error.message, 500), 500);
+
+    // À l’activation (live), fige le pool de questions (seed déterministe).
+    if (parsed.data.status === 'live' || data?.status === 'live') {
+      try {
+        const { materializeTournamentQuestions } = await import('../lib/tournamentQuestions.js');
+        await materializeTournamentQuestions(admin, param.data.id);
+      } catch (e) {
+        console.warn('[competitions] materializeTournamentQuestions', e);
+      }
+    }
+
     return c.json({ ok: true, item: data });
   })
   .delete('/competitions/:id', async (c) => {
@@ -1083,6 +1095,20 @@ export const backofficeRoutes = new Hono()
     const admin = createServiceRoleClient();
     const { data, error } = await admin.from('weekly_challenges').insert(parsed.data).select('*').single();
     if (error) return c.json(jsonError(error.message, 500), 500);
+
+    try {
+      const title = typeof data?.title === 'string' ? data.title : 'Nouveau challenge';
+      await broadcastNotification(
+        admin,
+        'challenge_new',
+        'Nouveau challenge !',
+        `« ${title} » est disponible. Partez à la conquête du classement.`,
+        { challenge_id: data?.id, kind: 'weekly' },
+      );
+    } catch {
+      /* la création reste valide même si la diffusion échoue */
+    }
+
     return c.json({ ok: true, item: data }, 201);
   })
   .put('/weekly-challenges/:id', async (c) => {
@@ -1286,18 +1312,48 @@ export const backofficeRoutes = new Hono()
     const parsed = notifSchema.safeParse(await c.req.json());
     if (!parsed.success) return c.json(jsonError('Payload invalide', 400, parsed.error.flatten()), 400);
     const admin = createServiceRoleClient();
-    const { data: profiles, error: pErr } = await admin.from('profiles').select('id');
-    if (pErr) return c.json(jsonError(pErr.message, 500), 500);
-    const rows = (profiles ?? []).map((p) => ({
-      user_id: p.id,
-      type: parsed.data.type,
-      title: parsed.data.title,
-      body: parsed.data.body,
-      data: parsed.data.data ?? {},
-      is_read: false,
-    }));
-    if (!rows.length) return c.json({ ok: true, inserted: 0 });
-    const { error } = await admin.from('notifications').insert(rows);
-    if (error) return c.json(jsonError(error.message, 500), 500);
-    return c.json({ ok: true, inserted: rows.length });
+    try {
+      const inserted = await broadcastNotification(
+        admin,
+        parsed.data.type,
+        parsed.data.title,
+        parsed.data.body,
+        parsed.data.data ?? {},
+      );
+      return c.json({ ok: true, inserted });
+    } catch (e) {
+      return c.json(jsonError(e instanceof Error ? e.message : 'Diffusion impossible', 500), 500);
+    }
+  })
+  /** Notification classement (hebdo / global) — déclenchée manuellement ou par cron. */
+  .post('/notifications/ranking-update', async (c) => {
+    const schema = z.object({
+      title: z.string().trim().min(1).max(120).default('Classement mis à jour'),
+      body: z
+        .string()
+        .trim()
+        .min(1)
+        .max(400)
+        .default('Consulte le nouveau classement et défie tes amis !'),
+      scope: z.enum(['weekly', 'global']).default('weekly'),
+      challenge_id: z.string().uuid().optional(),
+    });
+    const parsed = schema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return c.json(jsonError('Payload invalide', 400, parsed.error.flatten()), 400);
+    const admin = createServiceRoleClient();
+    try {
+      const inserted = await broadcastNotification(
+        admin,
+        'ranking_update',
+        parsed.data.title,
+        parsed.data.body,
+        {
+          scope: parsed.data.scope,
+          challenge_id: parsed.data.challenge_id ?? null,
+        },
+      );
+      return c.json({ ok: true, inserted });
+    } catch (e) {
+      return c.json(jsonError(e instanceof Error ? e.message : 'Diffusion impossible', 500), 500);
+    }
   });

@@ -15,7 +15,8 @@ import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import { Routes } from '@constants/Routes';
 import type { QuizPlayPayload } from '@app-types/quizPlay.types';
 import { delay } from '@utils/delay';
-import { shuffleArray } from '@utils/shuffleArray';
+import { buildQuizQuestionSet } from '@domain/quiz/buildQuizQuestionSet';
+import { pointsForDifficulty } from '@domain/quiz/difficultyPoints';
 import { getQuizPlayRepository } from '@services/quiz/play/quizPlayRepositoryInstance';
 import {
   fetchQuizReplayStatus,
@@ -86,9 +87,16 @@ export default function QuizEntryScreen() {
   const startPlay = useCallback(
     (raw: QuizPlayPayload) => {
       if (!quizId) return;
+      const composed = buildQuizQuestionSet({
+        pool: raw.questions,
+        totalQuestions: raw.questions.length,
+        quizLevel: raw.quiz.difficultyLevel,
+        // Seed déterministe par quiz : même ordre warm-up pour tous les joueurs d’un même quiz.
+        seed: quizId,
+      });
       const payload: QuizPlayPayload = {
         ...raw,
-        questions: shuffleArray(raw.questions),
+        questions: composed.questions,
       };
       bootstrap(payload, categorySlug ?? null, duelId ?? null, challengeId ?? null);
       router.replace(`/quiz/${quizId}/play`);
@@ -141,7 +149,10 @@ export default function QuizEntryScreen() {
         return;
       }
 
-      const maxPts = raw.questions.length * (raw.quiz.pointsPerQuestion ?? 1);
+      const maxPts = raw.questions.reduce(
+        (sum, q) => sum + pointsForDifficulty(q.difficulty),
+        0,
+      );
       const tok = token?.trim();
 
       if (maxPts > 0 && tok) {

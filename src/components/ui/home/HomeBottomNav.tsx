@@ -22,7 +22,7 @@ interface NavItem {
 function resolveActiveNavId(pathname: string): NavItemId {
   if (pathname.includes('profile')) return 'profile';
   if (pathname.includes('defis')) return 'defis';
-  if (pathname.includes('premium')) return 'gains';
+  if (pathname.includes('gains') || pathname.includes('premium')) return 'gains';
   if (pathname.includes('categories') || pathname.includes('/quiz/')) return 'play';
   return 'home';
 }
@@ -38,7 +38,7 @@ export function HomeBottomNav({ height }: HomeBottomNavProps) {
     { id: 'home', icon: 'home', label: 'Accueil' },
     { id: 'play', icon: 'play-circle', label: 'Jouer' },
     { id: 'defis', icon: 'flag', label: 'Défis' },
-    { id: 'gains', icon: 'gift', label: 'Gains', disabled: true },
+    { id: 'gains', icon: 'gift', label: 'Gains' },
     { id: 'profile', icon: 'user', label: 'Profil' },
   ];
 
@@ -56,6 +56,7 @@ export function HomeBottomNav({ height }: HomeBottomNavProps) {
       return;
     }
     if (id === 'gains') {
+      router.replace(Routes.GAINS);
       return;
     }
     if (id === 'profile') {

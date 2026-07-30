@@ -110,6 +110,8 @@ export interface Database {
           correct_option_id: string;
           explanation: string | null;
           order_index: number;
+          difficulty_label: string | null;
+          difficulty: 'easy' | 'medium' | 'hard' | null;
           created_at: string;
         };
         Insert: {
@@ -120,6 +122,8 @@ export interface Database {
           correct_option_id: string;
           explanation?: string | null;
           order_index: number;
+          difficulty_label?: string | null;
+          difficulty?: 'easy' | 'medium' | 'hard' | null;
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['questions']['Insert']>;

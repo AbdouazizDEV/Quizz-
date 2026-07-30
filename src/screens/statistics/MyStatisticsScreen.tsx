@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AchievementsSection } from '@components/ui/statistics/AchievementsSection';
+import { PerformanceRingCard } from '@components/ui/statistics/PerformanceRingCard';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { WeeklyPointsChartCard } from '@components/ui/statistics/WeeklyPointsChartCard';
 import { Routes } from '@constants/Routes';
@@ -57,17 +57,13 @@ export default function MyStatisticsScreen() {
     router.replace(Routes.PROFILE);
   }, [router]);
 
-  const onMore = useCallback(() => {
-    Alert.alert('My Statistics', 'Options à venir.');
-  }, []);
-
   return (
     <View style={styles.root}>
-      <LinearGradient colors={['#FFFFFF', '#F8F8F8']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={['#FFFDF6', '#F7F8FC']} style={StyleSheet.absoluteFillObject} />
 
       {loading && !data ? (
         <View style={[styles.centered, { paddingTop: insets.top }]}>
-          <ActivityIndicator size="large" color="#212121" />
+          <ActivityIndicator size="large" color="#1F2347" />
         </View>
       ) : error ? (
         <View style={[styles.centered, { paddingTop: insets.top, paddingHorizontal: 24 }]}>
@@ -82,7 +78,7 @@ export default function MyStatisticsScreen() {
           contentContainerStyle={[
             styles.scrollContent,
             {
-              paddingTop: insets.top + 16,
+              paddingTop: insets.top + 12,
               paddingHorizontal: 24,
               paddingBottom: StatisticsTheme.globalPaddingBottom + insets.bottom,
             },
@@ -90,14 +86,14 @@ export default function MyStatisticsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.inner, { maxWidth: contentWidth, width: '100%' }]}>
-            <StatisticsNavbar
-              title="My Statistics"
-              fonts={fonts}
-              onBack={onBack}
-              rightAction={{ type: 'more', onPress: onMore }}
-            />
+            <StatisticsNavbar title="Mes statistiques" fonts={fonts} onBack={onBack} />
 
             <View style={styles.body}>
+              <PerformanceRingCard
+                ratio={data.performanceRatio}
+                label={data.performanceLabel}
+                fonts={fonts}
+              />
               <WeeklyPointsChartCard weekly={data.weekly} fonts={fonts} />
               <AchievementsSection achievements={data.achievements} fonts={fonts} />
             </View>
@@ -109,19 +105,18 @@ export default function MyStatisticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FFFFFF' },
+  root: { flex: 1, backgroundColor: '#FFFDF6' },
   scroll: { flex: 1 },
   scrollContent: {
     alignItems: 'center',
-    gap: StatisticsTheme.globalGap,
   },
   inner: {
     alignItems: 'flex-start',
-    gap: StatisticsTheme.sectionGap,
+    gap: 20,
   },
   body: {
     width: '100%',
-    gap: StatisticsTheme.bodyGap,
+    gap: 16,
   },
   centered: {
     flex: 1,

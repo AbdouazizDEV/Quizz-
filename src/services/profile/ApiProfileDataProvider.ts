@@ -32,6 +32,7 @@ interface ApiProfilePayload {
   };
   quizzes?: Array<{
     id: string;
+    quiz_id?: string;
     title?: string;
     thumbnail_url?: string | null;
     question_count?: number;
@@ -84,8 +85,8 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
       { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
     ],
     quizTotalCount: stats?.quiz_count ?? 0,
-    quizzes: quizzes.map((q) => ({
-      id: q.id,
+    quizzes: quizzes.map((q, index) => ({
+      id: q.id || `${q.quiz_id ?? 'quiz'}-${index}`,
       title: q.title?.trim() || 'Quiz',
       thumbnailUri:
         q.thumbnail_url?.trim() ||
@@ -93,7 +94,7 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
       questionCount: q.question_count ?? 0,
       relativeTimeLabel: relativeLabelFromIso(q.played_at),
       playCount: q.play_count ?? 0,
-      visibility: 'public',
+      visibility: 'public' as const,
     })),
   };
 }

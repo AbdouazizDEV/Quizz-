@@ -94,7 +94,7 @@ export const usersRoutes = new Hono().get('/:userId/profile', async (c) => {
     .eq('user_id', userId)
     .eq('is_completed', true)
     .order('completed_at', { ascending: false })
-    .limit(12);
+    .limit(40);
   if (sessionsErr) return c.json({ error: sessionsErr.message }, 500);
 
   const quizzes = (sessions ?? [])
@@ -102,7 +102,9 @@ export const usersRoutes = new Hono().get('/:userId/profile', async (c) => {
       const q = Array.isArray(s.quizzes) ? s.quizzes[0] : s.quizzes;
       if (!q?.id) return null;
       return {
-        id: q.id,
+        // Session id = clé React unique (un même quiz peut être rejoué).
+        id: s.id,
+        quiz_id: q.id,
         title: q.title ?? 'Quiz',
         thumbnail_url: q.thumbnail_url,
         question_count: q.total_questions ?? 0,

@@ -1,7 +1,22 @@
 import type { LevelCode } from '@app-types/supabase/database.types';
 
 const LEVEL_ORDER: LevelCode[] = ['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3'];
-const SCORE_PER_LEVEL = 250;
+export const SCORE_PER_LEVEL = 250;
+
+export interface LevelProgressDetail {
+  levelIndex: number;
+  levelNumber: number;
+  nextLevelNumber: number | null;
+  levelCode: LevelCode;
+  progress: number;
+  percent: number;
+  pointsInLevel: number;
+  pointsToNextLevel: number;
+  isMaxLevel: boolean;
+  fromLabel: string;
+  toLabel: string;
+  remainingLabel: string;
+}
 
 const LEVEL_LABELS: Partial<Record<LevelCode, string>> = {
   Z0: '🌱 Niveau 1 · Débutant',
@@ -39,11 +54,38 @@ export function estimateLevelProgress(totalScore: number): number {
 
 /** Libellés courts sous la barre de progression (ex. Niv. 1 → Niv. 2). */
 export function levelProgressEndpoints(totalScore: number): { left: string; right: string } {
+  const detail = getLevelProgressDetail(totalScore);
+  return { left: detail.fromLabel, right: detail.toLabel };
+}
+
+/** Détail précis : % barre + points restants jusqu’au niveau supérieur. */
+export function getLevelProgressDetail(totalScore: number): LevelProgressDetail {
   const safeScore = Number.isFinite(totalScore) ? Math.max(0, Math.floor(totalScore)) : 0;
   const idx = Math.min(Math.floor(safeScore / SCORE_PER_LEVEL), LEVEL_ORDER.length - 1);
-  const left = `Niv. ${idx + 1}`;
-  const right = idx < LEVEL_ORDER.length - 1 ? `Niv. ${idx + 2}` : 'Palier max';
-  return { left, right };
+  const isMaxLevel = idx >= LEVEL_ORDER.length - 1;
+  const pointsInLevel = isMaxLevel ? SCORE_PER_LEVEL : safeScore % SCORE_PER_LEVEL;
+  const pointsToNextLevel = isMaxLevel ? 0 : SCORE_PER_LEVEL - pointsInLevel;
+  const progress = isMaxLevel ? 1 : Math.min(1, Math.max(0, pointsInLevel / SCORE_PER_LEVEL));
+  const percent = Math.round(progress * 100);
+  const levelNumber = idx + 1;
+  const nextLevelNumber = isMaxLevel ? null : levelNumber + 1;
+
+  return {
+    levelIndex: idx,
+    levelNumber,
+    nextLevelNumber,
+    levelCode: LEVEL_ORDER[idx]!,
+    progress,
+    percent,
+    pointsInLevel,
+    pointsToNextLevel,
+    isMaxLevel,
+    fromLabel: `Niv. ${levelNumber}`,
+    toLabel: nextLevelNumber ? `Niv. ${nextLevelNumber}` : 'Palier max',
+    remainingLabel: isMaxLevel
+      ? 'Niveau maximum atteint'
+      : `Encore ${pointsToNextLevel} pts`,
+  };
 }
 
 /** Nombre de jours écoulés depuis une date, incrémenté toutes les 24h. */

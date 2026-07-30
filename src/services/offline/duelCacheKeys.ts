@@ -31,6 +31,6 @@ export function profileScreenCacheKey(userId: string): string {
     source: 'api',
     method: 'GET',
     path: '/users/profile',
-    params: { userId },
+    params: { userId, v: 2 },
   });
 }

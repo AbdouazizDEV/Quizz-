@@ -1,4 +1,5 @@
 import type { ChallengeProgress } from '@app-types/challenge.types';
+import { estimateMaxScoreFromQuestionCount } from '@domain/quiz/estimateMaxScore';
 import {
   activeWeeklyChallengesCacheKey,
   challengeLeaderboardCacheKey,
@@ -155,7 +156,7 @@ async function loadChallengeProgressFromSupabase(
     const isPlayed = userScore !== null;
     const globallyCompleted = globallyCompletedIds.has(row.quiz_id);
     const isAvailable = row.scheduled_day <= today && !globallyCompleted;
-    const maxScore = (row.quizzes?.total_questions ?? 10) * 3;
+    const maxScore = estimateMaxScoreFromQuestionCount(row.quizzes?.total_questions ?? 10);
 
     return {
       quizId: row.quiz_id,

@@ -2,10 +2,12 @@ import { StyleSheet, View } from 'react-native';
 
 import type { ProfileStatItem } from '@app-types/profile.types';
 import { ProfileTheme } from '@constants/profileTheme';
+import { getLevelProgressDetail, type LevelProgressDetail } from '@utils/levelDisplay';
 
 import type { ProfileFontFamilies } from './ProfileFonts';
 import { ProfileCoverBanner } from './ProfileCoverBanner';
 import { ProfileIdentityRow } from './ProfileIdentityRow';
+import { ProfileInsightsCarousel } from './ProfileInsightsCarousel';
 import { ProfileStatsGrid } from './ProfileStatsGrid';
 
 interface ProfileHeaderSectionProps {
@@ -20,6 +22,13 @@ interface ProfileHeaderSectionProps {
   identityActionLabel?: string;
   identityActionVariant?: 'primary' | 'pending' | 'friend';
   identityActionDisabled?: boolean;
+  /** Affiche le carousel gamification (profil perso uniquement). */
+  showInsightsCarousel?: boolean;
+  progressDetail?: LevelProgressDetail | null;
+  quizzesCompleted?: number;
+  streakDays?: number;
+  isPremium?: boolean;
+  premiumDaysLeft?: number;
 }
 
 export function ProfileHeaderSection({
@@ -34,7 +43,15 @@ export function ProfileHeaderSection({
   identityActionLabel,
   identityActionVariant,
   identityActionDisabled,
+  showInsightsCarousel = false,
+  progressDetail = null,
+  quizzesCompleted = 0,
+  streakDays = 0,
+  isPremium = false,
+  premiumDaysLeft = 0,
 }: ProfileHeaderSectionProps) {
+  const resolvedProgress = progressDetail ?? getLevelProgressDetail(0);
+
   return (
     <View style={styles.headerBlock}>
       <ProfileCoverBanner coverUri={coverUri} onPressChangeCover={onPressChangeCover} />
@@ -50,7 +67,19 @@ export function ProfileHeaderSection({
           actionDisabled={identityActionDisabled}
         />
         <View style={styles.divider} />
-        <ProfileStatsGrid stats={stats} fonts={fonts} />
+        {showInsightsCarousel ? (
+          <ProfileInsightsCarousel
+            progress={resolvedProgress}
+            stats={stats}
+            quizzesCompleted={quizzesCompleted}
+            streakDays={streakDays}
+            isPremium={isPremium}
+            premiumDaysLeft={premiumDaysLeft}
+            fonts={fonts}
+          />
+        ) : (
+          <ProfileStatsGrid stats={stats} fonts={fonts} />
+        )}
       </View>
     </View>
   );

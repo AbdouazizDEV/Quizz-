@@ -39,6 +39,7 @@ import { ApiConnectionFollowService } from '@services/network/ApiConnectionFollo
 import { uploadMyAvatar } from '@services/profile/profileAvatarApi';
 import { uploadMyCover } from '@services/profile/profileCoverApi';
 import { useAppError } from '@providers/AppErrorProvider';
+import { getLevelProgressDetail } from '@utils/levelDisplay';
 
 const BOTTOM_NAV_HEIGHT = 86;
 
@@ -69,6 +70,10 @@ export default function ProfileScreen() {
 
   const { data: authMe } = useAuthMe();
   const profileUserId = viewedUserId ?? authMe?.user?.id;
+  const progressDetail = useMemo(
+    () => getLevelProgressDetail(authMe?.profile?.total_score ?? 0),
+    [authMe?.profile?.total_score],
+  );
   const { isOnline } = useNetworkStatus();
   const { data, loading, error, refetch } = useProfileScreenData(
     profileUserId,
@@ -275,6 +280,12 @@ export default function ProfileScreen() {
                 identityActionLabel={identityActionVm.label}
                 identityActionVariant={identityActionVm.variant}
                 identityActionDisabled={identityActionVm.disabled}
+                showInsightsCarousel={!isExternalProfile}
+                progressDetail={progressDetail}
+                quizzesCompleted={authMe?.profile?.quizzes_completed ?? data.quizTotalCount}
+                streakDays={authMe?.profile?.streak_days ?? 0}
+                isPremium={Boolean(authMe?.profile?.is_premium)}
+                premiumDaysLeft={9}
               />
 
               <ProfileSegmentedTabs active={tab} onChange={setTab} fonts={fonts} />

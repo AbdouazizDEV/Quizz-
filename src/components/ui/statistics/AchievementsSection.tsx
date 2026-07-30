@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import type { AchievementStat } from '@app-types/statistics.types';
-import { StatisticsTheme } from '@constants/statisticsTheme';
-
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
+import { StatisticsTheme } from '@constants/statisticsTheme';
 
 import { AchievementStatCard } from './AchievementStatCard';
 
@@ -25,17 +25,24 @@ export function AchievementsSection({ achievements, fonts }: AchievementsSection
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.title, fonts.bold && { fontFamily: fonts.bold }]}>
-        Your Achievements
-      </Text>
+      <Animated.View entering={FadeInDown.delay(120).duration(420)}>
+        <Text style={[styles.title, fonts.bold && { fontFamily: fonts.bold }]}>En un coup d’œil</Text>
+        <Text style={[styles.subtitle, fonts.medium && { fontFamily: fonts.medium }]}>
+          Tes indicateurs essentiels
+        </Text>
+      </Animated.View>
       <View style={styles.grid}>
         {rows.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.row}>
-            {row.map((item) => (
-              <View key={item.id} style={styles.cell}>
-                <AchievementStatCard item={item} fonts={fonts} />
-              </View>
+            {row.map((item, colIndex) => (
+              <AchievementStatCard
+                key={item.id}
+                item={item}
+                fonts={fonts}
+                index={rowIndex * 2 + colIndex}
+              />
             ))}
+            {row.length === 1 ? <View style={styles.cellSpacer} /> : null}
           </View>
         ))}
       </View>
@@ -46,13 +53,18 @@ export function AchievementsSection({ achievements, fonts }: AchievementsSection
 const styles = StyleSheet.create({
   section: {
     width: '100%',
-    gap: 16,
+    gap: 14,
   },
   title: {
     fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '700',
+    lineHeight: 24,
+    fontWeight: '800',
     color: StatisticsTheme.grey900,
+  },
+  subtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: StatisticsTheme.grey700,
   },
   grid: {
     gap: 12,
@@ -62,8 +74,7 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'stretch',
   },
-  cell: {
+  cellSpacer: {
     flex: 1,
-    minWidth: 0,
   },
 });
