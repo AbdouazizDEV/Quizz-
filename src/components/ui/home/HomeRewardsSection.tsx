@@ -1,19 +1,26 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+
+import { Routes } from '@constants/Routes';
 
 export function HomeRewardsSection() {
+  const router = useRouter();
+
   return (
     <LinearGradient colors={['#231F57', '#202A7D']} style={styles.rewardsCard}>
       <View style={styles.rewardsTop}>
         <View>
-          <Text style={styles.rewardsTitle}>Niveau Maître en cours</Text>
-          <Text style={styles.rewardsSubtitle}>Encore 360 pts pour débloquer ton badge violet.</Text>
+          <Text style={styles.rewardsTitle}>Tes gains t’attendent</Text>
+          <Text style={styles.rewardsSubtitle}>
+            Classement, cash prizes, série bonus et Quiz Express.
+          </Text>
         </View>
         <Feather name="gift" size={24} color="#F5D24A" />
       </View>
-      <Pressable style={styles.rewardsBtn}>
-        <Text style={styles.rewardsBtnText}>Voir mes récompenses</Text>
+      <Pressable style={styles.rewardsBtn} onPress={() => router.push(Routes.GAINS)}>
+        <Text style={styles.rewardsBtnText}>Voir mes gains</Text>
       </Pressable>
     </LinearGradient>
   );

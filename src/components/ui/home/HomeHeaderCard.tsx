@@ -50,6 +50,10 @@ interface HomeHeaderCardProps {
   streakOrDaysLabel?: string;
   progressLabelLeft?: string;
   progressLabelRight?: string;
+  /** Ex. « Encore 260 pts ». */
+  pointsRemainingLabel?: string;
+  /** Pourcentage entier 0–100 affiché à droite de la barre. */
+  progressPercentLabel?: string;
   onPressAvatar?: () => void;
 }
 
@@ -83,6 +87,46 @@ function QrActionButton({
   );
 }
 
+function MiniQrFlipHint({
+  qrValue,
+  innerSize,
+  boxSize,
+  onPress,
+}: {
+  qrValue: string;
+  innerSize: number;
+  boxSize: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Afficher mon QR profil"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.miniQrBtn,
+        {
+          width: boxSize,
+          height: boxSize,
+          borderRadius: Math.round(boxSize * 0.2),
+        },
+        pressed && styles.miniQrBtnPressed,
+      ]}
+    >
+      <View style={[styles.miniQrInner, { width: innerSize, height: innerSize }]}>
+        <QRCode
+          value={qrValue}
+          size={innerSize}
+          backgroundColor="transparent"
+          color="#2A2D5E"
+          quietZone={0}
+        />
+      </View>
+      <View style={styles.miniQrCornerAccent} />
+    </Pressable>
+  );
+}
+
 export function HomeHeaderCard({
   glowOpacity,
   progress,
@@ -96,6 +140,8 @@ export function HomeHeaderCard({
   streakOrDaysLabel = '0 jour',
   progressLabelLeft = 'Niv. 1',
   progressLabelRight = 'Niv. 2',
+  pointsRemainingLabel,
+  progressPercentLabel,
   onPressAvatar,
 }: HomeHeaderCardProps) {
   const router = useRouter();
@@ -128,6 +174,8 @@ export function HomeHeaderCard({
       backTitle: s(16),
       backHint: s(12),
       qrSize: Math.max(96, Math.min(128, Math.round(width * 0.28))),
+      miniQrBox: Math.max(48, Math.min(58, Math.round(52 * widthRatio))),
+      miniQrInner: Math.max(34, Math.min(42, Math.round(38 * widthRatio))),
     };
   }, [width, systemFontScale]);
 
@@ -147,6 +195,8 @@ export function HomeHeaderCard({
     () => (qrProfile ? encodeFriendQrDeepLink(qrProfile) : ''),
     [qrProfile],
   );
+
+  const miniQrValue = qrValue || 'quizzplus://profile';
 
   const onFrontLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -230,7 +280,13 @@ export function HomeHeaderCard({
   const cardFace = (
     <>
       <RNAnimated.View style={[styles.glowCircle, { opacity: glowOpacity }]} />
-      <View style={styles.headerTopRow}>
+      <MiniQrFlipHint
+        qrValue={miniQrValue}
+        innerSize={sizes.miniQrInner}
+        boxSize={sizes.miniQrBox}
+        onPress={toggleFlip}
+      />
+      <View style={[styles.headerTopRow, { paddingRight: sizes.miniQrBox + 10 }]}>
         <Pressable
           style={[styles.avatar, { width: sizes.avatarBox, height: sizes.avatarBox, borderRadius: sizes.avatarBox / 2 }]}
           onPress={onPressAvatar}
@@ -282,10 +338,36 @@ export function HomeHeaderCard({
         </View>
         <View style={styles.progressLabels}>
           <Text style={[styles.progressLabel, { fontSize: sizes.progressLabel }]}>{progressLabelLeft}</Text>
+          {pointsRemainingLabel ? (
+            <Text style={[styles.progressRemaining, { fontSize: sizes.progressLabel }]} numberOfLines={1}>
+              {pointsRemainingLabel}
+            </Text>
+          ) : null}
           <Text style={[styles.progressLabel, { fontSize: sizes.progressLabel }]}>{progressLabelRight}</Text>
         </View>
-        <View style={[styles.progressTrack, { height: sizes.progressTrack }]}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        <View style={styles.progressRow}>
+          <View
+            style={[
+              styles.progressTrack,
+              { height: sizes.progressTrack, borderRadius: sizes.progressTrack / 2 },
+            ]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  height: sizes.progressTrack,
+                  borderRadius: sizes.progressTrack / 2,
+                  width: `${Math.min(100, Math.max(0, progress * 100))}%`,
+                },
+              ]}
+            />
+          </View>
+          {progressPercentLabel ? (
+            <Text style={[styles.progressPercent, { fontSize: sizes.progressLabel }]}>
+              {progressPercentLabel}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
     </>
@@ -415,6 +497,39 @@ const styles = StyleSheet.create({
     top: -82,
     right: -70,
   },
+  miniQrBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 3,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 210, 74, 0.55)',
+    shadowColor: '#0F1230',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  miniQrBtnPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.96 }],
+  },
+  miniQrInner: {
+    overflow: 'hidden',
+    borderRadius: 4,
+  },
+  miniQrCornerAccent: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 2,
+    backgroundColor: '#F5D24A',
+  },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -487,20 +602,41 @@ const styles = StyleSheet.create({
     marginTop: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
   },
   progressLabel: {
     color: '#AAB3E8',
     fontWeight: '600',
   },
-  progressTrack: {
+  progressRemaining: {
+    color: '#F5D24A',
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
+  },
+  progressRow: {
     marginTop: 6,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 99,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 10,
+  },
+  progressTrack: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.28)',
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   progressFill: {
-    height: '100%',
     backgroundColor: '#F5D24A',
+    minWidth: 2,
+  },
+  progressPercent: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    minWidth: 36,
+    textAlign: 'right',
   },
   backPressable: {
     alignItems: 'center',

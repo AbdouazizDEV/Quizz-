@@ -28,6 +28,7 @@ import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
 import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import type { QuizLeaderboardEntry } from '@app-types/quizPlay.types';
+import { pointsForDifficulty } from '@domain/quiz/difficultyPoints';
 import { getQuizLeaderboardPort } from '@services/quiz/leaderboard/quizLeaderboardInstance';
 import { triggerQuizCongratsSound } from '@services/quiz/play/triggerQuizCongratsSound';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
@@ -83,7 +84,7 @@ export default function QuizCongratsScreen() {
   const correctCount = useMemo(() => answers.filter((a) => a.isCorrect).length, [answers]);
   const maxSessionPoints = useMemo(() => {
     if (!payload?.questions.length) return 0;
-    return payload.questions.length * (payload.quiz.pointsPerQuestion ?? 1);
+    return payload.questions.reduce((sum, q) => sum + pointsForDifficulty(q.difficulty), 0);
   }, [payload]);
   const isMaxScore = maxSessionPoints > 0 && sessionPoints >= maxSessionPoints;
   const isGreatScore = total > 0 && correctCount > total / 2;

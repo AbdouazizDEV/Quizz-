@@ -2,6 +2,8 @@ import { getQuizzApiClient } from '@sdk';
 import { useAuthStore } from '@stores/authStore';
 import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 import { syncSupabaseAuthSession } from '@services/supabase/syncSupabaseAuthSession';
+import { refreshAuthSessionIfNeeded } from '@services/auth/refreshAuthSession';
+import { tryProcessPendingFriendInvite } from '@services/network/friendInviteService';
 
 import type { AuthMeResponse } from '@sdk';
 import { clearAuthMeCache, loadAuthMe, setAuthMeCache } from '@services/auth/authMeRepository';
@@ -14,12 +16,16 @@ export async function runAuthBootstrapAndSyncStore(): Promise<AuthBootstrapSnaps
   const snapshot = await authSessionService.bootstrap();
   useAuthStore.getState().applyBootstrap(snapshot);
   if (snapshot.token?.trim()) {
-    try {
-      await syncSupabaseAuthSession(snapshot.token);
-    } catch {
-      /* refresh token absent ou expiré : reconnexion requise pour les écritures Supabase */
+    const refreshed = await refreshAuthSessionIfNeeded({ force: true });
+    if (!refreshed.ok) {
+      try {
+        await syncSupabaseAuthSession(snapshot.token);
+      } catch {
+        /* refresh token absent ou expiré : reconnexion requise pour les écritures Supabase */
+      }
     }
     void loadAuthMe({ force: false });
+    void tryProcessPendingFriendInvite();
   } else {
     await clearAuthMeCache();
   }
@@ -39,6 +45,7 @@ export async function persistLoginAndSyncStore(
     await setAuthMeCache(authMeSeed);
   }
   await loadAuthMe({ force: true });
+  void tryProcessPendingFriendInvite();
 }
 
 /** Déconnexion : invalide la session côté API si possible, efface le stockage local et le store. */

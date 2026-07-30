@@ -44,7 +44,7 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
   if (duel.winnerId === userId) {
     return {
       label: 'Victoire',
-      points: '+15 pts',
+      points: '+5 pts bonus',
       won: true,
       lost: false,
       tone: 'victory',
@@ -54,7 +54,7 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
   if (duel.winnerId && duel.winnerId !== userId) {
     return {
       label: 'Défaite',
-      points: '+5 pts',
+      points: 'Score quiz compté',
       won: false,
       lost: true,
       tone: 'defeat',
@@ -64,7 +64,7 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
   if (myScore > oppScore) {
     return {
       label: 'Victoire',
-      points: '+15 pts',
+      points: '+5 pts bonus',
       won: true,
       lost: false,
       tone: 'victory',
@@ -74,7 +74,7 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
   if (myScore < oppScore) {
     return {
       label: 'Défaite',
-      points: '+5 pts',
+      points: 'Score quiz compté',
       won: false,
       lost: true,
       tone: 'defeat',
@@ -83,7 +83,7 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
   }
   return {
     label: 'Égalité',
-    points: '+5 pts',
+    points: 'Score quiz compté',
     won: false,
     lost: false,
     tone: 'draw',

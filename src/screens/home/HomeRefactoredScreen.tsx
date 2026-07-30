@@ -18,7 +18,9 @@ import { HomeActionTiles } from '@components/ui/home/HomeActionTiles';
 import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { HomeDailyCategoriesSection } from '@components/ui/home/HomeDailyCategoriesSection';
 import { HomeHeaderCard } from '@components/ui/home/HomeHeaderCard';
-import { HomeFriendRequestsSheet } from '@components/ui/home/HomeFriendRequestsSheet';
+import { HomeNotificationsSheet } from '@components/ui/home/HomeNotificationsSheet';
+import { NotificationDeleteConfirmModal } from '@components/ui/settings/NotificationDeleteConfirmModal';
+import { NotificationMessageModal } from '@components/ui/settings/NotificationMessageModal';
 import { HomeSettingsDrawer } from '@components/ui/home/HomeSettingsDrawer';
 import { HomeTopNavbar } from '@components/ui/home/HomeTopNavbar';
 import { HomeInsightCarousel, type HomeInsightItem } from '@components/ui/home/HomeInsightCarousel';
@@ -28,6 +30,7 @@ import {
 } from '@components/ui/home/HomeLeaderboardSection';
 import { HomeRewardsSection } from '@components/ui/home/HomeRewardsSection';
 import { HomeSectionTitle } from '@components/ui/home/HomeSectionTitle';
+import type { AppNotification } from '@app-types/notification.types';
 import { buildUserProfileHref, Routes } from '@constants/Routes';
 import { DefisRoutes } from '@constants/defisRoutes';
 import type { HomeActionTileId } from '@constants/homeActionTiles';
@@ -37,19 +40,15 @@ import { useAuthMe } from '@hooks/useAuthMe';
 import { useGlobalLeaderboard } from '@hooks/useGlobalLeaderboard';
 import { useAuthStore } from '@stores/authStore';
 import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
-import {
-  acceptFriendRequest,
-  fetchFriendRequests,
-  rejectFriendRequest,
-  type FriendRequestItem,
-} from '@services/network/friendRequestsApi';
+import { useNotifications } from '@hooks/useNotifications';
+import { useNotificationInteractions } from '@hooks/useNotificationInteractions';
 import { getUserAvatarUri } from '@utils/getUserAvatarUri';
 import {
   elapsedDaysSince,
-  estimateLevelProgress,
   firstNameFromDisplay,
   formatJoursLabel,
   formatLevelCodeLabel,
+  getLevelProgressDetail,
   initialsFromName,
   levelCodeFromScore,
   levelProgressEndpoints,
@@ -96,10 +95,36 @@ export default function HomeRefactoredScreen() {
   const { data: me, loading: meLoading, refetch: refetchAuthMe } = useAuthMe();
   const { items: leaderboardRows, refetch: refetchLeaderboard } = useGlobalLeaderboard(5);
   const { data: allCategories, loading: categoriesLoading } = useCategoriesExplore();
-  const [requestsVisible, setRequestsVisible] = useState(false);
-  const [requestsLoading, setRequestsLoading] = useState(false);
-  const [friendRequests, setFriendRequests] = useState<FriendRequestItem[]>([]);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
+  const {
+    items: notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    actionId: notificationActionId,
+    refresh: refreshNotifications,
+    markRead,
+    markAllRead,
+    remove: removeNotification,
+    acceptFriend,
+    rejectFriend,
+    acceptDuel,
+    rejectDuel,
+  } = useNotifications();
+  const {
+    messageItem,
+    deleteTarget,
+    deleteBusy,
+    handlePress: handleNotificationPress,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+    closeMessage,
+  } = useNotificationInteractions({
+    markRead,
+    remove: removeNotification,
+    onNavigate: () => setNotificationsVisible(false),
+  });
 
   const isVisitor = useMemo(
     () => isVisitorSession({ token, hasRegisteredAccount }),
@@ -111,54 +136,51 @@ export default function HomeRefactoredScreen() {
       void refetchAuthMe({ force: false });
       void refetchLeaderboard();
       if (token?.trim()) {
-        void (async () => {
-          try {
-            const rows = await fetchFriendRequests(20);
-            setFriendRequests(rows);
-          } catch {
-            // Silent in home feed; modal retries on open.
-          }
-        })();
-      } else {
-        setFriendRequests([]);
+        void refreshNotifications();
       }
-    }, [refetchAuthMe, refetchLeaderboard, token]),
+    }, [refetchAuthMe, refetchLeaderboard, refreshNotifications, token]),
   );
 
-  const openFriendRequests = useCallback(async () => {
-    setRequestsVisible(true);
+  const openNotifications = useCallback(async () => {
+    setNotificationsVisible(true);
     if (!token?.trim()) return;
-    setRequestsLoading(true);
     try {
-      const rows = await fetchFriendRequests(20);
-      setFriendRequests(rows);
+      await refreshNotifications();
     } catch {
-      showAppError('Impossible de charger les demandes pour le moment.', {
+      showAppError('Impossible de charger les notifications pour le moment.', {
         title: 'Notifications',
-        onRetry: () => void openFriendRequests(),
+        onRetry: () => void openNotifications(),
       });
-    } finally {
-      setRequestsLoading(false);
     }
-  }, [token, showAppError]);
+  }, [refreshNotifications, showAppError, token]);
 
-  const onAcceptRequest = useCallback(async (notificationId: string) => {
-    try {
-      await acceptFriendRequest(notificationId);
-      setFriendRequests((prev) => prev.filter((r) => r.notificationId !== notificationId));
-    } catch {
-      showAppError("Impossible d'accepter la demande.", { title: 'Demande d\'ami' });
-    }
-  }, [showAppError]);
+  const onAcceptDuelNotification = useCallback(
+    async (item: AppNotification) => {
+      try {
+        const duelId = await acceptDuel(item);
+        setNotificationsVisible(false);
+        router.push(DefisRoutes.duelDetail(duelId) as never);
+      } catch (error) {
+        showAppError(error instanceof Error ? error.message : "Impossible d'accepter le duel.", {
+          title: 'Duel',
+        });
+      }
+    },
+    [acceptDuel, router, showAppError],
+  );
 
-  const onRejectRequest = useCallback(async (notificationId: string) => {
-    try {
-      await rejectFriendRequest(notificationId);
-      setFriendRequests((prev) => prev.filter((r) => r.notificationId !== notificationId));
-    } catch {
-      showAppError('Impossible de refuser la demande.', { title: 'Demande d\'ami' });
-    }
-  }, [showAppError]);
+  const onRejectDuelNotification = useCallback(
+    async (item: AppNotification) => {
+      try {
+        await rejectDuel(item);
+      } catch (error) {
+        showAppError(error instanceof Error ? error.message : 'Impossible de refuser le duel.', {
+          title: 'Duel',
+        });
+      }
+    },
+    [rejectDuel, showAppError],
+  );
 
   const topThreeCategories = useMemo(() => allCategories.slice(0, 3), [allCategories]);
 
@@ -248,7 +270,8 @@ export default function HomeRefactoredScreen() {
     const initials = initialsFromName(display || first);
     const score = profile?.total_score ?? 0;
     const levelCode = levelCodeFromScore(score);
-    const progress = estimateLevelProgress(score);
+    const progressDetail = getLevelProgressDetail(score);
+    const progress = progressDetail.progress;
     const { left, right } = levelProgressEndpoints(score);
     const streak = profile?.streak_days ?? 0;
     const createdAt = typeof userRaw?.created_at === 'string' ? userRaw.created_at : undefined;
@@ -272,6 +295,8 @@ export default function HomeRefactoredScreen() {
       streakOrDaysLabel: loadingPlaceholders ? '···' : clockLabel,
       progressLabelLeft: left,
       progressLabelRight: right,
+      pointsRemainingLabel: loadingPlaceholders ? '···' : progressDetail.remainingLabel,
+      progressPercentLabel: loadingPlaceholders ? '' : `${progressDetail.percent}%`,
       progress,
     };
   }, [me, meLoading, token]);
@@ -306,9 +331,9 @@ export default function HomeRefactoredScreen() {
       >
         <View style={[styles.column, { maxWidth: contentWidth }]}>
           <HomeTopNavbar
-            notificationCount={friendRequests.length}
+            notificationCount={unreadCount}
             onPressSearch={goToSearch}
-            onPressNotifications={() => void openFriendRequests()}
+            onPressNotifications={() => void openNotifications()}
             onPressMenu={openSettingsMenu}
           />
 
@@ -325,6 +350,8 @@ export default function HomeRefactoredScreen() {
             streakOrDaysLabel={headerVm.streakOrDaysLabel}
             progressLabelLeft={headerVm.progressLabelLeft}
             progressLabelRight={headerVm.progressLabelRight}
+            pointsRemainingLabel={headerVm.pointsRemainingLabel}
+            progressPercentLabel={headerVm.progressPercentLabel}
             onPressAvatar={goToProfile}
           />
 
@@ -371,13 +398,32 @@ export default function HomeRefactoredScreen() {
 
       <HomeBottomNav height={BOTTOM_NAV_HEIGHT} />
 
-      <HomeFriendRequestsSheet
-        visible={requestsVisible}
-        loading={requestsLoading}
-        requests={friendRequests}
-        onClose={() => setRequestsVisible(false)}
-        onAccept={(id) => void onAcceptRequest(id)}
-        onReject={(id) => void onRejectRequest(id)}
+      <HomeNotificationsSheet
+        visible={notificationsVisible}
+        loading={notificationsLoading}
+        items={notifications}
+        unreadCount={unreadCount}
+        actionId={notificationActionId}
+        onClose={() => setNotificationsVisible(false)}
+        onMarkAllRead={() => void markAllRead()}
+        onPressItem={(item) => void handleNotificationPress(item)}
+        onDeleteRequest={requestDelete}
+        onAcceptFriend={(id) => void acceptFriend(id)}
+        onRejectFriend={(id) => void rejectFriend(id)}
+        onAcceptDuel={(item) => void onAcceptDuelNotification(item)}
+        onRejectDuel={(item) => void onRejectDuelNotification(item)}
+        onSeeAll={() => {
+          setNotificationsVisible(false);
+          router.push(Routes.SETTINGS_NOTIFICATIONS);
+        }}
+      />
+      <NotificationMessageModal item={messageItem} fonts={{}} onClose={closeMessage} />
+      <NotificationDeleteConfirmModal
+        item={deleteTarget}
+        busy={deleteBusy}
+        fonts={{}}
+        onCancel={cancelDelete}
+        onConfirm={() => void confirmDelete()}
       />
       <HomeSettingsDrawer
         visible={settingsDrawerVisible}

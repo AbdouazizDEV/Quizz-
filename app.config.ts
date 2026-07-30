@@ -21,6 +21,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/icons/logo.png',
       backgroundColor: '#FFFFFF',
     },
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'https',
+            host: 'quizzplus-api.onrender.com',
+            pathPrefix: '/friend',
+          },
+        ],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
   },
   extra: {
     env: process.env.EXPO_PUBLIC_ENV ?? 'local',

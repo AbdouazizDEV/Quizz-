@@ -2,14 +2,14 @@ import type { StatisticsScreenData } from '@app-types/statistics.types';
 
 import type { IStatisticsDataProvider } from './IStatisticsDataProvider';
 
-const formatInt = (n: number) => new Intl.NumberFormat('en-US').format(n);
+const formatInt = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
 
 export class MockStatisticsDataProvider implements IStatisticsDataProvider {
   async getStatistics(_userId?: string): Promise<StatisticsScreenData> {
     return {
       weekly: {
-        label: 'Your Point this Week',
-        totalPointsFormatted: '875 Pt',
+        label: 'Cette semaine',
+        totalPointsFormatted: '875 pts',
         yMax: 1000,
         points: [
           { dayIndex: 0, value: 120 },
@@ -21,23 +21,14 @@ export class MockStatisticsDataProvider implements IStatisticsDataProvider {
           { dayIndex: 6, value: 875 },
         ],
       },
+      performanceRatio: 0.72,
+      performanceLabel: 'Score',
       achievements: [
-        { id: 'a1', icon: 'quizzo', label: 'Quizz+', valueFormatted: '85' },
-        {
-          id: 'a2',
-          icon: 'coin',
-          label: 'Lifetime Point',
-          valueFormatted: formatInt(245_679),
-        },
-        { id: 'a3', icon: 'flame', label: 'Quiz Passed', valueFormatted: '124' },
-        { id: 'a4', icon: 'medal', label: 'Top 3 Positions', valueFormatted: '38' },
-        {
-          id: 'a5',
-          icon: 'target',
-          label: 'Challenge Pass...',
-          valueFormatted: '269',
-        },
-        { id: 'a6', icon: 'clock', label: 'Fastest Record', valueFormatted: '72' },
+        { id: 'a1', icon: 'quizzo', label: 'Quiz joués', valueFormatted: '85' },
+        { id: 'a2', icon: 'coin', label: 'Points', valueFormatted: formatInt(245_679) },
+        { id: 'a3', icon: 'flame', label: 'Série', valueFormatted: '12 j' },
+        { id: 'a4', icon: 'medal', label: 'Niveau', valueFormatted: 'Z2' },
+        { id: 'a5', icon: 'target', label: 'Jours actifs', valueFormatted: '48' },
       ],
     };
   }

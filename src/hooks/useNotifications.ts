@@ -5,6 +5,8 @@ import {
   acceptFriendRequest,
   rejectFriendRequest,
 } from '@services/network/friendRequestsApi';
+import { apiAcceptDuel, apiDeclineDuel } from '@services/defis/duelApi';
+import { readDuelIdFromNotification } from '@services/notifications/duelNotificationHelpers';
 import { getNotificationsProvider } from '@services/notifications/notificationsProviderInstance';
 import { useAuthStore } from '@stores/authStore';
 
@@ -109,6 +111,47 @@ export function useNotifications() {
     [refresh],
   );
 
+  const acceptDuel = useCallback(
+    async (notification: AppNotification): Promise<string> => {
+      const duelId = readDuelIdFromNotification(notification);
+      if (!duelId) throw new Error('Duel introuvable.');
+      setActionId(notification.id);
+      try {
+        if (!notification.isRead) {
+          await getNotificationsProvider().markRead(notification.id);
+          setItems((prev) =>
+            prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)),
+          );
+          setUnreadCount((c) => Math.max(0, c - 1));
+        }
+        await apiAcceptDuel(duelId);
+        await refresh();
+        return duelId;
+      } finally {
+        setActionId(null);
+      }
+    },
+    [refresh],
+  );
+
+  const rejectDuel = useCallback(
+    async (notification: AppNotification) => {
+      const duelId = readDuelIdFromNotification(notification);
+      if (!duelId) throw new Error('Duel introuvable.');
+      setActionId(notification.id);
+      try {
+        if (!notification.isRead) {
+          await getNotificationsProvider().markRead(notification.id);
+        }
+        await apiDeclineDuel(duelId);
+        await refresh();
+      } finally {
+        setActionId(null);
+      }
+    },
+    [refresh],
+  );
+
   return {
     filter,
     setFilter,
@@ -126,5 +169,7 @@ export function useNotifications() {
     remove,
     acceptFriend,
     rejectFriend,
+    acceptDuel,
+    rejectDuel,
   };
 }

@@ -31,6 +31,9 @@
       "@utils/*": [
         "src/utils/*"
       ],
+      "@domain/*": [
+        "src/domain/*"
+      ],
       "@config": [
         "config/index.ts"
       ],

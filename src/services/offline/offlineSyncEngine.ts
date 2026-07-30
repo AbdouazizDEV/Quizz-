@@ -6,6 +6,10 @@ import { useNetworkStore } from '@stores/networkStore';
 
 import { CHALLENGE_PARTICIPATION_INSERT, type ChallengeParticipationMutationBody } from './challengeMutations';
 import {
+  QUIZ_SESSION_COMPLETE,
+  type QuizSessionMutationBody,
+} from './quizSessionMutations';
+import {
   COMPETITION_REGISTER_MUTATION,
   COMPETITION_UNREGISTER_MUTATION,
   type CompetitionRegistrationMutationBody,
@@ -99,6 +103,32 @@ async function executeSupabaseMutation(mutation: QueuedMutation): Promise<void> 
     if (error && !isDuplicateRegistrationError(error.message)) {
       throw new Error(error.message);
     }
+    return;
+  }
+
+  if (mutation.url === QUIZ_SESSION_COMPLETE) {
+    const payload = body as QuizSessionMutationBody;
+    const { data: inserted, error: insertErr } = await supabase
+      .from('quiz_sessions')
+      .insert({
+        user_id: payload.user_id,
+        quiz_id: payload.quiz_id,
+        score: payload.score,
+        answers: payload.answers,
+        is_completed: false,
+      })
+      .select('id')
+      .single();
+    if (insertErr || !inserted?.id) throw new Error(insertErr?.message ?? 'Insertion session impossible.');
+
+    const { error: updateErr } = await supabase
+      .from('quiz_sessions')
+      .update({
+        is_completed: payload.is_completed,
+        completed_at: payload.completed_at,
+      })
+      .eq('id', inserted.id);
+    if (updateErr) throw new Error(updateErr.message);
     return;
   }
 

@@ -5,21 +5,22 @@ import { QuizPlayTheme } from '@constants/quizPlayTheme';
 import type { ProfileFontFamilies } from '@components/ui/profile/ProfileFonts';
 
 interface QuizQuestionHeaderProps {
-  imageUri: string | null;
+  /** Illustration dédiée à la question ; masquée si absente (prévu pour plus tard). */
+  imageUri?: string | null;
   questionText: string;
   fonts: ProfileFontFamilies;
 }
 
 export function QuizQuestionHeader({ imageUri, questionText, fonts }: QuizQuestionHeaderProps) {
+  const resolvedImage = imageUri?.trim() || null;
+
   return (
     <View style={styles.block}>
-      <View style={styles.mediaWrap}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
-        ) : (
-          <View style={[styles.image, styles.placeholder]} />
-        )}
-      </View>
+      {resolvedImage ? (
+        <View style={styles.mediaWrap}>
+          <Image source={{ uri: resolvedImage }} style={styles.image} resizeMode="cover" />
+        </View>
+      ) : null}
       <Text style={[styles.question, fonts.bold && { fontFamily: fonts.bold }]}>{questionText}</Text>
     </View>
   );
@@ -41,9 +42,6 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-  },
-  placeholder: {
-    backgroundColor: '#DDD',
   },
   question: {
     width: '100%',

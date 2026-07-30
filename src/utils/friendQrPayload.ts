@@ -89,11 +89,42 @@ export function buildFriendQrProfile(input: {
   };
 }
 
-/** Lien deep link + payload signé (obfusqué en base64url). */
-export function encodeFriendQrDeepLink(profile: FriendQrProfile): string {
+function friendInviteTokenFromProfile(profile: FriendQrProfile): string {
   const sig = signProfile(profile);
-  const token = base64UrlEncode(JSON.stringify({ p: profile, sig }));
-  return `${DEEP_LINK_PREFIX}?d=${token}`;
+  return base64UrlEncode(JSON.stringify({ p: profile, sig }));
+}
+
+/** Lien deep link + payload signé (obfusqué en base64url) — QR code & ouverture directe app. */
+export function encodeFriendQrDeepLink(profile: FriendQrProfile): string {
+  return `${DEEP_LINK_PREFIX}?d=${friendInviteTokenFromProfile(profile)}`;
+}
+
+/** Lien HTTPS cliquable dans WhatsApp / SMS → pont serveur → deep link app. */
+export function encodeFriendInviteWebLink(profile: FriendQrProfile, webBaseUrl: string): string {
+  const token = friendInviteTokenFromProfile(profile);
+  const base = webBaseUrl.replace(/\/$/, '');
+  return `${base}/friend?d=${token}`;
+}
+
+/** Extrait le jeton `d` depuis une URL ou un deep link. */
+export function extractFriendInviteToken(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const tokenMatch = trimmed.match(/[?&]d=([^&#]+)/);
+  if (!tokenMatch?.[1]) return null;
+  try {
+    return decodeURIComponent(tokenMatch[1]);
+  } catch {
+    return tokenMatch[1];
+  }
+}
+
+/** Indique si l’URL pointe vers une invitation ami (deep link ou pont HTTPS). */
+export function isFriendInviteUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith(`${DEEP_LINK_PREFIX}?`)) return true;
+  return /\/friend\?/.test(trimmed) && /[?&]d=/.test(trimmed);
 }
 
 function parseEnvelope(raw: string): FriendQrProfile | null {
@@ -112,21 +143,10 @@ export function decodeFriendQrPayload(raw: string): FriendQrProfile | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  const tokenMatch = trimmed.match(/[?&]d=([^&#]+)/);
-  if (tokenMatch?.[1]) {
+  const token = extractFriendInviteToken(trimmed);
+  if (token) {
     try {
-      return parseEnvelope(base64UrlDecode(decodeURIComponent(tokenMatch[1])));
-    } catch {
-      return null;
-    }
-  }
-
-  if (trimmed.startsWith(`${DEEP_LINK_PREFIX}?`)) {
-    try {
-      const query = trimmed.slice(DEEP_LINK_PREFIX.length + 1);
-      const params = new URLSearchParams(query);
-      const token = params.get('d');
-      if (token) return parseEnvelope(base64UrlDecode(token));
+      return parseEnvelope(base64UrlDecode(token));
     } catch {
       return null;
     }

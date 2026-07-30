@@ -12,12 +12,17 @@ export interface QuizPlayQuestion {
   correctOptionId: string;
   explanation: string | null;
   orderIndex: number;
+  /** easy | medium | hard — barre de points variable. */
+  difficulty: 'easy' | 'medium' | 'hard';
+  /** Illustration dédiée à la question (colonne Supabase à brancher plus tard). */
+  imageUrl?: string | null;
 }
 
 export interface QuizPlayMeta {
   id: string;
   title: string;
   thumbnailUrl: string | null;
+  /** @deprecated Préférer pointsForDifficulty(question.difficulty). Conservé pour compat. */
   pointsPerQuestion: number;
   completionBonus: number;
   difficultyLevel: string | null;

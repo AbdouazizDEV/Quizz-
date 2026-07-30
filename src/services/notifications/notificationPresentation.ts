@@ -22,6 +22,14 @@ export function getNotificationVisual(type: string): NotificationVisual {
       return { icon: 'x-circle', iconBackground: '#FFEBEE', iconColor: '#C62828', accent: '#E53935' };
     case 'duel_completed':
       return { icon: 'award', iconBackground: '#FFF8E1', iconColor: '#F9A825', accent: '#FFB703' };
+    case 'duel_score':
+      return { icon: 'bell', iconBackground: '#F3E5F5', iconColor: '#8E24AA', accent: '#7B1FA2' };
+    case 'streak_reminder':
+      return { icon: 'clock', iconBackground: '#FFF3E0', iconColor: '#EF6C00', accent: '#FF7A4D' };
+    case 'challenge_new':
+      return { icon: 'flag', iconBackground: '#E8F5E9', iconColor: '#2E7D32', accent: '#43A047' };
+    case 'ranking_update':
+      return { icon: 'bar-chart-2', iconBackground: '#E3F2FD', iconColor: '#1565C0', accent: '#1F2261' };
     case 'admin_notice':
       return { icon: 'bell', iconBackground: '#FCE4EC', iconColor: '#D81B60', accent: '#AD1457' };
     default:

@@ -1,5 +1,7 @@
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
+import { refreshAuthSessionIfNeeded } from '@services/auth/refreshAuthSession';
 import { readStoredRefreshToken } from '@services/auth/authTokenStorage';
+import { useAuthStore } from '@stores/authStore';
 
 /**
  * Aligne le client Supabase JS avec le JWT Quizz+ (stocké après login API).
@@ -30,18 +32,26 @@ export async function syncSupabaseAuthSession(
     throw new Error('Session Supabase incomplète. Reconnectez-vous.');
   }
 
-  const { error } = await client.auth.setSession({
+  const { error, data } = await client.auth.setSession({
     access_token: token,
     refresh_token: refresh,
   });
-  if (error) {
-    throw new Error('Impossible de synchroniser la session. Reconnectez-vous.');
+  if (error || !data.session) {
+    const { data: refreshData, error: refreshErr } = await client.auth.refreshSession({
+      refresh_token: refresh,
+    });
+    if (refreshErr || !refreshData.session) {
+      throw new Error('Impossible de synchroniser la session. Reconnectez-vous.');
+    }
   }
 }
 
 /** À appeler avant tout INSERT/DELETE Supabase côté app. */
 export async function ensureSupabaseAuthSession(accessToken?: string | null): Promise<void> {
-  const token = accessToken?.trim() ?? undefined;
+  const refreshed = await refreshAuthSessionIfNeeded();
+  if (refreshed.ok) return;
+
+  const token = accessToken?.trim() ?? useAuthStore.getState().token?.trim();
   if (!token) {
     const client = getSupabaseClient();
     if (client) await client.auth.signOut();

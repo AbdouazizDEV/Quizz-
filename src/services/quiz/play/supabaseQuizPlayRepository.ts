@@ -1,4 +1,5 @@
 import type { QuizPlayMeta, QuizPlayPayload, QuizPlayQuestion } from '@app-types/quizPlay.types';
+import { normalizeQuestionDifficulty } from '@domain/quiz/difficultyPoints';
 import type { IQuizPlayRepository } from '@services/quiz/play/IQuizPlayRepository';
 import { parseQuestionOptions } from '@services/quiz/play/parseQuestionOptions';
 import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
@@ -11,6 +12,8 @@ function mapQuestion(row: {
   correct_option_id: string;
   explanation: string | null;
   order_index: number;
+  difficulty?: string | null;
+  difficulty_label?: string | null;
 }): QuizPlayQuestion {
   return {
     id: row.id,
@@ -20,6 +23,8 @@ function mapQuestion(row: {
     correctOptionId: row.correct_option_id,
     explanation: row.explanation,
     orderIndex: row.order_index,
+    difficulty: normalizeQuestionDifficulty(row.difficulty ?? row.difficulty_label),
+    imageUrl: null,
   };
 }
 
@@ -38,7 +43,9 @@ export class SupabaseQuizPlayRepository implements IQuizPlayRepository {
 
     const { data: rows, error: pErr } = await client
       .from('questions')
-      .select('id, quiz_id, question_text, options, correct_option_id, explanation, order_index')
+      .select(
+        'id, quiz_id, question_text, options, correct_option_id, explanation, order_index, difficulty, difficulty_label',
+      )
       .eq('quiz_id', quizId)
       .order('order_index', { ascending: true });
 
