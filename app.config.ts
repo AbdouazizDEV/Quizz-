@@ -1,5 +1,41 @@
 import { ConfigContext, ExpoConfig } from 'expo/config';
 
+const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? '';
+const googleIosUrlScheme = googleClientId
+  ? `com.googleusercontent.apps.${googleClientId.replace(/\.apps\.googleusercontent\.com$/i, '')}`
+  : undefined;
+
+const appPlugins: ExpoConfig['plugins'] = [
+  'expo-router',
+  'expo-font',
+  'expo-secure-store',
+  '@react-native-community/datetimepicker',
+  'expo-sqlite',
+  [
+    'expo-camera',
+    {
+      cameraPermission: 'Quizz+ utilise la caméra pour scanner le QR code d’un ami.',
+    },
+  ],
+  [
+    'expo-build-properties',
+    {
+      android: {
+        enableMinifyInReleaseBuilds: true,
+        enableShrinkResourcesInReleaseBuilds: true,
+        buildArchs: ['armeabi-v7a', 'arm64-v8a'],
+      },
+    },
+  ],
+];
+
+if (googleIosUrlScheme) {
+  appPlugins.push([
+    '@react-native-google-signin/google-signin',
+    { iosUrlScheme: googleIosUrlScheme },
+  ]);
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Quizz+',
@@ -11,8 +47,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   /** Requis pour EAS Build / Play Store — à adapter si vous changez l’identifiant. */
   ios: {
     bundleIdentifier: 'com.quizzplus.app',
+    associatedDomains: ['webcredentials:quizzp.com'],
     infoPlist: {
       LSApplicationQueriesSchemes: ['whatsapp', 'fb', 'fbapi', 'fb-messenger-share-api'],
+      /** Pas de chiffrement non-exempté → évite la question EAS et la déclaration export. */
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
@@ -28,7 +67,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         data: [
           {
             scheme: 'https',
-            host: 'quizzplus-api.onrender.com',
+            host: 'quizzp.com',
             pathPrefix: '/friend',
           },
         ],
@@ -43,27 +82,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: '23a2334f-26a5-4ae1-9911-56fcbed0ca9c',
     },
   },
-  plugins: [
-    'expo-router',
-    'expo-font',
-    'expo-secure-store',
-    '@react-native-community/datetimepicker',
-    'expo-sqlite',
-    [
-      'expo-camera',
-      {
-        cameraPermission: 'Quizz+ utilise la caméra pour scanner le QR code d’un ami.',
-      },
-    ],
-    [
-      'expo-build-properties',
-      {
-        android: {
-          enableMinifyInReleaseBuilds: true,
-          enableShrinkResourcesInReleaseBuilds: true,
-          buildArchs: ['armeabi-v7a', 'arm64-v8a'],
-        },
-      },
-    ],
-  ],
+  plugins: appPlugins,
 });

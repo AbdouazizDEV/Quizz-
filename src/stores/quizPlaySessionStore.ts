@@ -4,6 +4,7 @@ import type { QuizAnswerRecord, QuizPlayPayload, QuizPlayQuestion } from '@app-t
 import { getTimerSecondsForDifficulty } from '@constants/quiz.constants';
 
 export type QuizFeedbackPhase = 'idle' | 'correct' | 'incorrect' | 'timeout';
+export type QuizSessionPhase = 'playing' | 'submitting';
 
 const TIMEOUT_OPTION_ID = '__timeout__';
 
@@ -29,6 +30,7 @@ interface QuizPlaySessionState {
   feedbackChipLabel: string;
   correctAnswerLabel: string;
   secondsPerQuestion: number;
+  sessionPhase: QuizSessionPhase;
   reset: () => void;
   bootstrap: (
     payload: QuizPlayPayload,
@@ -58,6 +60,7 @@ const initial = {
   feedbackChipLabel: '',
   correctAnswerLabel: '',
   secondsPerQuestion: 16,
+  sessionPhase: 'playing' as QuizSessionPhase,
 };
 
 export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) => ({
@@ -72,7 +75,8 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
       challengeId: challengeId ?? null,
       secondsPerQuestion: getTimerSecondsForDifficulty(payload.quiz.difficultyLevel),
     }),
-  selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) =>
+  selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) => {
+    if (get().sessionPhase !== 'playing') return;
     set({
       selectedOptionId: optionId,
       feedbackPhase: isCorrect ? 'correct' : 'incorrect',
@@ -80,8 +84,10 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
       feedbackChipLabel: isCorrect ? `+${pointsIfCorrect}` : correctLabel,
       correctAnswerLabel: correctLabel,
       sessionPoints: isCorrect ? get().sessionPoints + pointsIfCorrect : get().sessionPoints,
-    }),
+    });
+  },
   advanceFromFeedback: () => {
+    if (get().sessionPhase === 'submitting') return 'finished';
     const p = get().payload;
     const idx = get().currentIndex;
     const q = p?.questions[idx];
@@ -99,6 +105,7 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
     if (isLast) {
       set({
         answers,
+        sessionPhase: 'submitting',
         ...clearFeedbackFields,
       });
       return 'finished';
@@ -116,6 +123,7 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
     return payload.questions[currentIndex] ?? null;
   },
   expireQuestion: (correctLabel) => {
+    if (get().sessionPhase !== 'playing') return;
     if (!get().getCurrentQuestion()) return;
     set({
       selectedOptionId: TIMEOUT_OPTION_ID,

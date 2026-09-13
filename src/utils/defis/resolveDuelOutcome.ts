@@ -11,37 +11,13 @@ export interface DuelOutcome {
   icon: string;
 }
 
-export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutcome {
-  if (duel.status === 'expired' || duel.isExpired) {
-    const isChallenger = duel.challengerId === userId;
-    const myScore = isChallenger ? duel.challengerScore : duel.challengedScore;
-    return {
-      label: myScore === null ? 'Non joué' : 'Expiré',
-      points: '+0 pts',
-      won: false,
-      lost: true,
-      tone: 'expired',
-      icon: '⏱',
-    };
-  }
-
-  if (duel.status === 'declined') {
-    const refusedByMe = duel.challengedId === userId;
-    return {
-      label: refusedByMe ? 'Refusé' : 'Décliné',
-      points: '+0 pts',
-      won: false,
-      lost: !refusedByMe,
-      tone: 'neutral',
-      icon: '✕',
-    };
-  }
-
-  const isChallenger = duel.challengerId === userId;
-  const myScore = isChallenger ? duel.challengerScore ?? 0 : duel.challengedScore ?? 0;
-  const oppScore = isChallenger ? duel.challengedScore ?? 0 : duel.challengerScore ?? 0;
-
-  if (duel.winnerId === userId) {
+function resolvePlayedOutcome(
+  duel: DuelSummary,
+  userId: string,
+  myScore: number,
+  oppScore: number,
+): DuelOutcome {
+  if (duel.winnerId === userId || (duel.winnerId === null && myScore > oppScore)) {
     return {
       label: 'Victoire',
       points: '+5 pts bonus',
@@ -59,16 +35,6 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
       lost: true,
       tone: 'defeat',
       icon: '💔',
-    };
-  }
-  if (myScore > oppScore) {
-    return {
-      label: 'Victoire',
-      points: '+5 pts bonus',
-      won: true,
-      lost: false,
-      tone: 'victory',
-      icon: '🏆',
     };
   }
   if (myScore < oppScore) {
@@ -89,4 +55,65 @@ export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutco
     tone: 'draw',
     icon: '⚖️',
   };
+}
+
+/** Résultat affiché : Victoire / Défaite / Égalité quand les deux scores sont connus. */
+export function resolveDuelOutcome(duel: DuelSummary, userId: string): DuelOutcome {
+  const isChallenger = duel.challengerId === userId;
+  const myScoreRaw = isChallenger ? duel.challengerScore : duel.challengedScore;
+  const oppScoreRaw = isChallenger ? duel.challengedScore : duel.challengerScore;
+
+  if (myScoreRaw !== null && oppScoreRaw !== null) {
+    return resolvePlayedOutcome(duel, userId, myScoreRaw, oppScoreRaw);
+  }
+
+  if (duel.status === 'declined' || duel.status === 'expired' || duel.isExpired) {
+    return {
+      label: 'Annulé',
+      points: '+0 pts',
+      won: false,
+      lost: false,
+      tone: 'neutral',
+      icon: '—',
+    };
+  }
+
+  return {
+    label: 'En cours',
+    points: '—',
+    won: false,
+    lost: false,
+    tone: 'neutral',
+    icon: '⏳',
+  };
+}
+
+export function buildDuelResultHeadline(tone: DuelOutcomeTone): string {
+  switch (tone) {
+    case 'victory':
+      return '🎉 Victoire !';
+    case 'defeat':
+      return 'Défaite';
+    case 'draw':
+      return '⚖️ Égalité !';
+    default:
+      return 'Duel annulé';
+  }
+}
+
+export function buildDuelResultStatusLabel(tone: DuelOutcomeTone): string {
+  switch (tone) {
+    case 'victory':
+      return 'Victoire';
+    case 'defeat':
+      return 'Défaite';
+    case 'draw':
+      return 'Égalité';
+    default:
+      return 'Annulé';
+  }
+}
+
+export function isDuelOutcomePlayable(tone: DuelOutcomeTone): boolean {
+  return tone === 'victory' || tone === 'defeat' || tone === 'draw';
 }

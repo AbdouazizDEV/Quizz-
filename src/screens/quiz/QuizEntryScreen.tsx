@@ -17,12 +17,12 @@ import type { QuizPlayPayload } from '@app-types/quizPlay.types';
 import { delay } from '@utils/delay';
 import { buildQuizQuestionSet } from '@domain/quiz/buildQuizQuestionSet';
 import { pointsForDifficulty } from '@domain/quiz/difficultyPoints';
+import { getAuthMeFromStore } from '@services/auth/authMeRepository';
 import { getQuizPlayRepository } from '@services/quiz/play/quizPlayRepositoryInstance';
 import {
   fetchQuizReplayStatus,
   type QuizReplayStatus,
 } from '@services/quiz/replay/quizReplayService';
-import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAuthStore } from '@stores/authStore';
 import { canVisitorPlayQuiz, lacksAuthToken } from '@services/auth/visitorAccessPolicy';
@@ -33,6 +33,15 @@ const LOADER_MS = 5000;
 interface PendingReplayStart {
   raw: QuizPlayPayload;
   status: QuizReplayStatus;
+}
+
+function decodeQuizRouteId(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    return decodeURIComponent(raw.trim());
+  } catch {
+    return raw.trim();
+  }
 }
 
 export default function QuizEntryScreen() {
@@ -49,7 +58,7 @@ export default function QuizEntryScreen() {
     duelId?: string | string[];
     challengeId?: string | string[];
   }>();
-  const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
+  const quizId = decodeQuizRouteId(typeof idParam === 'string' ? idParam : idParam?.[0]);
   const categorySlug =
     typeof catParam === 'string' ? catParam : Array.isArray(catParam) ? catParam[0] : undefined;
   const duelId =
@@ -86,20 +95,20 @@ export default function QuizEntryScreen() {
 
   const startPlay = useCallback(
     (raw: QuizPlayPayload) => {
-      if (!quizId) return;
+      const playId = raw.quiz.id?.trim() || quizId;
+      if (!playId) return;
       const composed = buildQuizQuestionSet({
         pool: raw.questions,
         totalQuestions: raw.questions.length,
         quizLevel: raw.quiz.difficultyLevel,
-        // Seed déterministe par quiz : même ordre warm-up pour tous les joueurs d’un même quiz.
-        seed: quizId,
+        seed: playId,
       });
       const payload: QuizPlayPayload = {
         ...raw,
         questions: composed.questions,
       };
       bootstrap(payload, categorySlug ?? null, duelId ?? null, challengeId ?? null);
-      router.replace(`/quiz/${quizId}/play`);
+      router.replace(`/quiz/${encodeURIComponent(playId)}/play`);
     },
     [bootstrap, categorySlug, challengeId, duelId, quizId, router],
   );
@@ -115,37 +124,28 @@ export default function QuizEntryScreen() {
 
   useEffect(() => {
     if (!quizId) {
-      setError('Quiz introuvable.');
+      setError('Quiz indisponible.');
       return;
     }
     let cancelled = false;
 
     (async () => {
-      if (lacksAuthToken(token)) {
-        const client = getSupabaseClient();
-        if (client) {
-          const { data: quizMeta } = await client
-            .from('quizzes')
-            .select('difficulty_level')
-            .eq('id', quizId)
-            .maybeSingle();
-          if (cancelled) return;
-          if (!canVisitorPlayQuiz(quizMeta?.difficulty_level)) {
-            showAppError('Connectez-vous pour accéder à ce quiz.', {
-              title: 'Connexion requise',
-              confirmLabel: 'Se connecter',
-              onClose: () => router.replace(Routes.LOGIN),
-            });
-            return;
-          }
-        }
-      }
-
       const repo = getQuizPlayRepository();
       const [raw] = await Promise.all([repo.loadPlayPayload(quizId), delay(LOADER_MS)]);
       if (cancelled) return;
+
+      // GET Nest /quizzes/:id → 404 / vide : bloquer avant de jouer.
       if (!raw?.questions.length) {
-        setError('Impossible de charger ce quiz.');
+        setError('Quiz indisponible.');
+        return;
+      }
+
+      if (lacksAuthToken(token) && !canVisitorPlayQuiz(raw.quiz.difficultyLevel)) {
+        showAppError('Connectez-vous pour accéder à ce quiz.', {
+          title: 'Connexion requise',
+          confirmLabel: 'Se connecter',
+          onClose: () => router.replace(Routes.LOGIN),
+        });
         return;
       }
 
@@ -153,32 +153,25 @@ export default function QuizEntryScreen() {
         (sum, q) => sum + pointsForDifficulty(q.difficulty),
         0,
       );
-      const tok = token?.trim();
+      const uid = getAuthMeFromStore()?.user?.id?.trim();
 
-      if (maxPts > 0 && tok) {
-        const client = getSupabaseClient();
-        if (client) {
-          const { data: authData } = await client.auth.getUser(tok);
-          const uid = authData.user?.id;
-          if (uid) {
-            const status = await fetchQuizReplayStatus(uid, quizId, maxPts);
-            if (cancelled) return;
+      if (maxPts > 0 && token?.trim() && uid) {
+        const status = await fetchQuizReplayStatus(uid, raw.quiz.id || quizId, maxPts);
+        if (cancelled) return;
 
-            if (!status.canReplay) {
-              const competitive = Boolean(duelId?.trim() || challengeId?.trim());
-              setError(
-                competitive
-                  ? 'Vous avez déjà terminé ce quiz. Il n’est pas rejouable en duel ou challenge.'
-                  : 'Score maximum déjà atteint sur ce quiz. Rejeu indisponible.',
-              );
-              return;
-            }
+        if (!status.canReplay) {
+          const competitive = Boolean(duelId?.trim() || challengeId?.trim());
+          setError(
+            competitive
+              ? 'Vous avez déjà terminé ce quiz. Il n’est pas rejouable en duel ou challenge.'
+              : 'Score maximum déjà atteint sur ce quiz. Rejeu indisponible.',
+          );
+          return;
+        }
 
-            if (status.hasPlayedBefore && status.missingPoints > 0) {
-              setPendingReplay({ raw, status });
-              return;
-            }
-          }
+        if (status.hasPlayedBefore && status.missingPoints > 0) {
+          setPendingReplay({ raw, status });
+          return;
         }
       }
 
@@ -188,7 +181,7 @@ export default function QuizEntryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [challengeId, quizId, router, showAppError, startPlay, token]);
+  }, [challengeId, duelId, quizId, router, showAppError, startPlay, token]);
 
   useEffect(() => {
     if (!error) return;

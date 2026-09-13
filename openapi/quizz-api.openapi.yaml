@@ -1,12 +1,12 @@
 openapi: 3.0.3
 info:
   title: Quizz+ API (mobile SDK)
-  description: Contrat HTTP aligné sur `server/src/routes/auth.ts` (base path `/api/v1`).
+  description: Contrat HTTP aligné sur le repo backend Quizz+ API (base path `/api/v1`).
   version: 1.0.0
 
 servers:
-  - url: https://quizzplus-api.onrender.com/api/v1
-    description: Production (Render)
+  - url: https://api.quizzp.com/api/v1
+    description: Production
   - url: http://localhost:3000/api/v1
     description: Développement local
 
@@ -87,6 +87,44 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /auth/google/token:
+    post:
+      tags: [auth]
+      operationId: authGoogleToken
+      summary: Connexion Google native (id_token mobile / GIS web)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_token]
+              properties:
+                id_token:
+                  type: string
+                  description: JWT Google Sign-In (SDK natif ou Google Identity Services)
+      responses:
+        '200':
+          description: Session JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Compte Google non inscrit (GOOGLE_ACCOUNT_NOT_REGISTERED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '503':
+          description: Google OAuth non configuré côté serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
 
   /auth/google:
     post:

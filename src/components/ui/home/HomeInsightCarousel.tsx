@@ -1,9 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 
 export interface HomeInsightItem {
   id: string;
-  title: string;
   body: string;
   tag: string;
   gradient: readonly [string, string];
@@ -15,6 +14,7 @@ interface HomeInsightCarouselProps {
   activeIndex: number;
   onChangeIndex: (index: number) => void;
   carouselRef: React.RefObject<FlatList<HomeInsightItem> | null>;
+  loading?: boolean;
 }
 
 export function HomeInsightCarousel({
@@ -23,7 +23,20 @@ export function HomeInsightCarousel({
   activeIndex,
   onChangeIndex,
   carouselRef,
+  loading = false,
 }: HomeInsightCarouselProps) {
+  if (loading) {
+    return (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator color="#B88700" />
+      </View>
+    );
+  }
+
+  if (insights.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.section}>
       <FlatList
@@ -44,9 +57,12 @@ export function HomeInsightCarousel({
         })}
         renderItem={({ item }) => (
           <LinearGradient colors={item.gradient} style={[styles.insightCard, { width: contentWidth }]}>
-            <Text style={styles.insightTag}>{item.tag}</Text>
-            <Text style={styles.insightTitle}>{item.title}</Text>
-            <Text style={styles.insightBody}>{item.body}</Text>
+            <Text style={styles.insightTag} numberOfLines={1}>
+              {item.tag}
+            </Text>
+            <Text style={styles.insightBody} numberOfLines={3}>
+              {item.body}
+            </Text>
           </LinearGradient>
         )}
       />
@@ -61,47 +77,48 @@ export function HomeInsightCarousel({
 
 const styles = StyleSheet.create({
   section: {
-    gap: 12,
+    gap: 8,
+  },
+  loadingWrap: {
+    minHeight: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   insightCard: {
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    gap: 10,
-    minHeight: 152,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 6,
+    minHeight: 88,
+    justifyContent: 'center',
   },
   insightTag: {
     color: '#6B7280',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  insightTitle: {
-    color: '#212121',
-    fontSize: 19,
-    lineHeight: 24,
-    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   insightBody: {
-    color: '#424242',
-    fontSize: 15,
+    color: '#212121',
+    fontSize: 14,
     lineHeight: 20,
+    fontWeight: '600',
   },
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     justifyContent: 'center',
   },
   dot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 999,
     backgroundColor: '#D1D5DB',
   },
   dotActive: {
-    width: 18,
+    width: 16,
     backgroundColor: 'rgba(255, 215, 0, 0.87)',
   },
 });

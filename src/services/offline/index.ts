@@ -17,7 +17,13 @@ export {
   COMPETITION_UNREGISTER_MUTATION,
 } from './competitionMutations';
 export { CHALLENGE_PARTICIPATION_INSERT } from './challengeMutations';
-export { QUIZ_SESSION_COMPLETE } from './quizSessionMutations';
+export {
+  quizCompleteApiPath,
+  isQuizCompleteApiPath,
+  parseQuizSessionCompleteResponse,
+  type QuizSessionCompleteBody,
+  type QuizSessionCompleteResponse,
+} from './quizSessionMutations';
 export { offlineStore, OfflineStore } from './OfflineStore';
 export { ensureOfflineDatabaseReady } from './offlineDatabase';
 export { readWithOfflineCache, OfflineCacheMissError, isOfflineCacheMissError } from './offlineRead';

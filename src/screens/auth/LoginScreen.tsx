@@ -5,10 +5,9 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Feather } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,19 +21,28 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { UnderlineLabeledField } from '@components/ui/auth/UnderlineLabeledField';
+import { AuthMethodSwitch, type AuthMethod } from '@components/ui/auth/AuthMethodSwitch';
+import { AuthSocialDivider } from '@components/ui/auth/AuthSocialDivider';
+import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { WalkthroughActionButton } from '@components/ui/walkthrough/WalkthroughActionButton';
 import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
-import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
+import { isGoogleSignInConfigured } from '@config';
+import { useGoogleAuthFinish } from '@hooks/useGoogleAuthFinish';
+import type { AuthSessionPayload, AuthUser } from '@app-types/authSession.types';
+import {
+  persistPasskeyAuthResult,
+  signOutAndSyncStore,
+} from '@services/auth/authSessionController';
+import { canUseLocalPasskey } from '@services/auth/devicePasskeyCapability';
 import { mapLoginUserToAuthMe } from '@services/auth/mapLoginToAuthMe';
 import { getAuthMeFromStore } from '@services/auth/authMeRepository';
 import { loginGateway } from '@services/auth/loginGatewayInstance';
-import { socialAuthGateway } from '@services/auth/socialAuthGateway';
-import { useAuthStore } from '@stores/authStore';
+import { toFrenchPasskeyError } from '@services/auth/passkeyAuthService';
+import { loginWithPassword } from '@services/auth/passwordAuthService';
 
 const FOOTER_BAR_HEIGHT = 118;
 const CONTENT_GAP = 28;
@@ -51,137 +59,129 @@ export default function LoginScreen() {
     Nunito_400Regular,
   });
 
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
-  const [secure, setSecure] = useState(true);
+  const [passkeyAvailable, setPasskeyAvailable] = useState(false);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('password');
+  const [capabilityReady, setCapabilityReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [socialSubmitting, setSocialSubmitting] = useState(false);
-  const [unlocking, setUnlocking] = useState(false);
+  const [discoverableSubmitting, setDiscoverableSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const storedToken = useAuthStore((s) => s.token);
+  const showGoogle = isGoogleSignInConfigured();
+  const {
+    signInWithGoogle,
+    googleSubmitting,
+    googleError,
+    showRegisterPrompt,
+    clearGoogleError,
+  } = useGoogleAuthFinish();
 
-  const autoUnlockStartedRef = useRef(false);
-
+  const displayError = formError ?? googleError;
   const titleSize = windowWidth < 360 ? 28 : windowWidth < 400 ? 32 : 36;
 
-  const fonts = useMemo(
-    () => ({
-      bold: fontsLoaded ? 'Nunito_700Bold' : undefined,
-      semi: fontsLoaded ? 'Nunito_600SemiBold' : undefined,
-      regular: fontsLoaded ? 'Nunito_400Regular' : undefined,
-    }),
-    [fontsLoaded],
-  );
+  const fonts = {
+    bold: fontsLoaded ? 'Nunito_700Bold' : undefined,
+    semi: fontsLoaded ? 'Nunito_600SemiBold' : undefined,
+    regular: fontsLoaded ? 'Nunito_400Regular' : undefined,
+  };
 
-  const onBack = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const ok = await canUseLocalPasskey();
+      if (!cancelled) {
+        setPasskeyAvailable(ok);
+        setAuthMethod(ok ? 'passkey' : 'password');
+        setCapabilityReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const usePasswordMode = authMethod === 'password';
+
+  const onRegister = useCallback(() => {
     router.replace(Routes.CREATE_ACCOUNT_TYPE);
   }, [router]);
 
-  const onForgotPassword = useCallback(() => {
-    const trimmed = email.trim();
-    if (trimmed) {
-      router.push({ pathname: Routes.FORGOT_PASSWORD, params: { email: trimmed } });
-      return;
-    }
-    router.push(Routes.FORGOT_PASSWORD);
-  }, [email, router]);
+  const finishLogin = useCallback(
+    async (result: { user?: AuthUser | null; session: AuthSessionPayload }) => {
+      if (!result.session) throw new Error('Session absente.');
+      await persistPasskeyAuthResult(
+        result.session,
+        result.user ? mapLoginUserToAuthMe(result.user) : null,
+      );
+      if (!getAuthMeFromStore()) {
+        await signOutAndSyncStore();
+        throw new Error('Profil introuvable après connexion.');
+      }
+      router.replace(Routes.HOME);
+    },
+    [router],
+  );
 
   const onSubmit = useCallback(async () => {
-    if (submitting) return;
-    const trimmed = email.trim();
+    if (submitting || discoverableSubmitting || googleSubmitting) return;
+    const trimmed = identifier.trim();
     if (!trimmed) {
-      setFormError('Saisissez votre adresse e-mail.');
+      setFormError('Saisissez votre e-mail ou nom d’utilisateur.');
       return;
     }
-    if (!password.trim()) {
+    if (usePasswordMode && !password) {
       setFormError('Saisissez votre mot de passe.');
       return;
     }
     setFormError(null);
+    clearGoogleError();
     setSubmitting(true);
     try {
-      const { accessToken, refreshToken, user } = await loginGateway.signIn({ email: trimmed, password });
-      await persistLoginAndSyncStore(
-        accessToken,
-        refreshToken,
-        user ? mapLoginUserToAuthMe(user) : null,
-      );
-      router.replace(Routes.HOME);
+      if (usePasswordMode) {
+        const looksLikeEmail = trimmed.includes('@');
+        const result = await loginWithPassword(
+          looksLikeEmail
+            ? { email: trimmed, password }
+            : { username: trimmed, password },
+        );
+        await finishLogin(result);
+      } else {
+        const result = await loginGateway.signIn({ identifier: trimmed });
+        await finishLogin(result);
+      }
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Connexion impossible. Réessayez.');
+      const message = toFrenchPasskeyError(error);
+      setFormError(message);
+      if (!usePasswordMode && /e-mail et mot de passe/i.test(message)) {
+        setAuthMethod('password');
+      }
     } finally {
       setSubmitting(false);
     }
-  }, [email, password, router, submitting]);
+  }, [
+    discoverableSubmitting,
+    finishLogin,
+    googleSubmitting,
+    clearGoogleError,
+    identifier,
+    password,
+    submitting,
+    usePasswordMode,
+  ]);
 
-  const onSocialLogin = useCallback(
-    async (provider: 'google' | 'facebook') => {
-      if (socialSubmitting || submitting) return;
-      setFormError(null);
-      setSocialSubmitting(true);
-      try {
-        const accessToken =
-          provider === 'google'
-            ? await socialAuthGateway.startGoogle()
-            : await socialAuthGateway.startFacebook();
-        await persistLoginAndSyncStore(accessToken);
-        const me = getAuthMeFromStore();
-        if (!me) {
-          await signOutAndSyncStore();
-          throw new Error(
-            'La session Google n’a pas été acceptée par le serveur. Vérifiez la connexion ou utilisez e-mail / mot de passe.',
-          );
-        }
-        router.replace(Routes.HOME);
-      } catch (error) {
-        setFormError(error instanceof Error ? error.message : 'Connexion sociale impossible.');
-      } finally {
-        setSocialSubmitting(false);
-      }
-    },
-    [router, socialSubmitting, submitting],
-  );
-
-  const onDeviceUnlock = useCallback(async () => {
-    if (unlocking || submitting || socialSubmitting) return;
-    if (!storedToken?.trim()) {
-      setFormError('Aucune session locale a deverrouiller. Connectez-vous avec votre mot de passe.');
-      return;
-    }
+  const onDiscoverableLogin = useCallback(async () => {
+    if (submitting || discoverableSubmitting || googleSubmitting || usePasswordMode) return;
     setFormError(null);
-    setUnlocking(true);
+    setDiscoverableSubmitting(true);
     try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !enrolled) {
-        setFormError("Aucun verrouillage biométrique/code appareil n'est configure sur ce telephone.");
-        return;
-      }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Deverrouiller Quizz+',
-        fallbackLabel: 'Utiliser le code du telephone',
-        disableDeviceFallback: false,
-      });
-      if (!result.success) {
-        setFormError('Deverrouillage annule ou echoue.');
-        return;
-      }
-      router.replace(Routes.HOME);
-    } catch {
-      setFormError('Deverrouillage impossible pour le moment.');
+      const result = await loginGateway.signInDiscoverable();
+      await finishLogin(result);
+    } catch (error) {
+      setFormError(toFrenchPasskeyError(error));
     } finally {
-      setUnlocking(false);
+      setDiscoverableSubmitting(false);
     }
-  }, [router, socialSubmitting, storedToken, submitting, unlocking]);
-
-  useEffect(() => {
-    if (!fontsLoaded) return;
-    if (!storedToken?.trim()) return;
-    if (autoUnlockStartedRef.current) return;
-    autoUnlockStartedRef.current = true;
-    void onDeviceUnlock();
-  }, [fontsLoaded, onDeviceUnlock, storedToken]);
+  }, [discoverableSubmitting, finishLogin, googleSubmitting, submitting, usePasswordMode]);
 
   return (
     <View style={styles.root}>
@@ -190,7 +190,6 @@ export default function LoginScreen() {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           style={styles.scroll}
@@ -207,9 +206,15 @@ export default function LoginScreen() {
         >
           <View style={[styles.column, onboardingColumn, { gap: CONTENT_GAP }]}>
             <View style={[styles.headerBlock, { gap: 24 }]}>
-              <Pressable onPress={onBack} style={styles.backButton} hitSlop={8} accessibilityRole="button">
-                <Feather name="arrow-left" size={22} color="#212121" />
-              </Pressable>
+              <WalkthroughActionButton
+                label="INSCRIPTION"
+                variant="primary"
+                size="compact"
+                onPress={onRegister}
+                fontFamily={fonts.bold}
+                accessibilityLabel="Inscription"
+                leadingIcon={<Feather name="user-plus" size={16} color="#212121" />}
+              />
               <Text
                 style={[
                   styles.greeting,
@@ -219,91 +224,114 @@ export default function LoginScreen() {
               >
                 Bonjour 👋
               </Text>
+              <Text
+                style={[
+                  styles.subtitle,
+                  fonts.regular ? { fontFamily: fonts.regular } : { fontWeight: '400' },
+                ]}
+              >
+                {showGoogle && usePasswordMode
+                  ? 'Google, e-mail / pseudo et mot de passe.'
+                  : usePasswordMode
+                    ? 'Connectez-vous avec votre e-mail (ou pseudo) et votre mot de passe.'
+                    : capabilityReady
+                      ? 'Connectez-vous avec Face ID ou empreinte digitale.'
+                      : 'Vérification de la sécurité de l’appareil…'}
+              </Text>
+              {capabilityReady && passkeyAvailable ? (
+                <AuthMethodSwitch
+                  value={authMethod}
+                  onChange={setAuthMethod}
+                  passkeyAvailable={passkeyAvailable}
+                  labelFontFamily={fonts.semi}
+                />
+              ) : null}
             </View>
 
             <View style={[styles.formBlock, { gap: FORM_GAP }]}>
-              {formError ? (
-                <Text style={[styles.formError, fonts.regular ? { fontFamily: fonts.regular } : undefined]}>
-                  {formError}
-                </Text>
+              {displayError ? (
+                <View style={styles.errorBlock}>
+                  <Text style={[styles.formError, fonts.regular ? { fontFamily: fonts.regular } : undefined]}>
+                    {displayError}
+                  </Text>
+                  {showRegisterPrompt ? (
+                    <Pressable accessibilityRole="button" onPress={onRegister}>
+                      <Text style={[styles.registerLink, fonts.semi ? { fontFamily: fonts.semi } : undefined]}>
+                        Créer un compte
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {showGoogle && usePasswordMode ? (
+                <>
+                  <SocialAuthButtons
+                    fontFamily={fonts.semi}
+                    loading={googleSubmitting}
+                    onGooglePress={() => void signInWithGoogle()}
+                    onFacebookPress={() => undefined}
+                    showFacebook={false}
+                  />
+                  <AuthSocialDivider fontFamily={fonts.regular} />
+                </>
               ) : null}
 
               <UnderlineLabeledField
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
+                label="E-mail ou pseudo"
+                value={identifier}
+                onChangeText={setIdentifier}
                 placeholder={AUTH_FORM_PLACEHOLDERS.email}
-                keyboardType="email-address"
                 autoCapitalize="none"
                 labelFontFamily={fonts.semi}
                 inputFontFamily={fonts.bold}
               />
 
-              <UnderlineLabeledField
-                label="Mot de passe"
-                value={password}
-                onChangeText={setPassword}
-                placeholder={AUTH_FORM_PLACEHOLDERS.password}
-                secureTextEntry={secure}
-                autoCapitalize="none"
-                labelFontFamily={fonts.semi}
-                inputFontFamily={fonts.bold}
-                rightSlot={
+              {usePasswordMode ? (
+                <>
+                  <UnderlineLabeledField
+                    label="Mot de passe"
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="••••••••"
+                    secureTextEntry
+                    autoCapitalize="none"
+                    labelFontFamily={fonts.semi}
+                    inputFontFamily={fonts.bold}
+                  />
                   <Pressable
-                    onPress={() => setSecure((v) => !v)}
-                    hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={secure ? 'Afficher le mot de passe' : 'Masquer le mot de passe'}
+                    onPress={() => router.push(Routes.FORGOT_PASSWORD)}
+                    style={styles.forgotLink}
                   >
-                    <Feather name={secure ? 'eye-off' : 'eye'} size={20} color="#FFD700" />
+                    <Text style={[styles.forgotText, fonts.semi ? { fontFamily: fonts.semi } : undefined]}>
+                      Mot de passe oublié ?
+                    </Text>
                   </Pressable>
-                }
-              />
-
-              <Pressable style={styles.rememberRow} onPress={() => setRememberMe((v) => !v)}>
-                <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                  {rememberMe ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
-                </View>
-                <Text
-                  style={[
-                    styles.rememberLabel,
-                    fonts.semi ? { fontFamily: fonts.semi } : { fontWeight: '600' },
-                  ]}
+                </>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void onDiscoverableLogin()}
+                  disabled={submitting || discoverableSubmitting}
+                  style={styles.discoverableLink}
                 >
-                  Souviens-toi de moi
-                </Text>
-              </Pressable>
-
-              <View style={styles.forgotWrap}>
-                <View style={styles.forgotDivider} />
-                <Pressable accessibilityRole="button" onPress={onForgotPassword}>
-                  <Text
-                    style={[
-                      styles.forgotLink,
-                      fonts.regular ? { fontFamily: fonts.regular } : { fontWeight: '400' },
-                    ]}
-                  >
-                    Mot de passe oublié ?
+                  <Text style={[styles.discoverableText, fonts.semi ? { fontFamily: fonts.semi } : undefined]}>
+                    Utiliser un passkey enregistré sur cet appareil
                   </Text>
                 </Pressable>
-              </View>
+              )}
 
-              <View style={styles.orDivider}>
-                <View style={styles.orDividerLine} />
+              {usePasswordMode ? (
                 <Text
-                  style={[styles.orLabel, fonts.regular ? { fontFamily: fonts.regular } : { fontWeight: '400' }]}
+                  style={[
+                    styles.sessionHint,
+                    fonts.regular ? { fontFamily: fonts.regular } : { fontWeight: '400' },
+                  ]}
                 >
-                  ou
+                  Session limitée à 24 h. Choisissez Passkey pour une connexion biométrique durable.
                 </Text>
-                <View style={styles.orDividerLine} />
-              </View>
-
-              {/* <SocialAuthButtons
-                fontFamily={fonts.semi}
-                loading={socialSubmitting}
-                onGooglePress={() => void onSocialLogin('google')}
-                onFacebookPress={() => void onSocialLogin('facebook')}
-              /> */}
+              ) : null}
             </View>
           </View>
         </ScrollView>
@@ -320,15 +348,17 @@ export default function LoginScreen() {
         ]}
       >
         <View style={[styles.footerInner, onboardingColumn]}>
-          {submitting || socialSubmitting || unlocking ? (
+          {submitting || discoverableSubmitting || googleSubmitting ? (
             <View style={styles.loaderRow}>
               <ActivityIndicator color="#543ACC" />
             </View>
           ) : null}
           <WalkthroughActionButton
-            label="SE CONNECTER"
+            label={usePasswordMode ? 'SE CONNECTER' : 'SE CONNECTER AVEC PASSKEY'}
             variant="primary"
-            onPress={onSubmit}
+            onPress={
+              submitting || discoverableSubmitting || googleSubmitting ? undefined : onSubmit
+            }
             fontFamily={fonts.bold}
           />
         </View>
@@ -361,14 +391,13 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'flex-start',
   },
-  backButton: {
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
   greeting: {
     color: '#212121',
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#616161',
   },
   formBlock: {
     width: '100%',
@@ -380,60 +409,35 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: '#C62828',
   },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: '#FFD700',
-    borderColor: '#FFD700',
-  },
-  rememberLabel: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#212121',
-  },
-  forgotWrap: {
+  errorBlock: {
     width: '100%',
-    alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  forgotDivider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#EEEEEE',
+  registerLink: {
+    fontSize: 15,
+    color: '#543ACC',
+    textDecorationLine: 'underline',
   },
   forgotLink: {
+    paddingVertical: 4,
+  },
+  forgotText: {
     fontSize: 15,
-    color: '#FFD700',
-    textAlign: 'center',
+    color: '#543ACC',
+    textDecorationLine: 'underline',
   },
-  orDivider: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+  discoverableLink: {
+    paddingVertical: 4,
   },
-  orDividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#EEEEEE',
-  },
-  orLabel: {
+  discoverableText: {
     fontSize: 15,
-    lineHeight: 20,
-    color: '#616161',
+    color: '#543ACC',
+    textDecorationLine: 'underline',
+  },
+  sessionHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#757575',
   },
   footerBar: {
     position: 'absolute',

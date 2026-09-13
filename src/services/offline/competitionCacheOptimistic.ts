@@ -1,4 +1,5 @@
 import type { CompetitionSummary } from '@app-types/challenge.types';
+import { resolveEffectiveCompetitionStatus } from '@utils/defis/competitionDisplay';
 
 import { competitionDetailCacheKey, competitionsListCacheKey } from './competitionCacheKeys';
 import { offlineStore } from './OfflineStore';
@@ -18,7 +19,7 @@ async function patchCompetitionInListCache(
   if (!hasMatch) return;
 
   const updated = list.map((item) => (item.id === competitionId ? patch(item) : item));
-  await offlineStore.setCachedResponse({ cacheKey, source: 'supabase', data: updated });
+  await offlineStore.setCachedResponse({ cacheKey, source: 'api', data: updated });
 }
 
 export async function findCachedCompetitionSummary(
@@ -52,7 +53,7 @@ export async function validateRegistrationFromCache(
   }
 
   if (register) {
-    if (competition.status !== 'scheduled') {
+    if (resolveEffectiveCompetitionStatus(competition) !== 'scheduled') {
       throw new Error('Les inscriptions sont fermées pour ce tournoi.');
     }
     if (competition.isRegistered) {
@@ -90,7 +91,7 @@ export async function applyOptimisticRegistration(
   if (detail) {
     await offlineStore.setCachedResponse({
       cacheKey: detailKey,
-      source: 'supabase',
+      source: 'api',
       data: patch(detail),
     });
   } else if (register) {
@@ -101,7 +102,7 @@ export async function applyOptimisticRegistration(
     if (fromList) {
       await offlineStore.setCachedResponse({
         cacheKey: detailKey,
-        source: 'supabase',
+        source: 'api',
         data: patch(fromList),
       });
     }

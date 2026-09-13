@@ -21,6 +21,10 @@ import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingConti
 import { OnboardingCountryPickerField } from '@components/ui/onboarding/OnboardingCountryPickerField';
 import { OnboardingDateField } from '@components/ui/onboarding/OnboardingDateField';
 import { OnboardingFilledField } from '@components/ui/onboarding/OnboardingFilledField';
+import {
+  OnboardingGenderField,
+  type OnboardingGender,
+} from '@components/ui/onboarding/OnboardingGenderField';
 import { OnboardingInternationalPhoneField } from '@components/ui/onboarding/OnboardingInternationalPhoneField';
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
 import { Routes } from '@constants/Routes';
@@ -51,6 +55,7 @@ export default function CreateAccountProfileScreen() {
 
   const [fullName, setFullName] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [gender, setGender] = useState<OnboardingGender | null>(null);
 
   const initialCountry = useMemo(() => {
     const c = getCountryByCca2('SN') ?? getCountryByCca2('FR') ?? getCountryByCca2('US');
@@ -84,11 +89,16 @@ export default function CreateAccountProfileScreen() {
       Alert.alert('Profil incomplet', 'Indiquez au minimum votre nom et votre numéro de téléphone.');
       return;
     }
+    if (!gender) {
+      Alert.alert('Profil incomplet', 'Indiquez votre genre pour personnaliser votre avatar.');
+      return;
+    }
     setProfile({
       fullName: fullName.trim(),
       birthDateIso,
       countryCca2: selectedCountry.cca2,
       phoneE164,
+      gender,
     });
     router.push(Routes.REGISTER);
   };
@@ -158,6 +168,14 @@ export default function CreateAccountProfileScreen() {
                 value={birthDate}
                 onChange={setBirthDate}
                 placeholder={AUTH_FORM_PLACEHOLDERS.birthDate}
+                labelFontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
+                valueFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
+              />
+
+              <OnboardingGenderField
+                label="Genre"
+                value={gender}
+                onChange={setGender}
                 labelFontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
                 valueFontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
               />

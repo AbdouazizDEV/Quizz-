@@ -1,4 +1,3 @@
-import type { ILoginGateway } from './ILoginGateway';
-import { ApiLoginGateway } from './ApiLoginGateway';
+import { PasskeyLoginGateway } from './PasskeyLoginGateway';
 
-export const loginGateway: ILoginGateway = new ApiLoginGateway();
+export const loginGateway = new PasskeyLoginGateway();

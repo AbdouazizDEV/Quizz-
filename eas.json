@@ -11,13 +11,32 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "production"
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.quizzp.com/api/v1",
+        "EXPO_PUBLIC_INVITE_WEB_BASE_URL": "https://quizzp.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "232134350428-4a7abpte6ja4tjnqdu5quiqld2oba72p.apps.googleusercontent.com"
+      }
+    },
+    "preview-ios-sim": {
+      "distribution": "internal",
+      "environment": "production",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.quizzp.com/api/v1",
+        "EXPO_PUBLIC_INVITE_WEB_BASE_URL": "https://quizzp.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "232134350428-4a7abpte6ja4tjnqdu5quiqld2oba72p.apps.googleusercontent.com"
       }
     },
     "production": {
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_ENV": "production"
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.quizzp.com/api/v1",
+        "EXPO_PUBLIC_INVITE_WEB_BASE_URL": "https://quizzp.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "232134350428-4a7abpte6ja4tjnqdu5quiqld2oba72p.apps.googleusercontent.com"
       }
     }
   },

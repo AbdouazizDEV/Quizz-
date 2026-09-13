@@ -10,7 +10,7 @@ import { useAuthMeStore } from '@stores/authMeStore';
 import { useAuthStore } from '@stores/authStore';
 import {
   decodeFriendQrPayload,
-  extractFriendInviteToken,
+  normalizeFriendInviteToken,
   type FriendQrProfile,
 } from '@utils/friendQrPayload';
 
@@ -71,9 +71,13 @@ export async function sendFriendInviteFromRawPayload(
   rawPayload: string,
   myUserId?: string | null,
 ): Promise<FriendInviteSendResult> {
-  const token = extractFriendInviteToken(rawPayload) ?? rawPayload.trim();
+  const token = normalizeFriendInviteToken(rawPayload);
   if (!token) {
-    return { ok: false, code: 'invalid', message: 'Invitation invalide ou expirée.' };
+    return {
+      ok: false,
+      code: 'invalid',
+      message: 'Ce QR code n’est pas une invitation Quizz+ valide. Utilise le scanner dans l’app.',
+    };
   }
   return sendFriendInviteFromToken(token, myUserId);
 }

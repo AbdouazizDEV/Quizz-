@@ -61,10 +61,11 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
   const identity = data.identity;
   const stats = data.stats;
   const quizzes = data.quizzes ?? [];
+  const completedQuizCount = quizzes.length;
 
   const displayName = identity?.display_name?.trim() || 'Joueur';
   const uid = identity?.id || userId || '';
-  const avatarUri = getUserAvatarUri(uid, identity?.avatar_url);
+  const avatarUri = getUserAvatarUri(uid, identity?.avatar_url, identity?.gender ?? 'unknown');
 
   return {
     identity: {
@@ -77,14 +78,14 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
       viewerRelationship: identity?.viewer_relationship ?? (userId ? 'none' : 'self'),
     },
     stats: [
-      { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quiz' },
+      { id: 'quizzo', valueLabel: String(completedQuizCount), caption: 'Quiz' },
       { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Parties' },
       { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Joueurs' },
       { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Trophées' },
       { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'Abonnés' },
       { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
     ],
-    quizTotalCount: stats?.quiz_count ?? 0,
+    quizTotalCount: completedQuizCount,
     quizzes: quizzes.map((q, index) => ({
       id: q.id || `${q.quiz_id ?? 'quiz'}-${index}`,
       title: q.title?.trim() || 'Quiz',

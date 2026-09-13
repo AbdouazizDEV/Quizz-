@@ -85,7 +85,36 @@ export function formatValidationDetails(details: unknown): string | undefined {
 
 export function humanizeApiErrorTitle(error: string): string {
   const trimmed = error.trim();
+  const runtime = humanizeRuntimeError(trimmed);
+  if (runtime) return runtime;
   return GENERIC_ERROR_TITLES[trimmed] ?? AUTH_ERROR_MESSAGES[trimmed] ?? trimmed;
+}
+
+/** Messages techniques JS / réseau → texte utilisateur. */
+export function humanizeRuntimeError(message: string): string | null {
+  const trimmed = message.trim();
+  if (!trimmed) return null;
+
+  const lower = trimmed.toLowerCase();
+
+  if (
+    lower.includes("property '") && lower.includes("doesn't exist") ||
+    lower.includes('referenceerror') ||
+    lower.includes(' is not defined') ||
+    lower.includes('cannot read propert')
+  ) {
+    return 'Impossible d’enregistrer votre score pour le moment. Réessayez dans un instant.';
+  }
+
+  if (lower.includes('network error') || lower.includes('network request failed')) {
+    return 'Connexion instable. Vérifiez votre réseau puis réessayez.';
+  }
+
+  if (/request failed with status code/i.test(trimmed)) {
+    return 'Le serveur n’a pas répondu correctement. Réessayez plus tard.';
+  }
+
+  return null;
 }
 
 export function humanizeAuthError(message: string): string {

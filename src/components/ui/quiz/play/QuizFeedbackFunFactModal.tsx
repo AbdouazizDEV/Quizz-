@@ -24,6 +24,8 @@ export interface QuizFeedbackFunFactModalProps {
   funFact: string;
   /** Libellé de la bonne réponse (incorrect / temps écoulé). */
   correctAnswerLabel?: string;
+  continueLabel?: string;
+  continueDisabled?: boolean;
   onContinue: () => void;
   fonts: ProfileFontFamilies;
 }
@@ -46,6 +48,8 @@ export function QuizFeedbackFunFactModal({
   pointsEarnedLabel,
   funFact,
   correctAnswerLabel,
+  continueLabel = 'Continuer',
+  continueDisabled = false,
   onContinue,
   fonts,
 }: QuizFeedbackFunFactModalProps) {
@@ -115,10 +119,16 @@ export function QuizFeedbackFunFactModal({
 
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ disabled: continueDisabled }}
+            disabled={continueDisabled}
             onPress={onContinue}
-            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+            style={({ pressed }) => [
+              styles.cta,
+              continueDisabled && styles.ctaDisabled,
+              pressed && !continueDisabled && styles.ctaPressed,
+            ]}
           >
-            <Text style={[styles.ctaText, fonts.bold && { fontFamily: fonts.bold }]}>Continuer</Text>
+            <Text style={[styles.ctaText, fonts.bold && { fontFamily: fonts.bold }]}>{continueLabel}</Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -209,6 +219,9 @@ const styles = StyleSheet.create({
   ctaPressed: {
     opacity: 0.92,
     transform: [{ scale: 0.99 }],
+  },
+  ctaDisabled: {
+    opacity: 0.55,
   },
   ctaText: {
     fontSize: 17,

@@ -1,7 +1,15 @@
-import { clearStoredRefreshToken, writeStoredRefreshToken } from './authTokenStorage';
+import type { AuthSessionPayload } from '@app-types/authSession.types';
+
+import {
+  clearStoredRefreshToken,
+  clearStoredSessionExpiresAt,
+  clearStoredSessionHardExpiresAt,
+  writeStoredRefreshToken,
+  writeStoredSessionExpiresAt,
+  writeStoredSessionHardExpiresAt,
+} from './authTokenStorage';
 import type { IAccountRegistrationPersistence, IAuthTokenPersistence } from './authPersistence';
 import type { AuthBootstrapSnapshot, IAuthSessionService } from './IAuthSessionService';
-import { getSupabaseClient } from '@services/supabase/supabaseClientSingleton';
 
 export class DefaultAuthSessionService implements IAuthSessionService {
   constructor(
@@ -17,10 +25,20 @@ export class DefaultAuthSessionService implements IAuthSessionService {
     return { token, hasRegisteredAccount };
   }
 
-  async saveAuthenticatedSession(token: string, refreshToken?: string | null): Promise<void> {
+  async saveAuthenticatedSession(
+    token: string,
+    refreshToken?: string | null,
+    sessionMeta?: Pick<AuthSessionPayload, 'expires_at' | 'session_expires_at'> | null,
+  ): Promise<void> {
     await this.tokens.writeToken(token);
     if (refreshToken?.trim()) {
       await writeStoredRefreshToken(refreshToken.trim());
+    }
+    if (typeof sessionMeta?.expires_at === 'number') {
+      await writeStoredSessionExpiresAt(sessionMeta.expires_at);
+    }
+    if (typeof sessionMeta?.session_expires_at === 'number') {
+      await writeStoredSessionHardExpiresAt(sessionMeta.session_expires_at);
     }
     await this.accountFlags.writeHasRegisteredAccount(true);
   }
@@ -28,9 +46,7 @@ export class DefaultAuthSessionService implements IAuthSessionService {
   async signOut(): Promise<void> {
     await this.tokens.clearToken();
     await clearStoredRefreshToken();
-    const client = getSupabaseClient();
-    if (client) {
-      await client.auth.signOut();
-    }
+    await clearStoredSessionExpiresAt();
+    await clearStoredSessionHardExpiresAt();
   }
 }

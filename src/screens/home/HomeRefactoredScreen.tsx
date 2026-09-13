@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
   FlatList,
   Platform,
   Pressable,
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeActionTiles } from '@components/ui/home/HomeActionTiles';
 import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
-import { HomeDailyCategoriesSection } from '@components/ui/home/HomeDailyCategoriesSection';
+import { HomeDailyQuizSection } from '@components/ui/home/HomeDailyQuizSection';
 import { HomeHeaderCard } from '@components/ui/home/HomeHeaderCard';
 import { HomeNotificationsSheet } from '@components/ui/home/HomeNotificationsSheet';
 import { NotificationDeleteConfirmModal } from '@components/ui/settings/NotificationDeleteConfirmModal';
@@ -31,18 +32,20 @@ import {
 import { HomeRewardsSection } from '@components/ui/home/HomeRewardsSection';
 import { HomeSectionTitle } from '@components/ui/home/HomeSectionTitle';
 import type { AppNotification } from '@app-types/notification.types';
-import { buildUserProfileHref, Routes } from '@constants/Routes';
+import type { DailyQuizCard } from '@app-types/dailyQuiz.types';
+import { buildQuizEntryHref, buildUserProfileHref, Routes } from '@constants/Routes';
 import { DefisRoutes } from '@constants/defisRoutes';
 import type { HomeActionTileId } from '@constants/homeActionTiles';
 import { Spacing } from '@constants/Spacing';
-import { useCategoriesExplore } from '@hooks/useCategoriesExplore';
+import { useDailyQuizzes } from '@hooks/useDailyQuizzes';
+import { useHomeFunFacts } from '@hooks/useHomeFunFacts';
 import { useAuthMe } from '@hooks/useAuthMe';
 import { useGlobalLeaderboard } from '@hooks/useGlobalLeaderboard';
 import { useAuthStore } from '@stores/authStore';
-import { canVisitorAccessCategory, isVisitorSession } from '@services/auth/visitorAccessPolicy';
+import { isVisitorSession } from '@services/auth/visitorAccessPolicy';
 import { useNotifications } from '@hooks/useNotifications';
 import { useNotificationInteractions } from '@hooks/useNotificationInteractions';
-import { getUserAvatarUri } from '@utils/getUserAvatarUri';
+import { getUserAvatarUri, resolveProfileGender } from '@utils/getUserAvatarUri';
 import {
   elapsedDaysSince,
   firstNameFromDisplay,
@@ -54,32 +57,12 @@ import {
   levelProgressEndpoints,
 } from '@utils/levelDisplay';
 import { useAppError } from '@providers/AppErrorProvider';
+import {
+  FALLBACK_HOME_INSIGHTS,
+  mapFunFactsToInsights,
+} from '@utils/homeFunFactsDisplay';
 
 const BOTTOM_NAV_HEIGHT = 86;
-
-const INSIGHTS: HomeInsightItem[] = [
-  {
-    id: 'savoir-1',
-    title: 'Le cerveau adore les quiz courts',
-    body: 'Des sessions de 3 a 5 minutes ameliorent la memorisation a long terme.',
-    tag: 'Neurosciences',
-    gradient: ['#EEF2FF', '#E0E7FF'],
-  },
-  {
-    id: 'savoir-2',
-    title: 'Repondre vite aide la concentration',
-    body: "Limiter le temps de reponse active l'attention et reduit la distraction.",
-    tag: 'Productivite',
-    gradient: ['#FFF7D6', '#FFE9A8'],
-  },
-  {
-    id: 'savoir-3',
-    title: 'La repetition espacee fonctionne',
-    body: 'Rejouer un quiz 24h puis 72h plus tard ancre les connaissances.',
-    tag: 'Methode',
-    gradient: ['#E8FAF2', '#CCF1E2'],
-  },
-];
 
 export default function HomeRefactoredScreen() {
   const router = useRouter();
@@ -94,7 +77,16 @@ export default function HomeRefactoredScreen() {
   const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
   const { data: me, loading: meLoading, refetch: refetchAuthMe } = useAuthMe();
   const { items: leaderboardRows, refetch: refetchLeaderboard } = useGlobalLeaderboard(5);
-  const { data: allCategories, loading: categoriesLoading } = useCategoriesExplore();
+  const {
+    data: dailyQuizzes,
+    isLoading: dailyQuizzesLoading,
+    refetch: refetchDailyQuizzes,
+  } = useDailyQuizzes();
+  const {
+    data: funFacts,
+    isLoading: funFactsLoading,
+    refetch: refetchFunFacts,
+  } = useHomeFunFacts();
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const {
@@ -133,13 +125,25 @@ export default function HomeRefactoredScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void refetchAuthMe({ force: false });
+      // Après un quiz : rafraîchir le score (merge Math.max protège un patch local plus élevé).
+      void refetchAuthMe({ force: true });
       void refetchLeaderboard();
+      void refetchDailyQuizzes();
+      void refetchFunFacts();
       if (token?.trim()) {
         void refreshNotifications();
       }
-    }, [refetchAuthMe, refetchLeaderboard, refreshNotifications, token]),
+    }, [refetchAuthMe, refetchDailyQuizzes, refetchFunFacts, refetchLeaderboard, refreshNotifications, token]),
   );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        void refetchAuthMe({ force: true });
+      }
+    });
+    return () => sub.remove();
+  }, [refetchAuthMe]);
 
   const openNotifications = useCallback(async () => {
     setNotificationsVisible(true);
@@ -182,24 +186,22 @@ export default function HomeRefactoredScreen() {
     [rejectDuel, showAppError],
   );
 
-  const topThreeCategories = useMemo(() => allCategories.slice(0, 3), [allCategories]);
-
   const goToAllCategories = useCallback(() => {
     router.push(Routes.CATEGORIES);
   }, [router]);
 
-  const goToCategory = useCallback(
-    (categorySlug: string) => {
-      if (
-        isVisitorSession({ token, hasRegisteredAccount }) &&
-        !canVisitorAccessCategory({ slug: categorySlug })
-      ) {
+  const goToDailyQuiz = useCallback(
+    (quiz: DailyQuizCard) => {
+      if (!quiz.isPlayable) return;
+      if (isVisitor) {
         router.push(Routes.LOGIN);
         return;
       }
-      router.push(`${Routes.CATEGORIES}/${categorySlug}`);
+      router.push(
+        buildQuizEntryHref(quiz.id, { categorySlug: quiz.categorySlug }) as never,
+      );
     },
-    [hasRegisteredAccount, router, token],
+    [isVisitor, router],
   );
   const goToScoreboard = useCallback(() => {
     router.push(Routes.PLAYERS);
@@ -246,16 +248,29 @@ export default function HomeRefactoredScreen() {
     return () => pulse.stop();
   }, [glowAnim]);
 
+  const insights = useMemo<HomeInsightItem[]>(() => {
+    const fromApi = mapFunFactsToInsights(funFacts?.items ?? []);
+    return fromApi.length > 0 ? fromApi : FALLBACK_HOME_INSIGHTS;
+  }, [funFacts?.items]);
+
+  const insightIdsKey = useMemo(() => insights.map((item) => item.id).join('|'), [insights]);
+
   useEffect(() => {
+    setActiveInsight(0);
+    carouselRef.current?.scrollToIndex({ index: 0, animated: false });
+  }, [insightIdsKey]);
+
+  useEffect(() => {
+    if (insights.length <= 1) return;
     const timer = setInterval(() => {
       setActiveInsight((prev) => {
-        const next = (prev + 1) % INSIGHTS.length;
+        const next = (prev + 1) % insights.length;
         carouselRef.current?.scrollToIndex({ index: next, animated: true });
         return next;
       });
     }, 4200);
     return () => clearInterval(timer);
-  }, []);
+  }, [insights.length]);
 
   const headerVm = useMemo(() => {
     const profile = me?.profile;
@@ -279,7 +294,11 @@ export default function HomeRefactoredScreen() {
     const daysActive = Math.max(profile?.days_active ?? 0, elapsedDays);
     const clockLabel =
       streak > 0 ? formatJoursLabel(streak) : daysActive > 0 ? formatJoursLabel(daysActive) : '0 jour';
-    const loadingPlaceholders = Boolean(token?.trim()) && meLoading;
+    const loadingPlaceholders = Boolean(token?.trim()) && meLoading && !profile;
+    const gender = resolveProfileGender(
+      (profile as Record<string, unknown> | undefined)?.gender,
+      meta?.gender,
+    );
 
     return {
       userId: me?.user?.id,
@@ -287,6 +306,7 @@ export default function HomeRefactoredScreen() {
       avatarUri: getUserAvatarUri(
         me?.user?.id ?? 'me',
         profile?.avatar_url ?? (typeof meta?.avatar_url === 'string' ? meta.avatar_url : undefined),
+        gender,
       ),
       displayNameWithEmoji: loadingPlaceholders ? '··· 👋' : `${first} 👋`,
       totalScoreDisplay: loadingPlaceholders ? '—' : String(score),
@@ -358,20 +378,21 @@ export default function HomeRefactoredScreen() {
           <View style={styles.section}>
             <HomeSectionTitle title="Le savoir du jour" />
             <HomeInsightCarousel
-              insights={INSIGHTS}
+              insights={insights}
               contentWidth={contentWidth}
               activeIndex={activeInsight}
               onChangeIndex={setActiveInsight}
               carouselRef={carouselRef}
+              loading={funFactsLoading && insights.length === 0}
             />
           </View>
 
           <View style={styles.section}>
             <HomeSectionTitle title="Quizz du jour" action="Voir tout" onActionPress={goToAllCategories} />
-            <HomeDailyCategoriesSection
-              categories={topThreeCategories}
-              loading={categoriesLoading}
-              onPressCategory={goToCategory}
+            <HomeDailyQuizSection
+              quizzes={dailyQuizzes?.items ?? []}
+              loading={dailyQuizzesLoading}
+              onPressQuiz={goToDailyQuiz}
             />
           </View>
 
@@ -407,7 +428,7 @@ export default function HomeRefactoredScreen() {
         onClose={() => setNotificationsVisible(false)}
         onMarkAllRead={() => void markAllRead()}
         onPressItem={(item) => void handleNotificationPress(item)}
-        onDeleteRequest={requestDelete}
+        onSwipeDelete={requestDelete}
         onAcceptFriend={(id) => void acceptFriend(id)}
         onRejectFriend={(id) => void rejectFriend(id)}
         onAcceptDuel={(item) => void onAcceptDuelNotification(item)}

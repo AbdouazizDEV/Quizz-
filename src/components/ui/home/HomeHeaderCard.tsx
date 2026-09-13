@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useMemo, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react';
 import {
   Animated as RNAnimated,
   Image,
@@ -25,7 +25,7 @@ import Animated, {
 
 import { Routes } from '@constants/Routes';
 import { shareFriendProfile } from '@services/network/shareFriendProfile';
-import { buildFriendQrProfile, encodeFriendQrDeepLink } from '@utils/friendQrPayload';
+import { buildFriendQrProfile, encodeFriendQrScanPayload } from '@utils/friendQrPayload';
 
 /** Largeur de référence (iPhone 11 / Pixel) — en dessous, les tailles diminuent. */
 const REF_WIDTH = 390;
@@ -148,8 +148,13 @@ export function HomeHeaderCard({
   const { width, fontScale: systemFontScale } = useWindowDimensions();
   const [isFlipped, setIsFlipped] = useState(false);
   const [faceHeights, setFaceHeights] = useState({ front: 0, back: 0 });
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const flipProgress = useSharedValue(0);
   const containerHeight = useSharedValue(0);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUri]);
 
   const sizes = useMemo(() => {
     const widthRatio = Math.min(1.08, Math.max(0.78, width / REF_WIDTH));
@@ -192,7 +197,7 @@ export function HomeHeaderCard({
   }, [displayNameWithEmoji, levelLabel, totalScoreDisplay, userId]);
 
   const qrValue = useMemo(
-    () => (qrProfile ? encodeFriendQrDeepLink(qrProfile) : ''),
+    () => (qrProfile ? encodeFriendQrScanPayload(qrProfile) : ''),
     [qrProfile],
   );
 
@@ -292,8 +297,12 @@ export function HomeHeaderCard({
           onPress={onPressAvatar}
           accessibilityRole="button"
         >
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          {avatarUri && !avatarLoadFailed ? (
+            <Image
+              source={{ uri: avatarUri }}
+              style={styles.avatarImage}
+              onError={() => setAvatarLoadFailed(true)}
+            />
           ) : (
             <Text style={[styles.avatarText, { fontSize: sizes.avatar }]}>{avatarInitial}</Text>
           )}

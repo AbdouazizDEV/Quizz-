@@ -10,7 +10,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Modal,
@@ -24,40 +23,30 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { OnboardingContinueBar } from '@components/ui/onboarding/OnboardingContinueBar';
 import { OnboardingProgressBar } from '@components/ui/onboarding/OnboardingProgressBar';
+import { AuthMethodSwitch, type AuthMethod } from '@components/ui/auth/AuthMethodSwitch';
+import { AuthSocialDivider } from '@components/ui/auth/AuthSocialDivider';
+import { SocialAuthButtons } from '@components/ui/auth/SocialAuthButtons';
 import { AUTH_FORM_PLACEHOLDERS } from '@constants/authFormPlaceholders';
 import { onboardingColumn } from '@constants/layout';
 import { Routes } from '@constants/Routes';
-import { persistLoginAndSyncStore, signOutAndSyncStore } from '@services/auth/authSessionController';
-import { getAuthMeFromStore } from '@services/auth/authMeRepository';
+import { isGoogleSignInConfigured } from '@config';
+import { useGoogleAuthFinish } from '@hooks/useGoogleAuthFinish';
+import { persistPasskeyAuthResult } from '@services/auth/authSessionController';
+import { canUseLocalPasskey } from '@services/auth/devicePasskeyCapability';
 import { mapLoginUserToAuthMe } from '@services/auth/mapLoginToAuthMe';
-import { socialAuthGateway } from '@services/auth/socialAuthGateway';
+import { registerWithPasskey, toFrenchPasskeyError } from '@services/auth/passkeyAuthService';
+import { registerWithPassword } from '@services/auth/passwordAuthService';
 import { Spacing } from '@constants/Spacing';
-import { getQuizzApiClient, parseQuizzApiError } from '@sdk';
 import { useOnboardingRegisterStore } from '@stores/onboardingRegisterStore';
 
 const BOTTOM_BAR_MIN = 118;
 const SUCCESS_MODAL_MS = 5_000;
 const PLACEHOLDER_COLOR = '#8E8E93';
 
-function formatRegisterApiError(raw: string | undefined): string {
-  if (!raw) return 'Impossible de finaliser l’inscription. Réessayez.';
-  const lower = raw.toLowerCase();
-  if (
-    lower.includes('database error creating new user') ||
-    lower.includes('database error saving new user')
-  ) {
-    return 'Impossible de créer le profil (pseudo ou téléphone déjà utilisé). Essayez un autre nom d’utilisateur.';
-  }
-  if (lower.includes('user already registered') || lower.includes('already been registered')) {
-    return 'Cette adresse e-mail est déjà utilisée. Connectez-vous ou réinitialisez votre mot de passe.';
-  }
-  if (lower.includes('rate limit') || lower.includes('too many')) {
-    return 'Limite Supabase atteinte : trop d’e-mails ou de tentatives. Attendez ~1 h, ou testez avec une autre adresse (ex. alias +test@gmail.com). Vérifiez aussi Auth → Rate Limits dans le dashboard.';
-  }
-  return raw;
+function formatRegisterApiError(raw: unknown): string {
+  return toFrenchPasskeyError(raw) || 'Impossible de finaliser l’inscription. Réessayez.';
 }
 
 export default function RegisterScreen() {
@@ -75,12 +64,22 @@ export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
-  const [secure, setSecure] = useState(true);
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passkeyAvailable, setPasskeyAvailable] = useState(false);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('password');
+  const [capabilityReady, setCapabilityReady] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [socialSubmitting, setSocialSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const showGoogle = isGoogleSignInConfigured();
+  const {
+    signInWithGoogle,
+    googleSubmitting,
+    googleError,
+    clearGoogleError,
+  } = useGoogleAuthFinish();
+
+  const displayError = formError ?? googleError;
 
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.88)).current;
@@ -95,97 +94,81 @@ export default function RegisterScreen() {
     router.back();
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const ok = await canUseLocalPasskey();
+      if (!cancelled) {
+        setPasskeyAvailable(ok);
+        setAuthMethod(ok ? 'passkey' : 'password');
+        setCapabilityReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const usePasswordMode = authMethod === 'password';
+
   const handleSignup = async () => {
-    if (submitting) return;
+    if (submitting || googleSubmitting) return;
     setFormError(null);
+    clearGoogleError();
 
     const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
-    if (!trimmedUsername || !trimmedEmail || !password) {
-      setFormError('Renseignez le nom d’utilisateur, l’e-mail et le mot de passe.');
+    if (!trimmedUsername || !trimmedEmail) {
+      setFormError('Renseignez le nom d’utilisateur et l’e-mail.');
       return;
     }
     if (trimmedUsername.length > 50) {
       setFormError('Le nom d’utilisateur ne peut pas dépasser 50 caractères.');
       return;
     }
-    if (password.length < 6) {
-      setFormError('Le mot de passe doit contenir au moins 6 caractères.');
-      return;
+
+    if (usePasswordMode) {
+      if (password.length < 6) {
+        setFormError('Le mot de passe doit contenir au moins 6 caractères.');
+        return;
+      }
+      if (password !== passwordConfirm) {
+        setFormError('Les mots de passe ne correspondent pas.');
+        return;
+      }
     }
 
     const onboarding = useOnboardingRegisterStore.getState();
 
     setSubmitting(true);
     try {
-      const { data, error } = await getQuizzApiClient().POST('/auth/register', {
-        body: {
-          email: trimmedEmail,
-          password,
-          username: trimmedUsername,
-          account_type: onboarding.accountTypeId || undefined,
-          workplace: onboarding.workplaceId || undefined,
-          full_name: onboarding.fullName.trim() || undefined,
-          birth_date: onboarding.birthDateIso || undefined,
-          country_code: onboarding.countryCca2 || undefined,
-          phone: onboarding.phoneE164.trim() || undefined,
-        },
-      });
+      const common = {
+        email: trimmedEmail,
+        username: trimmedUsername,
+        account_type: onboarding.accountTypeId || undefined,
+        workplace: onboarding.workplaceId || undefined,
+        full_name: onboarding.fullName.trim() || undefined,
+        birth_date: onboarding.birthDateIso || undefined,
+        country_code: onboarding.countryCca2 || undefined,
+        phone: onboarding.phoneE164.trim() || undefined,
+        gender: onboarding.gender || undefined,
+      };
 
-      if (error || !data) {
-        setFormError(formatRegisterApiError(parseQuizzApiError(error)));
-        return;
-      }
+      const { user, session } = usePasswordMode
+        ? await registerWithPassword({ ...common, password })
+        : await registerWithPasskey(common);
 
-      const token = data.session?.access_token;
-      const refreshToken = data.session?.refresh_token;
-      if (token && refreshToken) {
-        await persistLoginAndSyncStore(
-          token,
-          refreshToken,
-          data.user ? mapLoginUserToAuthMe(data.user) : null,
-        );
-        onboarding.clear();
-        setShowSuccess(true);
-        return;
-      }
-
-      Alert.alert(
-        'Session non disponible',
-        data.hint ??
-          'Confirmez votre e-mail ou configurez SUPABASE_SERVICE_ROLE_KEY sur l’API pour obtenir une session immédiate.',
-        [{ text: 'OK', onPress: () => router.replace(Routes.LOGIN) }],
-      );
+      await persistPasskeyAuthResult(session, mapLoginUserToAuthMe(user));
+      onboarding.clear();
+      setShowSuccess(true);
     } catch (error) {
-      setFormError(formatRegisterApiError(parseQuizzApiError(error)));
+      const message = formatRegisterApiError(error);
+      setFormError(message);
+      if (!usePasswordMode && /e-mail et mot de passe/i.test(message)) {
+        setAuthMethod('password');
+      }
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleSocialSignup = async (provider: 'google' | 'facebook') => {
-    if (submitting || socialSubmitting) return;
-    setFormError(null);
-    setSocialSubmitting(true);
-    try {
-      const accessToken =
-        provider === 'google'
-          ? await socialAuthGateway.startGoogle()
-          : await socialAuthGateway.startFacebook();
-      await persistLoginAndSyncStore(accessToken);
-      const me = getAuthMeFromStore();
-      if (!me) {
-        await signOutAndSyncStore();
-        throw new Error(
-          'La session Google n’a pas été acceptée par le serveur. Réessayez ou inscrivez-vous par e-mail.',
-        );
-      }
-      useOnboardingRegisterStore.getState().clear();
-      router.replace(Routes.HOME);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Connexion sociale impossible.');
-    } finally {
-      setSocialSubmitting(false);
     }
   };
 
@@ -321,12 +304,36 @@ export default function RegisterScreen() {
                   fontsLoaded ? { fontFamily: 'Nunito_400Regular' } : { fontWeight: '400' },
                 ]}
               >
-                Veuillez saisir votre nom d&apos;utilisateur, votre adresse e-mail et votre mot de
-                passe.
+                {showGoogle && usePasswordMode
+                  ? 'Inscrivez-vous avec Google ou avec e-mail et mot de passe.'
+                  : usePasswordMode
+                    ? 'Saisissez votre nom d’utilisateur, votre e-mail et un mot de passe.'
+                    : 'Saisissez votre nom d’utilisateur et votre e-mail. Vous validerez ensuite avec Face ID ou empreinte.'}
               </Text>
+              {capabilityReady && passkeyAvailable ? (
+                <AuthMethodSwitch
+                  value={authMethod}
+                  onChange={setAuthMethod}
+                  passkeyAvailable={passkeyAvailable}
+                  labelFontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
+                />
+              ) : null}
             </View>
 
             <View style={styles.formBlock}>
+              {showGoogle && usePasswordMode ? (
+                <>
+                  <SocialAuthButtons
+                    fontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
+                    loading={googleSubmitting}
+                    onGooglePress={() => void signInWithGoogle()}
+                    onFacebookPress={() => undefined}
+                    showFacebook={false}
+                  />
+                  <AuthSocialDivider fontFamily={fontsLoaded ? 'Nunito_400Regular' : undefined} />
+                </>
+              ) : null}
+
               <View style={styles.fieldBlock}>
                 <Text
                   style={[
@@ -374,95 +381,100 @@ export default function RegisterScreen() {
                 <View style={styles.underline} />
               </View>
 
-              <View style={styles.fieldBlock}>
+              {usePasswordMode ? (
+                <>
+                  <View style={styles.fieldBlock}>
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        fontsLoaded ? { fontFamily: 'Nunito_600SemiBold' } : { fontWeight: '600' },
+                      ]}
+                    >
+                      Mot de passe
+                    </Text>
+                    <TextInput
+                      value={password}
+                      onChangeText={setPassword}
+                      style={[
+                        styles.fieldInput,
+                        fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
+                      ]}
+                      placeholder="••••••••"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
+                      secureTextEntry
+                      autoCapitalize="none"
+                    />
+                    <View style={styles.underline} />
+                  </View>
+                  <View style={styles.fieldBlock}>
+                    <Text
+                      style={[
+                        styles.fieldLabel,
+                        fontsLoaded ? { fontFamily: 'Nunito_600SemiBold' } : { fontWeight: '600' },
+                      ]}
+                    >
+                      Confirmer le mot de passe
+                    </Text>
+                    <TextInput
+                      value={passwordConfirm}
+                      onChangeText={setPasswordConfirm}
+                      style={[
+                        styles.fieldInput,
+                        fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
+                      ]}
+                      placeholder="••••••••"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
+                      secureTextEntry
+                      autoCapitalize="none"
+                    />
+                    <View style={styles.underline} />
+                  </View>
+                  <Text
+                    style={[
+                      styles.passkeyHint,
+                      fontsLoaded ? { fontFamily: 'Nunito_400Regular' } : { fontWeight: '400' },
+                    ]}
+                  >
+                    Session limitée à 24 h. Choisissez Passkey pour une connexion biométrique durable.
+                  </Text>
+                </>
+              ) : (
                 <Text
                   style={[
-                    styles.fieldLabel,
-                    fontsLoaded ? { fontFamily: 'Nunito_600SemiBold' } : { fontWeight: '600' },
+                    styles.passkeyHint,
+                    fontsLoaded ? { fontFamily: 'Nunito_400Regular' } : { fontWeight: '400' },
                   ]}
                 >
-                  Mot de passe
+                  {capabilityReady
+                    ? 'Vous configurerez Face ID ou empreinte digitale à l’étape suivante.'
+                    : 'Vérification de la sécurité de l’appareil…'}
                 </Text>
-                <View style={styles.passwordRow}>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    style={[
-                      styles.fieldInput,
-                      styles.passwordInput,
-                      fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
-                    ]}
-                    secureTextEntry={secure}
-                    placeholder={AUTH_FORM_PLACEHOLDERS.password}
-                    placeholderTextColor={PLACEHOLDER_COLOR}
-                    autoCapitalize="none"
-                  />
-                  <Pressable
-                    onPress={() => setSecure((prev) => !prev)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={secure ? 'Afficher le mot de passe' : 'Masquer le mot de passe'}
-                  >
-                    <Feather name={secure ? 'eye-off' : 'eye'} size={20} color="#FFD700" />
-                  </Pressable>
-                </View>
-                <View style={styles.underline} />
-              </View>
+              )}
             </View>
 
-            {formError ? (
+            {displayError ? (
               <Text
                 style={[
                   styles.formError,
                   fontsLoaded ? { fontFamily: 'Nunito_400Regular' } : { fontWeight: '400' },
                 ]}
               >
-                {formError}
+                {displayError}
               </Text>
             ) : null}
-
-            <Pressable style={styles.rememberRow} onPress={() => setRememberMe((prev) => !prev)}>
-              <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                {rememberMe ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
-              </View>
-              <Text
-                style={[
-                  styles.rememberLabel,
-                  fontsLoaded ? { fontFamily: 'Nunito_600SemiBold' } : { fontWeight: '600' },
-                ]}
-              >
-                Souviens-toi de moi
-              </Text>
-            </Pressable>
-
-            <View style={styles.orDivider}>
-              <View style={styles.dividerLine} />
-              <Text
-                style={[
-                  styles.orText,
-                  fontsLoaded ? { fontFamily: 'Nunito_400Regular' } : { fontWeight: '400' },
-                ]}
-              >
-                or
-              </Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.socialContainer}>
-              <SocialAuthButtons
-                fontFamily={fontsLoaded ? 'Nunito_600SemiBold' : undefined}
-                loading={socialSubmitting}
-                onGooglePress={() => void handleSocialSignup('google')}
-                onFacebookPress={() => void handleSocialSignup('facebook')}
-              />
-            </View>
           </ScrollView>
         </View>
       </View>
 
       <OnboardingContinueBar
-        label={submitting ? 'Inscription…' : 'Inscrivez-vous'}
-        onPress={() => void handleSignup()}
+        label={
+          submitting || googleSubmitting
+            ? 'Inscription…'
+            : usePasswordMode
+              ? 'Créer mon compte'
+              : 'Inscrivez-vous avec Passkey'
+        }
+        onPress={submitting || googleSubmitting ? undefined : () => void handleSignup()}
         fontFamily={fontsLoaded ? 'Nunito_700Bold' : undefined}
       />
 
@@ -609,63 +621,17 @@ const styles = StyleSheet.create({
     padding: 0,
     margin: 0,
   },
-  passwordRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  passwordInput: {
-    flex: 1,
+  passkeyHint: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#616161',
+    marginTop: 8,
   },
   underline: {
     width: '100%',
     height: 2,
     borderRadius: 2,
     backgroundColor: 'rgba(255, 215, 0, 0.87)',
-  },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: '#FFD700',
-    borderColor: '#FFD700',
-  },
-  rememberLabel: {
-    fontSize: 20,
-    lineHeight: 30,
-    color: '#212121',
-  },
-  orDivider: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#EEEEEE',
-  },
-  orText: {
-    fontSize: 20,
-    lineHeight: 26,
-    color: '#616161',
-  },
-  socialContainer: {
-    width: '100%',
   },
   pressed: {
     opacity: 0.9,

@@ -8,4 +8,11 @@ export class StubCoverPhotoPickerService implements ICoverPhotoPickerService {
   > {
     return { cancelled: true };
   }
+
+  async openAvatarPicker(): Promise<
+    | { cancelled: true }
+    | { cancelled: false; uri: string; base64?: string; mimeType?: string | null }
+  > {
+    return { cancelled: true };
+  }
 }

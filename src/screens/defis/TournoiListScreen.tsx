@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +24,11 @@ import {
   fetchCompetitionsByTab,
   registerForCompetition,
 } from '@services/defis/competitionRepository';
+import {
+  canRegisterForCompetition,
+  getCompetitionStatusLabel,
+  resolveEffectiveCompetitionStatus,
+} from '@utils/defis/competitionDisplay';
 import { useAppError } from '@providers/AppErrorProvider';
 
 type TournoiTab = 'inscriptions' | 'en_cours' | 'fin';
@@ -33,12 +39,6 @@ const TABS = [
   { id: 'fin' as const, label: 'Terminés' },
 ];
 
-const TAB_STATUS: Record<TournoiTab, string> = {
-  inscriptions: 'Inscriptions ouvertes',
-  en_cours: 'En cours',
-  fin: 'Terminé',
-};
-
 export default function TournoiListScreen() {
   const [tab, setTab] = useState<TournoiTab>('inscriptions');
   const router = useRouter();
@@ -48,11 +48,18 @@ export default function TournoiListScreen() {
   const userId = authMe?.user?.id ?? '';
   const { isOnline } = useNetworkStatus();
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['competitions', tab, userId],
     queryFn: () => fetchCompetitionsByTab(tab, userId),
     enabled: Boolean(userId),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      void refetch();
+    }, [refetch, userId]),
+  );
 
   const onRegister = async (competition: CompetitionSummary) => {
     if (!userId) return;
@@ -104,8 +111,6 @@ export default function TournoiListScreen() {
           key={competition.id}
           competition={competition}
           index={index}
-          tab={tab}
-          statusLabel={TAB_STATUS[tab]}
           onPress={() => router.push(DefisRoutes.tournoiDetail(competition.id))}
           onRegister={() => void onRegister(competition)}
         />
@@ -125,15 +130,11 @@ export default function TournoiListScreen() {
 function TournoiCard({
   competition,
   index,
-  tab,
-  statusLabel,
   onPress,
   onRegister,
 }: {
   competition: CompetitionSummary;
   index: number;
-  tab: TournoiTab;
-  statusLabel: string;
   onPress: () => void;
   onRegister: () => void;
 }) {
@@ -141,7 +142,9 @@ function TournoiCard({
     ? competition.registeredCount / competition.maxParticipants
     : 0;
   const isFull = competition.registeredCount >= competition.maxParticipants;
-  const canRegister = tab === 'inscriptions' && !competition.isRegistered && !isFull;
+  const effectiveStatus = resolveEffectiveCompetitionStatus(competition);
+  const canRegister = canRegisterForCompetition(competition);
+  const statusLabel = getCompetitionStatusLabel(competition);
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(400)}>
@@ -176,7 +179,7 @@ function TournoiCard({
           </View>
           {competition.startsAt ? (
             <Text style={styles.date}>
-              📅 {tab === 'inscriptions' ? 'Inscriptions jusqu\'au' : 'Commence le'}{' '}
+              📅 {effectiveStatus === 'scheduled' ? 'Inscriptions jusqu\'au' : 'Commence le'}{' '}
               {formatDate(competition.startsAt)}
             </Text>
           ) : null}
@@ -196,7 +199,7 @@ function TournoiCard({
               <Text style={styles.ctaText}>Rejoindre →</Text>
             </Pressable>
           ) : null}
-          {competition.isRegistered && tab === 'inscriptions' ? (
+          {competition.isRegistered && effectiveStatus === 'scheduled' ? (
             <Text style={styles.registered}>✓ Inscrit — bonne chance !</Text>
           ) : null}
         </View>

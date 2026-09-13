@@ -42,3 +42,33 @@ export async function writeStoredRefreshToken(refreshToken: string): Promise<voi
 export async function clearStoredRefreshToken(): Promise<void> {
   await clearSecureOrAsync(AUTH_STORAGE_KEYS.refreshToken);
 }
+
+export async function readStoredSessionExpiresAt(): Promise<number | null> {
+  const raw = await readSecureOrAsync(AUTH_STORAGE_KEYS.sessionExpiresAt);
+  if (!raw) return null;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function writeStoredSessionExpiresAt(expiresAt: number): Promise<void> {
+  await writeSecureOrAsync(AUTH_STORAGE_KEYS.sessionExpiresAt, String(expiresAt));
+}
+
+export async function clearStoredSessionExpiresAt(): Promise<void> {
+  await clearSecureOrAsync(AUTH_STORAGE_KEYS.sessionExpiresAt);
+}
+
+export async function readStoredSessionHardExpiresAt(): Promise<number | null> {
+  const raw = await readSecureOrAsync(AUTH_STORAGE_KEYS.sessionHardExpiresAt);
+  if (!raw) return null;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function writeStoredSessionHardExpiresAt(expiresAt: number): Promise<void> {
+  await writeSecureOrAsync(AUTH_STORAGE_KEYS.sessionHardExpiresAt, String(expiresAt));
+}
+
+export async function clearStoredSessionHardExpiresAt(): Promise<void> {
+  await clearSecureOrAsync(AUTH_STORAGE_KEYS.sessionHardExpiresAt);
+}

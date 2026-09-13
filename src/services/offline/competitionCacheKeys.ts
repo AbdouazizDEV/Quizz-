@@ -2,18 +2,18 @@ import { buildCacheKey } from './cacheKey';
 
 export function competitionsListCacheKey(tab: string, userId: string): string {
   return buildCacheKey({
-    source: 'supabase',
+    source: 'api',
     method: 'GET',
-    path: 'competitions/list',
+    path: 'defis/competitions/list',
     params: { tab, userId },
   });
 }
 
 export function competitionDetailCacheKey(competitionId: string, userId: string): string {
   return buildCacheKey({
-    source: 'supabase',
+    source: 'api',
     method: 'GET',
-    path: 'competitions/detail',
+    path: 'defis/competitions/detail',
     params: { competitionId, userId },
   });
 }

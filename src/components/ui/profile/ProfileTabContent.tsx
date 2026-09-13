@@ -12,12 +12,11 @@ const INITIAL_VISIBLE = 10;
 
 interface ProfileTabContentProps {
   tab: ProfileTabId;
-  quizTotalCount: number;
   quizzes: ProfileQuizListItem[];
   fonts: ProfileFontFamilies;
 }
 
-export function ProfileTabContent({ tab, quizTotalCount, quizzes, fonts }: ProfileTabContentProps) {
+export function ProfileTabContent({ tab, quizzes, fonts }: ProfileTabContentProps) {
   const [expanded, setExpanded] = useState(false);
 
   const visibleQuizzes = useMemo(() => {
@@ -26,7 +25,7 @@ export function ProfileTabContent({ tab, quizTotalCount, quizzes, fonts }: Profi
   }, [expanded, quizzes]);
 
   const hasMore = quizzes.length > INITIAL_VISIBLE;
-  const displayCount = Math.max(quizTotalCount, quizzes.length);
+  const displayCount = quizzes.length;
 
   if (tab === 'collections') {
     return (

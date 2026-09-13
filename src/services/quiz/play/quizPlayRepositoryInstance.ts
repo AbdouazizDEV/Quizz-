@@ -1,7 +1,7 @@
 import type { IQuizPlayRepository } from '@services/quiz/play/IQuizPlayRepository';
-import { SupabaseQuizPlayRepository } from '@services/quiz/play/supabaseQuizPlayRepository';
+import { NestQuizPlayRepository } from '@services/quiz/play/nestQuizPlayRepository';
 
-let instance: IQuizPlayRepository = new SupabaseQuizPlayRepository();
+let instance: IQuizPlayRepository = new NestQuizPlayRepository();
 
 export function getQuizPlayRepository(): IQuizPlayRepository {
   return instance;

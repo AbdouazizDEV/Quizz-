@@ -68,7 +68,7 @@ export default function ProfileScreen() {
     [fontsLoaded],
   );
 
-  const { data: authMe } = useAuthMe();
+  const { data: authMe, refetch: refetchAuthMe } = useAuthMe();
   const profileUserId = viewedUserId ?? authMe?.user?.id;
   const progressDetail = useMemo(
     () => getLevelProgressDetail(authMe?.profile?.total_score ?? 0),
@@ -157,14 +157,18 @@ export default function ProfileScreen() {
     useCallback(() => {
       setRelationshipOverride(null);
       void refetch();
-    }, [refetch]),
+      if (!isExternalProfile) {
+        void refetchAuthMe({ force: true });
+      }
+    }, [isExternalProfile, refetch, refetchAuthMe]),
   );
 
   const onChooseCoverPhoto = useCallback(async () => {
     try {
       setCoverBusy(true);
+      await refetchAuthMe({ force: true });
       const picker = getCoverPhotoPickerService();
-      const result = await picker.openPicker();
+      const result = await picker.openPicker({ aspect: [16, 9], quality: 0.45 });
       setCoverModalVisible(false);
       if (result.cancelled) return;
       if (!result.base64) {
@@ -173,6 +177,7 @@ export default function ProfileScreen() {
       }
       await uploadMyCover(result.base64);
       void refetch();
+      void refetchAuthMe({ force: true });
       Alert.alert('Profil', 'Photo de couverture mise à jour.');
     } catch (e) {
       showAppError(
@@ -182,13 +187,17 @@ export default function ProfileScreen() {
     } finally {
       setCoverBusy(false);
     }
-  }, [refetch, showAppError]);
+  }, [refetch, refetchAuthMe, showAppError]);
 
   const onChooseAvatarFromGallery = useCallback(async () => {
     try {
       setAvatarBusy(true);
+      await refetchAuthMe({ force: true });
       const picker = getCoverPhotoPickerService();
-      const result = await picker.openPicker();
+      const result =
+        typeof picker.openAvatarPicker === 'function'
+          ? await picker.openAvatarPicker()
+          : await picker.openPicker({ aspect: [1, 1], quality: 0.4 });
       if (result.cancelled) return;
       if (!result.base64) {
         showAppError("Impossible de lire l'image sélectionnée.", { title: 'Image' });
@@ -197,6 +206,7 @@ export default function ProfileScreen() {
       await uploadMyAvatar(result.base64);
       setAvatarSheetVisible(false);
       void refetch();
+      void refetchAuthMe({ force: true });
       Alert.alert('Profil', 'Avatar mis à jour avec succès.');
     } catch (e) {
       showAppError(
@@ -206,7 +216,7 @@ export default function ProfileScreen() {
     } finally {
       setAvatarBusy(false);
     }
-  }, [refetch, showAppError]);
+  }, [refetch, refetchAuthMe, showAppError]);
 
   return (
     <View style={styles.root}>
@@ -282,7 +292,7 @@ export default function ProfileScreen() {
                 identityActionDisabled={identityActionVm.disabled}
                 showInsightsCarousel={!isExternalProfile}
                 progressDetail={progressDetail}
-                quizzesCompleted={authMe?.profile?.quizzes_completed ?? data.quizTotalCount}
+                quizzesCompleted={data.quizTotalCount}
                 streakDays={authMe?.profile?.streak_days ?? 0}
                 isPremium={Boolean(authMe?.profile?.is_premium)}
                 premiumDaysLeft={9}
@@ -292,7 +302,6 @@ export default function ProfileScreen() {
 
               <ProfileTabContent
                 tab={tab}
-                quizTotalCount={data.quizTotalCount}
                 quizzes={data.quizzes}
                 fonts={fonts}
               />

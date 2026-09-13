@@ -10,6 +10,12 @@ import { Routes } from '@constants/Routes';
 import { COLORS } from '@constants/Colors';
 import { isDuelResultReady, useDuelQuery } from '@hooks/defis/useDuelQuery';
 import { useAuthMe } from '@hooks/useAuthMe';
+import {
+  buildDuelResultHeadline,
+  buildDuelResultStatusLabel,
+  isDuelOutcomePlayable,
+  resolveDuelOutcome,
+} from '@utils/defis/resolveDuelOutcome';
 import { resolveRouteParamId } from '@utils/resolveRouteParamId';
 
 const enteringAnimation = Platform.OS === 'web' ? undefined : FadeInDown.duration(400);
@@ -103,40 +109,39 @@ export default function DuelResultScreen() {
     authMe?.profile?.username?.trim() ||
     'Vous';
 
-  const expired = duel.isExpired || duel.status === 'expired';
+  const outcome = resolveDuelOutcome(duel, userId);
+  const playable = isDuelOutcomePlayable(outcome.tone);
   const declined = duel.status === 'declined';
-  const won =
-    !expired &&
-    !declined &&
-    (duel.winnerId === userId || (duel.winnerId === null && myQuizScore > opponentQuizScore));
+  const expired = !playable && (duel.status === 'expired' || duel.isExpired);
+  const scoreLine =
+    myQuizScoreRaw !== null && opponentQuizScoreRaw !== null
+      ? `${myQuizScoreRaw} - ${opponentQuizScoreRaw} pts`
+      : null;
 
-  const headline = expired
-    ? '⏱ Duel expiré'
-    : declined
-      ? 'Défi refusé'
-      : won
-        ? '🎉 Victoire !'
-        : 'Bien joué !';
-
-  const subline = expired
-    ? myQuizScoreRaw !== null && opponentQuizScoreRaw !== null
-      ? `Score final : ${myQuizScoreRaw} - ${opponentQuizScoreRaw} pts`
-      : isChallenger
-        ? duel.challengerScore === null
-          ? 'Vous n\'avez pas joué à temps.'
-          : 'L\'adversaire n\'a pas terminé à temps.'
-        : duel.challengedScore === null
-          ? 'Vous n\'avez pas joué à temps.'
-          : opponentQuizScoreRaw !== null
-            ? `Adversaire : ${opponentQuizScoreRaw} pts · délai dépassé`
-            : 'Le délai est dépassé.'
+  const headline = buildDuelResultHeadline(outcome.tone);
+  const subline = playable
+    ? outcome.tone === 'victory'
+      ? [scoreLine, '+5 pts bonus duel (score quiz déjà compté)'].filter(Boolean).join(' · ')
+      : outcome.tone === 'draw'
+        ? [scoreLine, 'Égalité, aucun bonus'].filter(Boolean).join(' · ')
+        : [scoreLine, 'Score quiz compté dans ton total'].filter(Boolean).join(' · ')
     : declined
       ? duel.challengedId === userId
         ? 'Vous avez refusé ce défi.'
         : `${opponentName} a refusé votre défi.`
-      : won
-        ? '+5 pts bonus duel (score quiz déjà compté)'
-        : 'Score quiz compté dans ton total';
+      : expired
+        ? scoreLine
+          ? `Score final : ${scoreLine}`
+          : isChallenger
+            ? duel.challengerScore === null
+              ? 'Vous n\'avez pas joué à temps.'
+              : 'L\'adversaire n\'a pas terminé à temps.'
+            : duel.challengedScore === null
+              ? 'Vous n\'avez pas joué à temps.'
+              : opponentQuizScoreRaw !== null
+                ? `Adversaire : ${opponentQuizScoreRaw} pts · délai dépassé`
+                : 'Le délai est dépassé.'
+        : 'Ce duel n\'a pas abouti.';
 
   return (
     <DefisPageShell title="Résultat">
@@ -148,7 +153,7 @@ export default function DuelResultScreen() {
       ) : null}
 
       <Animated.View entering={enteringAnimation} style={styles.headlineWrap}>
-        <Text style={[styles.headline, (expired || declined) && styles.headlineMuted]}>{headline}</Text>
+        <Text style={[styles.headline, !playable && styles.headlineMuted]}>{headline}</Text>
         <Text style={styles.subline}>{subline}</Text>
       </Animated.View>
 
@@ -171,19 +176,19 @@ export default function DuelResultScreen() {
         questionsCount={duel.questionsCount}
         expiresAt={duel.expiresAt}
         isExpired={expired}
-        statusLabel={expired ? 'Expiré' : declined ? 'Refusé' : won ? 'Victoire' : 'Résultat'}
+        statusLabel={buildDuelResultStatusLabel(outcome.tone)}
         motivationalLine={
-          declined
-            ? 'Aucune partie n\'a été jouée pour ce duel.'
-            : expired
-              ? myQuizScoreRaw !== null && opponentQuizScoreRaw !== null
+          playable
+            ? `${myQuizScoreRaw ?? 0} vs ${opponentQuizScoreRaw ?? 0} pts`
+            : declined
+              ? 'Aucune partie n\'a été jouée pour ce duel.'
+              : scoreLine
                 ? `${myQuizScoreRaw} vs ${opponentQuizScoreRaw} pts · duel archivé`
                 : 'Ce duel est archivé dans vos duels récents.'
-              : `${myQuizScoreRaw ?? 0} vs ${opponentQuizScoreRaw ?? 0} pts`
         }
       />
 
-      {!expired && !declined && !won && opponentQuizScore > myQuizScore ? (
+      {playable && outcome.tone === 'defeat' && opponentQuizScore > myQuizScore ? (
         <Text style={styles.encourage}>
           {opponentName} n&apos;était qu&apos;à {opponentQuizScore - myQuizScore} pt
           {opponentQuizScore - myQuizScore > 1 ? 's' : ''} devant vous !

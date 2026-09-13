@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { AppNotification, NotificationFilter } from '@app-types/notification.types';
 import {
@@ -9,6 +9,7 @@ import { apiAcceptDuel, apiDeclineDuel } from '@services/defis/duelApi';
 import { readDuelIdFromNotification } from '@services/notifications/duelNotificationHelpers';
 import { getNotificationsProvider } from '@services/notifications/notificationsProviderInstance';
 import { useAuthStore } from '@stores/authStore';
+import { sortNotifications } from '@utils/notifications/sortNotifications';
 
 export function useNotifications() {
   const token = useAuthStore((s) => s.token);
@@ -152,10 +153,12 @@ export function useNotifications() {
     [refresh],
   );
 
+  const sortedItems = useMemo(() => sortNotifications(items), [items]);
+
   return {
     filter,
     setFilter,
-    items,
+    items: sortedItems,
     unreadCount,
     loading,
     loadingMore,

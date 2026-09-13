@@ -6,6 +6,7 @@ interface SocialAuthButtonsProps {
   loading?: boolean;
   onGooglePress: () => void;
   onFacebookPress: () => void;
+  showFacebook?: boolean;
 }
 
 interface SocialButtonProps {
@@ -35,6 +36,7 @@ export function SocialAuthButtons({
   loading = false,
   onGooglePress,
   onFacebookPress,
+  showFacebook = false,
 }: SocialAuthButtonsProps) {
   return (
     <View style={styles.container}>
@@ -46,14 +48,16 @@ export function SocialAuthButtons({
         disabled={loading}
         onPress={onGooglePress}
       />
-      <SocialButton
-        label="Continuer avec Facebook"
-        icon="facebook"
-        iconColor="#1877F2"
-        fontFamily={fontFamily}
-        disabled={loading}
-        onPress={onFacebookPress}
-      />
+      {showFacebook ? (
+        <SocialButton
+          label="Continuer avec Facebook"
+          icon="facebook"
+          iconColor="#1877F2"
+          fontFamily={fontFamily}
+          disabled={loading}
+          onPress={onFacebookPress}
+        />
+      ) : null}
     </View>
   );
 }

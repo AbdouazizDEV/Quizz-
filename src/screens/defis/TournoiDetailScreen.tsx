@@ -1,6 +1,8 @@
+import { useCallback } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { CompetitionHeroBanner } from '@components/ui/defis/CompetitionHeroBanner';
@@ -15,6 +17,7 @@ import {
   registerForCompetition,
   unregisterFromCompetition,
 } from '@services/defis/competitionRepository';
+import { resolveEffectiveCompetitionStatus } from '@utils/defis/competitionDisplay';
 import { useAppError } from '@providers/AppErrorProvider';
 
 export default function TournoiDetailScreen() {
@@ -27,14 +30,22 @@ export default function TournoiDetailScreen() {
   const userId = authMe?.user?.id ?? '';
   const { isOnline } = useNetworkStatus();
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['competition', competitionId, userId],
     queryFn: () => fetchCompetitionById(competitionId, userId),
     enabled: Boolean(competitionId && userId),
   });
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!competitionId || !userId) return;
+      void refetch();
+    }, [competitionId, refetch, userId]),
+  );
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['competition', competitionId] });
+    await queryClient.invalidateQueries({ queryKey: ['competitions'] });
   };
 
   const onRegister = async () => {
@@ -98,9 +109,10 @@ export default function TournoiDetailScreen() {
     );
   }
 
-  const isOpen = data.status === 'scheduled';
-  const isLive = data.status === 'live';
-  const isDone = data.status === 'completed';
+  const effectiveStatus = resolveEffectiveCompetitionStatus(data);
+  const isOpen = effectiveStatus === 'scheduled';
+  const isLive = effectiveStatus === 'live';
+  const isDone = effectiveStatus === 'completed';
 
   return (
     <DefisPageShell title="Tournoi">

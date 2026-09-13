@@ -1,15 +1,21 @@
+import { resolveApiBaseUrl, resolveWsBaseUrl } from '../apiBaseUrl';
 import { getSupabaseEnvFromProcess } from '../supabaseEnv';
-import { inviteWebBaseFromApiUrl } from '../inviteWebBase';
 
-const API_BASE_URL = 'https://quizzplus-api.onrender.com/api/v1';
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL?.trim()?.replace(/\/$/, '') ??
+  'https://api.quizzp.com/api/v1';
+
+const INVITE_WEB_BASE_URL =
+  process.env.EXPO_PUBLIC_INVITE_WEB_BASE_URL?.trim()?.replace(/\/$/, '') ??
+  'https://quizzp.com';
 
 export const productionConfig = {
   ENV: 'production' as const,
-  /** API Node déployée sur Render (`server/`). */
+  /** API backend déployée (repo séparé). */
   API_BASE_URL,
-  INVITE_WEB_BASE_URL: inviteWebBaseFromApiUrl(API_BASE_URL),
-  //API_BASE_URL: 'http://localhost:3000/api/v1',
-  WS_URL: 'wss://quizzplus-api.onrender.com',
+  /** Liens d’invitation ami (front Quizzweb, pas le sous-domaine API). */
+  INVITE_WEB_BASE_URL,
+  WS_URL: resolveWsBaseUrl(API_BASE_URL),
   TIMEOUT_MS: 30_000,
   ENABLE_LOGS: false,
   ENABLE_DEVTOOLS: false,

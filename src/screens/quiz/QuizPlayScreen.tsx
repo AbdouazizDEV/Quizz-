@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   Nunito_500Medium,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuizAnswerGrid } from '@components/ui/quiz/play/QuizAnswerGrid';
 import { QuizFeedbackFunFactModal } from '@components/ui/quiz/play/QuizFeedbackFunFactModal';
+import { QuizResultsProcessingModal } from '@components/ui/quiz/play/QuizResultsProcessingModal';
 import { QuizPlayNavbar } from '@components/ui/quiz/play/QuizPlayNavbar';
 import { QuizQuestionHeader } from '@components/ui/quiz/play/QuizQuestionHeader';
 import { Spacing } from '@constants/Spacing';
@@ -23,13 +24,23 @@ import { useAuthMe } from '@hooks/useAuthMe';
 import { useQuestionTimer } from '@hooks/useQuestionTimer';
 import { recordChallengeParticipation } from '@services/defis/participateChallenge.service';
 import { submitDuelScore } from '@services/defis/duelRepository';
-import { invalidateAuthMeCache } from '@services/auth/authMeRepository';
+import { loadAuthMe } from '@services/auth/authMeRepository';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
+import { extractApiError } from '@utils/extractApiError';
 import { triggerQuizCorrectFeedback } from '@services/quiz/play/triggerQuizCorrectFeedback';
 import { triggerQuizWrongFeedback } from '@services/quiz/play/triggerQuizWrongFeedback';
 import { pointsForDifficulty } from '@domain/quiz/difficultyPoints';
 import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 import { useAppError } from '@providers/AppErrorProvider';
+
+function decodeQuizRouteId(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    return decodeURIComponent(raw.trim());
+  } catch {
+    return raw.trim();
+  }
+}
 
 export default function QuizPlayScreen() {
   const insets = useSafeAreaInsets();
@@ -39,7 +50,8 @@ export default function QuizPlayScreen() {
   const { data: authMe } = useAuthMe();
   const userId = authMe?.user?.id ?? '';
   const { quizId: idParam } = useLocalSearchParams<{ quizId: string | string[] }>();
-  const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
+  const routeQuizId = typeof idParam === 'string' ? idParam : idParam?.[0];
+  const quizId = decodeQuizRouteId(routeQuizId);
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, QuizPlayTheme.contentMaxWidth);
 
@@ -49,6 +61,7 @@ export default function QuizPlayScreen() {
   const currentIndex = useQuizPlaySessionStore((s) => s.currentIndex);
   const sessionPoints = useQuizPlaySessionStore((s) => s.sessionPoints);
   const feedbackPhase = useQuizPlaySessionStore((s) => s.feedbackPhase);
+  const sessionPhase = useQuizPlaySessionStore((s) => s.sessionPhase);
   const selectedOptionId = useQuizPlaySessionStore((s) => s.selectedOptionId);
   const lastPointsEarned = useQuizPlaySessionStore((s) => s.lastPointsEarned);
   const correctAnswerLabel = useQuizPlaySessionStore((s) => s.correctAnswerLabel);
@@ -61,6 +74,8 @@ export default function QuizPlayScreen() {
   const expiredForQuestionRef = useRef(false);
   const wrongFeedbackKeyRef = useRef<string | null>(null);
   const correctFeedbackKeyRef = useRef<string | null>(null);
+  const submitLockRef = useRef(false);
+  const [isContinueBusy, setIsContinueBusy] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -96,7 +111,7 @@ export default function QuizPlayScreen() {
     duration: secondsPerQuestion,
     onExpire: handleTimerExpire,
     resetKey: currentIndex,
-    autoStart: feedbackPhase === 'idle',
+    autoStart: feedbackPhase === 'idle' && sessionPhase === 'playing',
   });
 
   useEffect(() => {
@@ -113,9 +128,9 @@ export default function QuizPlayScreen() {
   }, [currentIndex]);
 
   useEffect(() => {
-    if (feedbackPhase === 'idle') resume();
+    if (feedbackPhase === 'idle' && sessionPhase === 'playing') resume();
     else pause();
-  }, [feedbackPhase, pause, resume]);
+  }, [feedbackPhase, sessionPhase, pause, resume]);
 
   useEffect(() => {
     if (feedbackPhase === 'correct') {
@@ -155,7 +170,8 @@ export default function QuizPlayScreen() {
   const onPick = useCallback(
     (optionId: string) => {
       if (timeLeft <= 0 || !question || !payload) return;
-      if (useQuizPlaySessionStore.getState().feedbackPhase !== 'idle') return;
+      const state = useQuizPlaySessionStore.getState();
+      if (state.sessionPhase !== 'playing' || state.feedbackPhase !== 'idle') return;
       const isCorrect = optionId === question.correctOptionId;
       const pts = pointsForDifficulty(question.difficulty);
       const correctLabel =
@@ -166,23 +182,35 @@ export default function QuizPlayScreen() {
   );
 
   const onContinueAfterFeedback = useCallback(async () => {
+    if (submitLockRef.current) return;
     if (!quizId || !payload) return;
+    if (useQuizPlaySessionStore.getState().sessionPhase === 'submitting') return;
+
+    const isLastQuestion = currentIndex >= payload.questions.length - 1;
+    if (isLastQuestion) {
+      submitLockRef.current = true;
+      setIsContinueBusy(true);
+    }
+
     const next = advanceFromFeedback();
-    if (next === 'continue') return;
+    if (next === 'continue') {
+      submitLockRef.current = false;
+      setIsContinueBusy(false);
+      return;
+    }
 
     const answers = useQuizPlaySessionStore.getState().answers;
     const earned = useQuizPlaySessionStore.getState().sessionPoints;
+    const completeQuizId = payload.quiz.id?.trim() || quizId;
     const res = await getQuizSessionPersistence().recordCompletedSession({
-      quizId,
+      quizId: completeQuizId,
       earnedPoints: earned,
       answers,
     });
     if (!res.ok) {
-      showAppError(res.errorMessage ?? 'Votre score n\'a pas pu être enregistré.', {
+      showAppError(extractApiError(res.errorMessage, 'Votre score n’a pas pu être enregistré.'), {
         title: 'Enregistrement',
       });
-    } else {
-      void invalidateAuthMeCache();
     }
 
     if (duelId) {
@@ -196,7 +224,7 @@ export default function QuizPlayScreen() {
           await queryClient.invalidateQueries({ queryKey: ['duels-recent'] });
           await queryClient.invalidateQueries({ queryKey: ['duels-pending-list'] });
           await queryClient.invalidateQueries({ queryKey: ['duels-recent-list'] });
-          void invalidateAuthMeCache();
+          void loadAuthMe({ force: true });
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Score duel non enregistré.';
@@ -233,7 +261,18 @@ export default function QuizPlayScreen() {
       ? `/quiz/${quizId}/congrats?${congratsQs}`
       : `/quiz/${quizId}/congrats`;
     router.replace(congratsHref);
-  }, [advanceFromFeedback, challengeId, duelId, queryClient, quizId, payload, router, showAppError, userId]);
+  }, [
+    advanceFromFeedback,
+    challengeId,
+    currentIndex,
+    duelId,
+    queryClient,
+    quizId,
+    payload,
+    router,
+    showAppError,
+    userId,
+  ]);
 
   if (!payload || !question) {
     return (
@@ -248,7 +287,8 @@ export default function QuizPlayScreen() {
     (sum, q) => sum + pointsForDifficulty(q.difficulty),
     0,
   );
-  const revealed = feedbackPhase !== 'idle';
+  const isSubmittingResults = sessionPhase === 'submitting';
+  const revealed = feedbackPhase !== 'idle' && !isSubmittingResults;
   const questionImageUri = question.imageUrl ?? null;
 
   return (
@@ -266,7 +306,7 @@ export default function QuizPlayScreen() {
             gap: 28,
           },
         ]}
-        scrollEnabled={!revealed}
+        scrollEnabled={!revealed && !isSubmittingResults}
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.inner, { width: contentWidth, maxWidth: contentWidth, gap: 24 }]}>
@@ -302,7 +342,7 @@ export default function QuizPlayScreen() {
         </View>
       </ScrollView>
 
-      {feedbackPhase !== 'idle' && question ? (
+      {feedbackPhase !== 'idle' && question && !isSubmittingResults ? (
         <QuizFeedbackFunFactModal
           visible={revealed}
           phase={feedbackPhase}
@@ -315,10 +355,14 @@ export default function QuizPlayScreen() {
           correctAnswerLabel={
             feedbackPhase === 'incorrect' || feedbackPhase === 'timeout' ? correctAnswerLabel : undefined
           }
-          onContinue={onContinueAfterFeedback}
+          continueLabel={currentIndex >= total - 1 ? 'Voir le score' : 'Continuer'}
+          continueDisabled={isContinueBusy}
+          onContinue={() => void onContinueAfterFeedback()}
           fonts={fonts}
         />
       ) : null}
+
+      <QuizResultsProcessingModal visible={isSubmittingResults} fonts={fonts} />
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import type { IQuizSessionPersistence } from '@services/quiz/session/IQuizSessionPersistence';
-import { SupabaseQuizSessionPersistence } from '@services/quiz/session/supabaseQuizSessionPersistence';
+import { NestQuizSessionPersistence } from '@services/quiz/session/nestQuizSessionPersistence';
 
-let instance: IQuizSessionPersistence = new SupabaseQuizSessionPersistence();
+let instance: IQuizSessionPersistence = new NestQuizSessionPersistence();
 
 export function getQuizSessionPersistence(): IQuizSessionPersistence {
   return instance;

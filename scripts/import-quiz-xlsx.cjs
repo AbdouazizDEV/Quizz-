@@ -6,9 +6,9 @@
  *
  * Variables (Dashboard Supabase → Settings → API) :
  *   SUPABASE_URL (ou EXPO_PUBLIC_SUPABASE_URL dans .env.local)
- *   SUPABASE_SERVICE_ROLE_KEY (secret — jamais dans le client Expo ; mettre dans server/.env ou .env.local)
+ *   SUPABASE_SERVICE_ROLE_KEY (secret — jamais dans le client Expo ; mettre dans .env.local)
  *
- * Commandes (à lancer depuis la RACINE du repo QuizzMobile, pas depuis server/) :
+ * Commandes (à lancer depuis la RACINE du repo QuizzMobile) :
  *   npm run quiz:import-excel
  *      → lit les .xlsx dans le dossier ./quiz-import
  *   npm run quiz:import-excel -- .
@@ -43,12 +43,11 @@ const { createClient } = require('@supabase/supabase-js');
 
 const REPO_ROOT = path.join(__dirname, '..');
 
-/** Charge .env / .env.local / server/.env : les fichiers plus bas dans la liste écrasent les précédents. */
+/** Charge .env / .env.local : les fichiers plus bas dans la liste écrasent les précédents. */
 function loadEnvMerged() {
   const files = [
     path.join(REPO_ROOT, '.env'),
     path.join(REPO_ROOT, '.env.local'),
-    path.join(REPO_ROOT, 'server', '.env'),
   ];
   for (const filePath of files) {
     if (!fs.existsSync(filePath)) continue;
@@ -197,7 +196,7 @@ async function main() {
     console.error('  ', path.join(REPO_ROOT, '.env.local'));
     console.error('  ', path.join(REPO_ROOT, 'server', '.env'));
     console.error('');
-    console.error('Ajoutez au minimum dans server/.env ou .env.local :');
+    console.error('Ajoutez au minimum dans .env.local :');
     console.error('  SUPABASE_URL=https://xxxx.supabase.co');
     console.error('  SUPABASE_SERVICE_ROLE_KEY=eyJ... (clé service_role du dashboard)');
     console.error('');

@@ -1,17 +1,7 @@
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
-import { createElement, useEffect, useState } from 'react';
-import {
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createElement, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import DatePicker from 'react-native-date-picker';
 
 import { onboardingColumn } from '@constants/layout';
 
@@ -43,59 +33,38 @@ function toIsoDateOnly(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function endOfToday(): Date {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return today;
+}
+
 export function OnboardingDateField({
   label,
   value,
   onChange,
   placeholder = 'JJ/MM/AAAA',
-  maximumDate = new Date(),
+  maximumDate,
   minimumDate = DEFAULT_MIN,
   labelFontFamily,
   valueFontFamily,
 }: OnboardingDateFieldProps) {
-  const insets = useSafeAreaInsets();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerSeed = value ?? maximumDate;
-  const [draft, setDraft] = useState(pickerSeed);
+  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    setDraft(value ?? maximumDate);
-  }, [value, maximumDate]);
-
-  const openPicker = () => {
-    setDraft(value ?? maximumDate);
-    setPickerOpen(true);
-  };
-
-  const handleNativeChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') {
-      setPickerOpen(false);
-    }
-    if (event.type === 'set' && date) {
-      onChange(date);
-      setDraft(date);
-    }
-  };
-
-  const confirmIos = () => {
-    onChange(draft);
-    setPickerOpen(false);
-  };
+  const maxDate = maximumDate ?? endOfToday();
+  const minDate = minimumDate;
+  const pickerDate = value ?? maxDate;
 
   const isWeb = Platform.OS === 'web';
 
   const applyPickedDate = (iso: string) => {
     const trimmed = iso.trim();
-    if (!trimmed) {
-      return;
-    }
+    if (!trimmed) return;
+
     const next = new Date(`${trimmed}T12:00:00`);
-    if (Number.isNaN(next.getTime())) {
-      return;
-    }
-    if (next < minimumDate || next > maximumDate) {
-      return;
-    }
+    if (Number.isNaN(next.getTime())) return;
+    if (next < minDate || next > maxDate) return;
+
     onChange(next);
   };
 
@@ -118,8 +87,8 @@ export function OnboardingDateField({
             {createElement('input', {
               type: 'date',
               value: value ? toIsoDateOnly(value) : '',
-              min: toIsoDateOnly(minimumDate),
-              max: toIsoDateOnly(maximumDate),
+              min: toIsoDateOnly(minDate),
+              max: toIsoDateOnly(maxDate),
               onChange: (event: { target: { value: string } }) => {
                 applyPickedDate(event.target.value);
               },
@@ -149,7 +118,7 @@ export function OnboardingDateField({
             </View>
           </View>
         ) : (
-          <Pressable onPress={openPicker} style={styles.valueRow}>
+          <Pressable onPress={() => setOpen(true)} style={styles.valueRow}>
             <Text style={displayStyle}>{displayValue}</Text>
             <Feather name="calendar" size={20} color="#FFD700" />
           </Pressable>
@@ -157,50 +126,24 @@ export function OnboardingDateField({
         <View style={styles.underline} />
       </View>
 
-      {/* Android : montage = ouverture du dialogue natif (voir datetimepicker.android.js) */}
-      {pickerOpen && Platform.OS === 'android' ? (
-        <DateTimePicker
-          value={draft}
+      {!isWeb ? (
+        <DatePicker
+          modal
+          open={open}
+          date={pickerDate}
           mode="date"
-          display="default"
-          minimumDate={minimumDate}
-          maximumDate={maximumDate}
-          onChange={handleNativeChange}
+          locale="fr"
+          title={label}
+          confirmText="OK"
+          cancelText="Annuler"
+          minimumDate={minDate}
+          maximumDate={maxDate}
+          onConfirm={(date) => {
+            setOpen(false);
+            onChange(date);
+          }}
+          onCancel={() => setOpen(false)}
         />
-      ) : null}
-
-      {/* iOS : modal avec roue + validation */}
-      {pickerOpen && Platform.OS === 'ios' ? (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)}>
-            <Pressable
-              style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <DateTimePicker
-                value={draft}
-                mode="date"
-                display="spinner"
-                minimumDate={minimumDate}
-                maximumDate={maximumDate}
-                themeVariant="light"
-                onChange={(_, date) => {
-                  if (date) {
-                    setDraft(date);
-                  }
-                }}
-              />
-              <View style={styles.modalActions}>
-                <Pressable onPress={() => setPickerOpen(false)} style={styles.modalBtn}>
-                  <Text style={styles.modalBtnText}>Annuler</Text>
-                </Pressable>
-                <Pressable onPress={confirmIos} style={styles.modalBtn}>
-                  <Text style={[styles.modalBtnText, styles.modalBtnPrimary]}>OK</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
       ) : null}
     </View>
   );
@@ -261,41 +204,5 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 2,
     backgroundColor: 'rgba(255, 215, 0, 0.87)',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingTop: 16,
-    alignItems: 'center',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 24,
-    width: '100%',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  modalBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-  },
-  modalBtnText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  modalBtnPrimary: {
-    color: '#212121',
-    fontWeight: '700',
   },
 });

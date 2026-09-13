@@ -2,16 +2,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { CountdownTimer } from '@components/atoms/CountdownTimer';
-import { COLORS } from '@constants/Colors';
 import type { CompetitionSummary } from '@app-types/challenge.types';
-
-const STATUS_LABELS: Record<CompetitionSummary['status'], string> = {
-  draft: 'Brouillon',
-  scheduled: 'Inscriptions ouvertes',
-  live: 'En cours',
-  completed: 'Terminé',
-  cancelled: 'Annulé',
-};
+import {
+  getCompetitionCountdown,
+  getCompetitionStatusLabel,
+} from '@utils/defis/competitionDisplay';
 
 interface CompetitionHeroBannerProps {
   competition: Pick<
@@ -22,12 +17,8 @@ interface CompetitionHeroBannerProps {
 }
 
 export function CompetitionHeroBanner({ competition, subtitle }: CompetitionHeroBannerProps) {
-  const countdownTarget =
-    competition.status === 'scheduled'
-      ? competition.startsAt
-      : competition.status === 'live'
-        ? competition.endsAt
-        : null;
+  const statusLabel = getCompetitionStatusLabel(competition);
+  const countdown = getCompetitionCountdown(competition);
 
   return (
     <LinearGradient
@@ -39,7 +30,7 @@ export function CompetitionHeroBanner({ competition, subtitle }: CompetitionHero
       <View style={styles.topRow}>
         <Text style={styles.trophy}>🏆</Text>
         <View style={styles.statusPill}>
-          <Text style={styles.statusText}>{STATUS_LABELS[competition.status]}</Text>
+          <Text style={styles.statusText}>{statusLabel}</Text>
         </View>
       </View>
 
@@ -67,12 +58,10 @@ export function CompetitionHeroBanner({ competition, subtitle }: CompetitionHero
         ) : null}
       </View>
 
-      {countdownTarget ? (
+      {countdown ? (
         <View style={styles.countdownBox}>
-          <Text style={styles.countdownLabel}>
-            {competition.status === 'scheduled' ? 'Début dans' : 'Se termine dans'}
-          </Text>
-          <CountdownTimer endsAt={countdownTarget} light showPrefix={false} />
+          <Text style={styles.countdownLabel}>{countdown.label}</Text>
+          <CountdownTimer endsAt={countdown.target} light showPrefix={false} />
         </View>
       ) : null}
     </LinearGradient>

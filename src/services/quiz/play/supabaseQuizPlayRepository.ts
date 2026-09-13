@@ -41,13 +41,27 @@ export class SupabaseQuizPlayRepository implements IQuizPlayRepository {
 
     if (qErr || !quiz || !quiz.is_published) return null;
 
-    const { data: rows, error: pErr } = await client
+    const questionColumnsWithDifficulty =
+      'id, quiz_id, question_text, options, correct_option_id, explanation, order_index, difficulty, difficulty_label';
+    const questionColumnsLegacy =
+      'id, quiz_id, question_text, options, correct_option_id, explanation, order_index, difficulty_label';
+
+    let { data: rows, error: pErr } = await client
       .from('questions')
-      .select(
-        'id, quiz_id, question_text, options, correct_option_id, explanation, order_index, difficulty, difficulty_label',
-      )
+      .select(questionColumnsWithDifficulty)
       .eq('quiz_id', quizId)
       .order('order_index', { ascending: true });
+
+    // Colonne `difficulty` absente tant que la migration n'est pas appliquée.
+    if (pErr?.code === '42703' || /difficulty does not exist/i.test(pErr?.message ?? '')) {
+      const fallback = await client
+        .from('questions')
+        .select(questionColumnsLegacy)
+        .eq('quiz_id', quizId)
+        .order('order_index', { ascending: true });
+      rows = fallback.data as typeof rows;
+      pErr = fallback.error;
+    }
 
     if (pErr || !rows?.length) return null;
 
