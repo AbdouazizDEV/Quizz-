@@ -1,9 +1,9 @@
--- Quizz+ : notifications (devices, log, prefs, timezone) + quiz difficulty + tournoi questions
+-- Quizz+ : notifications (devices, log, prefs, timezone) + quiz difficulty + tournament questions
 -- SOLID foundations for streak push, event notifications, difficulty scoring, tournament pools
 
--- ════════════════════════════════════════
--- Questions : difficulté normalisée (easy|medium|hard)
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Questions: normalized difficulty (easy|medium|hard)
+-- ---------------------------------------------------------------
 ALTER TABLE public.questions
   ADD COLUMN IF NOT EXISTS difficulty TEXT;
 
@@ -32,18 +32,18 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS idx_questions_difficulty ON public.questions (difficulty);
 
--- ════════════════════════════════════════
--- Profils : fuseau horaire (rappels streak locaux)
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Profiles: timezone for local streak reminders
+-- ---------------------------------------------------------------
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Africa/Dakar';
 
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS last_played_at TIMESTAMPTZ;
 
--- ════════════════════════════════════════
--- Devices Expo Push
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Expo Push devices
+-- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.user_devices (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -65,9 +65,9 @@ DROP POLICY IF EXISTS user_devices_own ON public.user_devices;
 CREATE POLICY user_devices_own ON public.user_devices
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- ════════════════════════════════════════
--- Log d’envois (anti-doublon cron)
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Delivery log (cron de-duplication)
+-- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.notification_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -82,14 +82,14 @@ CREATE INDEX IF NOT EXISTS idx_notification_log_user_type
 
 ALTER TABLE public.notification_log ENABLE ROW LEVEL SECURITY;
 
--- Lecture seule pour le propriétaire ; écriture via service role
+-- Read-only for the owner; writes go through the service role
 DROP POLICY IF EXISTS notification_log_select_own ON public.notification_log;
 CREATE POLICY notification_log_select_own ON public.notification_log
   FOR SELECT USING (auth.uid() = user_id);
 
--- ════════════════════════════════════════
--- Préférences par type
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Per-type preferences
+-- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.notification_preferences (
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   type TEXT NOT NULL,
@@ -104,9 +104,9 @@ DROP POLICY IF EXISTS notification_preferences_own ON public.notification_prefer
 CREATE POLICY notification_preferences_own ON public.notification_preferences
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- ════════════════════════════════════════
--- Tournois : seed + pool de questions figé
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Tournaments: seed + frozen question pool
+-- ---------------------------------------------------------------
 ALTER TABLE public.competitions
   ADD COLUMN IF NOT EXISTS seed TEXT;
 
@@ -131,10 +131,10 @@ DROP POLICY IF EXISTS tournament_questions_read ON public.tournament_questions;
 CREATE POLICY tournament_questions_read ON public.tournament_questions
   FOR SELECT USING (TRUE);
 
--- ════════════════════════════════════════
--- Score serveur : recalcul à partir de difficulty (anti-triche)
--- Barème : easy=1, medium=2, hard=3
--- ════════════════════════════════════════
+-- ---------------------------------------------------------------
+-- Server-side score: recomputed from difficulty (anti-cheat)
+-- Scale: easy=1, medium=2, hard=3
+-- ---------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.recompute_quiz_session_score()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -190,7 +190,7 @@ CREATE TRIGGER trg_recompute_quiz_session_score
   WHEN (NEW.answers IS NOT NULL AND jsonb_typeof(NEW.answers) = 'array' AND jsonb_array_length(NEW.answers) > 0)
   EXECUTE FUNCTION public.recompute_quiz_session_score();
 
--- last_played_at sur completion
+-- last_played_at on completion
 CREATE OR REPLACE FUNCTION public.touch_last_played_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql

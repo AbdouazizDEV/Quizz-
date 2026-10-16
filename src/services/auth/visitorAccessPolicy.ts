@@ -17,7 +17,7 @@ const VISITOR_ALLOWED_CATEGORY_NAMES = new Set([
 ]);
 
 /** Codes de difficulté persistés (alignés sur `quizzes.difficulty_level`). */
-const QUIZ_DIFFICULTY_LEVEL_CODES = new Set(['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3']);
+const QUIZ_DIFFICULTY_LEVEL_CODES = new Set(['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5']);
 
 /**
  * Difficulté « définie » au sens produit : quiz verrouillé pour les visiteurs.

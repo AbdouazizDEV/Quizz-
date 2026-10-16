@@ -21,7 +21,7 @@ export class ApiPasswordResetGateway implements IPasswordResetGateway {
       throw new Error(
         parsed ??
           (response.status === 503
-            ? 'Le serveur n’est pas configuré pour l’envoi d’e-mail (SMTP ou clé service manquante). Vérifiez l’API ciblée (local vs production).'
+            ? 'L’envoi d’e-mail est temporairement indisponible. Réessayez plus tard.'
             : 'Impossible d’envoyer le code OTP.'),
       );
     }
@@ -42,7 +42,7 @@ export class ApiPasswordResetGateway implements IPasswordResetGateway {
       body: { channel: 'email', email: normalized, code },
     });
     if (error || !data?.reset_token) {
-      throw new Error(parseQuizzApiError(error) ?? 'Code OTP invalide ou expiré.');
+      throw new Error(parseQuizzApiError(error) ?? AUTH_MESSAGES.password.otpInvalid);
     }
 
     this.pendingResetToken = data.reset_token;

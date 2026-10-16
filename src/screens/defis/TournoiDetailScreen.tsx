@@ -1,6 +1,8 @@
+import { useCallback } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { CompetitionHeroBanner } from '@components/ui/defis/CompetitionHeroBanner';
@@ -12,10 +14,13 @@ import { useAuthMe } from '@hooks/useAuthMe';
 import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import {
   fetchCompetitionById,
+  drawCompetitionMatch,
   registerForCompetition,
   unregisterFromCompetition,
 } from '@services/defis/competitionRepository';
+import { resolveEffectiveCompetitionStatus } from '@utils/defis/competitionDisplay';
 import { useAppError } from '@providers/AppErrorProvider';
+import { buildQuizEntryHref } from '@constants/Routes';
 
 export default function TournoiDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,14 +32,22 @@ export default function TournoiDetailScreen() {
   const userId = authMe?.user?.id ?? '';
   const { isOnline } = useNetworkStatus();
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['competition', competitionId, userId],
     queryFn: () => fetchCompetitionById(competitionId, userId),
     enabled: Boolean(competitionId && userId),
   });
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!competitionId || !userId) return;
+      void refetch();
+    }, [competitionId, refetch, userId]),
+  );
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['competition', competitionId] });
+    await queryClient.invalidateQueries({ queryKey: ['competitions'] });
   };
 
   const onRegister = async () => {
@@ -72,6 +85,32 @@ export default function TournoiDetailScreen() {
     }
   };
 
+  const onPlayMatch = async () => {
+    if (!userId || !competitionId) return;
+    try {
+      const draw = await drawCompetitionMatch(competitionId);
+      Alert.alert(
+        'Tournoi',
+        `Match ${draw.phase ?? ''} · ${draw.questionsCount} questions`,
+      );
+      router.push(
+        buildQuizEntryHref(draw.quizId, {
+          competitionId,
+          matchId: draw.matchId,
+        }) as never,
+      );
+    } catch (playError) {
+      const message =
+        playError instanceof Error ? playError.message : 'Impossible de démarrer le match.';
+      if (/déjà joué|attendez|bracket/i.test(message)) {
+        Alert.alert('Tournoi', message);
+        router.push(DefisRoutes.tournoiBracket(competitionId));
+      } else {
+        showAppError(message, { title: 'Tournoi' });
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <DefisPageShell title="Tournoi">
@@ -98,9 +137,10 @@ export default function TournoiDetailScreen() {
     );
   }
 
-  const isOpen = data.status === 'scheduled';
-  const isLive = data.status === 'live';
-  const isDone = data.status === 'completed';
+  const effectiveStatus = resolveEffectiveCompetitionStatus(data);
+  const isOpen = effectiveStatus === 'scheduled';
+  const isLive = effectiveStatus === 'live';
+  const isDone = effectiveStatus === 'completed';
 
   return (
     <DefisPageShell title="Tournoi">
@@ -157,7 +197,7 @@ export default function TournoiDetailScreen() {
               Jouez quand vous voulez avant la fin du tournoi. Chaque victoire vous rapproche du
               titre.
             </Text>
-            <Pressable style={styles.matchCta}>
+            <Pressable style={styles.matchCta} onPress={() => void onPlayMatch()}>
               <Text style={styles.matchCtaText}>Jouer mon match →</Text>
             </Pressable>
           </LinearGradient>

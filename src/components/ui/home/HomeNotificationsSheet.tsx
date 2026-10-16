@@ -21,7 +21,7 @@ interface HomeNotificationsSheetProps {
   onClose: () => void;
   onMarkAllRead: () => void;
   onPressItem: (item: AppNotification) => void;
-  onDeleteRequest: (item: AppNotification) => void;
+  onSwipeDelete: (item: AppNotification) => void;
   onAcceptFriend: (id: string) => void;
   onRejectFriend: (id: string) => void;
   onAcceptDuel: (item: AppNotification) => void;
@@ -38,7 +38,7 @@ export function HomeNotificationsSheet({
   onClose,
   onMarkAllRead,
   onPressItem,
-  onDeleteRequest,
+  onSwipeDelete,
   onAcceptFriend,
   onRejectFriend,
   onAcceptDuel,
@@ -76,7 +76,11 @@ export function HomeNotificationsSheet({
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.content}
+            nestedScrollEnabled
+          >
             {loading && items.length === 0 ? (
               <ActivityIndicator style={styles.loader} color="#FFB703" size="large" />
             ) : items.length === 0 ? (
@@ -117,7 +121,7 @@ export function HomeNotificationsSheet({
                       ? () => onRejectDuel(item)
                       : undefined
                   }
-                  onDeleteRequest={() => onDeleteRequest(item)}
+                  onSwipeDelete={() => onSwipeDelete(item)}
                 />
               ))
             )}
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   seeAllText: { fontSize: 13, fontWeight: '700', color: '#C9A000' },
-  content: { paddingTop: 8, paddingBottom: 8, gap: 10 },
+  content: { paddingTop: 12, paddingBottom: 12, gap: 14 },
   loader: { marginTop: 32 },
   empty: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 12, gap: 8 },
   emptyIcon: {

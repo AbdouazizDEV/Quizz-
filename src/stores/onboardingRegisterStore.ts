@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import type { OnboardingGender } from '@components/ui/onboarding/OnboardingGenderField';
+
 /** Données collectées avant l’écran Register (envoyées à POST /auth/register). */
 export interface OnboardingRegisterPayload {
   accountTypeId: string;
@@ -8,13 +10,17 @@ export interface OnboardingRegisterPayload {
   birthDateIso: string;
   countryCca2: string;
   phoneE164: string;
+  gender: OnboardingGender | '';
 }
 
 interface OnboardingRegisterState extends OnboardingRegisterPayload {
   setAccountTypeId: (id: string) => void;
   setWorkplaceId: (id: string) => void;
   setProfile: (
-    p: Pick<OnboardingRegisterPayload, 'fullName' | 'birthDateIso' | 'countryCca2' | 'phoneE164'>,
+    p: Pick<
+      OnboardingRegisterPayload,
+      'fullName' | 'birthDateIso' | 'countryCca2' | 'phoneE164' | 'gender'
+    >,
   ) => void;
   isComplete: () => boolean;
   clear: () => void;
@@ -27,14 +33,15 @@ const empty = (): OnboardingRegisterPayload => ({
   birthDateIso: '',
   countryCca2: '',
   phoneE164: '',
+  gender: '',
 });
 
 export const useOnboardingRegisterStore = create<OnboardingRegisterState>((set, get) => ({
   ...empty(),
   setAccountTypeId: (accountTypeId) => set({ accountTypeId }),
   setWorkplaceId: (workplaceId) => set({ workplaceId }),
-  setProfile: ({ fullName, birthDateIso, countryCca2, phoneE164 }) =>
-    set({ fullName, birthDateIso, countryCca2, phoneE164 }),
+  setProfile: ({ fullName, birthDateIso, countryCca2, phoneE164, gender }) =>
+    set({ fullName, birthDateIso, countryCca2, phoneE164, gender }),
   isComplete: () => {
     const s = get();
     return Boolean(
@@ -43,7 +50,8 @@ export const useOnboardingRegisterStore = create<OnboardingRegisterState>((set, 
         s.fullName.trim() &&
         s.birthDateIso &&
         s.countryCca2 &&
-        s.phoneE164.trim(),
+        s.phoneE164.trim() &&
+        s.gender,
     );
   },
   clear: () => set(empty()),

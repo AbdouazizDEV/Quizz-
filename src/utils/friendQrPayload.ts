@@ -9,6 +9,8 @@ export interface FriendQrProfile {
 
 const FRIEND_QR_SALT = 'quizzplus-friend-v1';
 const DEEP_LINK_PREFIX = 'quizzplus://friend';
+/** Préfixe QR in-app uniquement (non cliquable hors Quizz+). */
+export const FRIEND_QR_SCAN_PREFIX = 'quizzp-friend-v1:';
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 function fnv1a(input: string): string {
@@ -94,7 +96,12 @@ function friendInviteTokenFromProfile(profile: FriendQrProfile): string {
   return base64UrlEncode(JSON.stringify({ p: profile, sig }));
 }
 
-/** Lien deep link + payload signé (obfusqué en base64url) — QR code & ouverture directe app. */
+/** Payload compact pour QR affiché in-app (scan Quizz+ web/mobile uniquement). */
+export function encodeFriendQrScanPayload(profile: FriendQrProfile): string {
+  return `${FRIEND_QR_SCAN_PREFIX}${friendInviteTokenFromProfile(profile)}`;
+}
+
+/** Lien deep link + payload signé (obfusqué en base64url) — ouverture directe app. */
 export function encodeFriendQrDeepLink(profile: FriendQrProfile): string {
   return `${DEEP_LINK_PREFIX}?d=${friendInviteTokenFromProfile(profile)}`;
 }
@@ -104,6 +111,45 @@ export function encodeFriendInviteWebLink(profile: FriendQrProfile, webBaseUrl: 
   const token = friendInviteTokenFromProfile(profile);
   const base = webBaseUrl.replace(/\/$/, '');
   return `${base}/friend?d=${token}`;
+}
+
+/** Extrait le jeton depuis un QR in-app `quizzp-friend-v1:…`. */
+export function extractFriendQrScanToken(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith(FRIEND_QR_SCAN_PREFIX)) return null;
+  const token = trimmed.slice(FRIEND_QR_SCAN_PREFIX.length).trim();
+  return token || null;
+}
+
+/** Indique si le contenu ressemble à une invitation Quizz+ (scan ou lien partagé). */
+export function isRecognizedFriendInvitePayload(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith(FRIEND_QR_SCAN_PREFIX)) return true;
+  if (trimmed.startsWith(`${DEEP_LINK_PREFIX}?`)) return true;
+  if (isFriendInviteUrl(trimmed)) return true;
+  if (trimmed.startsWith('{')) return true;
+  return /^[A-Za-z0-9_-]{24,}$/.test(trimmed);
+}
+
+/** Normalise un scan ou un lien partagé en jeton signé. */
+export function normalizeFriendInviteToken(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const scanToken = extractFriendQrScanToken(trimmed);
+  if (scanToken) return scanToken;
+
+  const urlToken = extractFriendInviteToken(trimmed);
+  if (urlToken) return urlToken;
+
+  try {
+    if (parseEnvelope(base64UrlDecode(trimmed))) return trimmed;
+  } catch {
+    /* ignore */
+  }
+
+  return null;
 }
 
 /** Extrait le jeton `d` depuis une URL ou un deep link. */
@@ -142,6 +188,15 @@ function parseEnvelope(raw: string): FriendQrProfile | null {
 export function decodeFriendQrPayload(raw: string): FriendQrProfile | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
+
+  const scanToken = extractFriendQrScanToken(trimmed);
+  if (scanToken) {
+    try {
+      return parseEnvelope(base64UrlDecode(scanToken));
+    } catch {
+      return null;
+    }
+  }
 
   const token = extractFriendInviteToken(trimmed);
   if (token) {

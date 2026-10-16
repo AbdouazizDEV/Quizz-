@@ -2,6 +2,8 @@ import { Fragment } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { ProfileStatItem } from '@app-types/profile.types';
+import { LevelBadge } from '@components/ui/home/LevelBadge';
+import { formatLevelCodeLabel } from '@utils/levelDisplay';
 import { ProfileTheme } from '@constants/profileTheme';
 
 import type { ProfileFontFamilies } from './ProfileFonts';
@@ -28,7 +30,16 @@ function StatCell({
 }) {
   return (
     <View style={styles.cell}>
-      <Text style={[styles.value, fonts.bold && { fontFamily: fonts.bold }]}>{item.valueLabel}</Text>
+      {item.id === 'level' ? (
+        <View style={styles.levelValue}>
+          <LevelBadge code={item.valueLabel} />
+          <Text style={[styles.value, fonts.bold && { fontFamily: fonts.bold }]} numberOfLines={1}>
+            {formatLevelCodeLabel(item.valueLabel).split('·').pop()?.trim()}
+          </Text>
+        </View>
+      ) : (
+        <Text style={[styles.value, fonts.bold && { fontFamily: fonts.bold }]}>{item.valueLabel}</Text>
+      )}
       <Text style={[styles.caption, fonts.medium && { fontFamily: fonts.medium }]}>{item.caption}</Text>
     </View>
   );
@@ -76,6 +87,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 4,
     gap: 4,
+  },
+  levelValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   value: {
     fontSize: 20,

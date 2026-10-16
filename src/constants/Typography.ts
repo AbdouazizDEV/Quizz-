@@ -1,4 +1,5 @@
 export const Typography = {
+  extraBold: 'Nunito_800ExtraBold',
   black: 'Nunito_900Black',
   bold: 'Nunito_700Bold',
   semiBold: 'Nunito_600SemiBold',

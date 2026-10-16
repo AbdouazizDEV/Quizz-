@@ -22,7 +22,7 @@ interface NotificationListItemProps {
   onRejectFriend?: () => void;
   onAcceptDuel?: () => void;
   onRejectDuel?: () => void;
-  onDeleteRequest?: () => void;
+  onSwipeDelete?: () => void;
 }
 
 function DeleteSwipeAction() {
@@ -43,7 +43,7 @@ export function NotificationListItem({
   onRejectFriend,
   onAcceptDuel,
   onRejectDuel,
-  onDeleteRequest,
+  onSwipeDelete,
 }: NotificationListItemProps) {
   const swipeRef = useRef<Swipeable>(null);
   const visual = getNotificationVisual(item.type);
@@ -136,7 +136,7 @@ export function NotificationListItem({
     </Pressable>
   );
 
-  if (!onDeleteRequest) {
+  if (!onSwipeDelete) {
     return card;
   }
 
@@ -150,7 +150,7 @@ export function NotificationListItem({
       friction={2}
       onSwipeableOpen={() => {
         swipeRef.current?.close();
-        onDeleteRequest();
+        onSwipeDelete();
       }}
     >
       {card}

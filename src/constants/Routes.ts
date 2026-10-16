@@ -37,6 +37,9 @@ export const Routes = {
   SETTINGS_SECURITY: '/settings/security',
   SETTINGS_HELP: '/settings/help',
   SETTINGS_ABOUT: '/settings/about',
+  /** Parcours Arena 2026 (inscription campus, calendrier). */
+  ARENA: '/arena',
+  CARNET: '/carnet',
   PREMIUM: '/premium',
   PREMIUM_COMPARE: '/premium/compare',
   PREMIUM_PLANS: '/premium/plans',
@@ -51,13 +54,21 @@ export function buildUserProfileHref(userId: string): string {
 /** Loader 5s + fetch des questions (`app/quiz/[quizId]/index`). */
 export function buildQuizEntryHref(
   quizId: string,
-  options?: { categorySlug?: string | null; duelId?: string | null; challengeId?: string | null },
+  options?: {
+    categorySlug?: string | null;
+    duelId?: string | null;
+    challengeId?: string | null;
+    competitionId?: string | null;
+    matchId?: string | null;
+  },
 ): string {
   const id = encodeURIComponent(quizId);
   const params = new URLSearchParams();
   if (options?.categorySlug) params.set('categorySlug', options.categorySlug);
   if (options?.duelId) params.set('duelId', options.duelId);
   if (options?.challengeId) params.set('challengeId', options.challengeId);
+  if (options?.competitionId) params.set('competitionId', options.competitionId);
+  if (options?.matchId) params.set('matchId', options.matchId);
   const qs = params.toString();
   return qs ? `/quiz/${id}?${qs}` : `/quiz/${id}`;
 }

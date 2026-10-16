@@ -42,14 +42,14 @@ export default function DuelRecentListScreen() {
   const stats = useMemo(() => {
     let victories = 0;
     let defeats = 0;
-    let other = 0;
+    let draws = 0;
     for (const duel of duels) {
       const outcome = resolveDuelOutcome(duel, userId);
-      if (outcome.won) victories += 1;
-      else if (outcome.lost) defeats += 1;
-      else other += 1;
+      if (outcome.tone === 'victory') victories += 1;
+      else if (outcome.tone === 'defeat') defeats += 1;
+      else if (outcome.tone === 'draw') draws += 1;
     }
-    return { victories, defeats, other };
+    return { victories, defeats, draws };
   }, [duels, userId]);
 
   const listHeader = (
@@ -69,7 +69,7 @@ export default function DuelRecentListScreen() {
           <View style={styles.statsRow}>
             <StatChip label="Victoires" value={String(stats.victories)} tone="win" />
             <StatChip label="Défaites" value={String(stats.defeats)} tone="loss" />
-            <StatChip label="Autres" value={String(stats.other)} tone="neutral" />
+            <StatChip label="Égalités" value={String(stats.draws)} tone="neutral" />
           </View>
         ) : null}
       </LinearGradient>
@@ -78,7 +78,7 @@ export default function DuelRecentListScreen() {
         <View style={styles.legendRow}>
           <LegendDot color={COLORS.success} label="Victoire" />
           <LegendDot color={COLORS.error} label="Défaite" />
-          <LegendDot color="#9CA3AF" label="Égalité / autre" />
+          <LegendDot color="#9CA3AF" label="Égalité" />
         </View>
       ) : null}
     </View>

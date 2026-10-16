@@ -1,6 +1,7 @@
 import type { ProfileScreenData } from '@app-types/profile.types';
 import type { AuthMeResponse } from '@services/auth/fetchAuthMe';
 import { formatCompactNumber } from '@utils/formatCompactNumber';
+import { levelCodeFromScore } from '@utils/levelDisplay';
 
 const COVER_PLACEHOLDER =
   'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80';
@@ -32,7 +33,7 @@ export function mapAuthMeToProfileScreenData(me: AuthMeResponse): ProfileScreenD
   const quizzesDone = profile?.quizzes_completed ?? 0;
   const daysActive = profile?.days_active ?? 0;
   const streak = profile?.streak_days ?? 0;
-  const level = profile?.level_code ?? 'Z0';
+  const level = levelCodeFromScore(totalScore);
   const premium = profile?.is_premium ?? false;
 
   return {

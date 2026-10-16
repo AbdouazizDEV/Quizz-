@@ -3,7 +3,11 @@
  * Brancher expo-image-picker ou un module natif dans une implémentation concrète.
  */
 export interface ICoverPhotoPickerService {
-  openPicker(): Promise<
+  openPicker(options?: { aspect?: [number, number]; quality?: number }): Promise<
+    | { cancelled: true }
+    | { cancelled: false; uri: string; base64?: string; mimeType?: string | null }
+  >;
+  openAvatarPicker?(): Promise<
     | { cancelled: true }
     | { cancelled: false; uri: string; base64?: string; mimeType?: string | null }
   >;

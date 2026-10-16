@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 
 import type { AuthMeResponse } from '@sdk';
-import { invalidateAuthMeCache, loadAuthMe } from '@services/auth/authMeRepository';
+import { loadAuthMe } from '@services/auth/authMeRepository';
 import { useAuthMeStore } from '@stores/authMeStore';
 import { useAuthStore } from '@stores/authStore';
 
@@ -15,6 +15,7 @@ interface UseAuthMeResult {
 /**
  * Cache partagé (Zustand + SQLite) pour GET /auth/me.
  * Les appels réseau sont dédupliqués et ignorés tant que le cache n’est pas expiré.
+ * `force: true` refetch sans vider le cache SQLite (évite d’écraser un score patché post-quiz).
  */
 export function useAuthMe(): UseAuthMeResult {
   const token = useAuthStore((s) => s.token);
@@ -23,11 +24,7 @@ export function useAuthMe(): UseAuthMeResult {
   const error = useAuthMeStore((s) => s.error);
 
   const refetch = useCallback(async (options?: { force?: boolean }) => {
-    if (options?.force) {
-      await invalidateAuthMeCache();
-      return;
-    }
-    await loadAuthMe({ force: false });
+    await loadAuthMe({ force: options?.force === true });
   }, []);
 
   useEffect(() => {

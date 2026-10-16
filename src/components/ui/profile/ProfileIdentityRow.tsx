@@ -1,5 +1,8 @@
+import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { LevelBadge } from '@components/ui/home/LevelBadge';
+import { formatLevelCodeLabel } from '@utils/levelDisplay';
 import { ProfileTheme } from '@constants/profileTheme';
 
 import type { ProfileFontFamilies } from './ProfileFonts';
@@ -9,6 +12,8 @@ interface ProfileIdentityRowProps {
   handle: string;
   avatarUri: string;
   fonts: ProfileFontFamilies;
+  badgeSlot?: ReactNode;
+  levelCode?: string;
   onEditProfile: () => void;
   actionLabel?: string;
   actionVariant?: 'primary' | 'pending' | 'friend';
@@ -20,6 +25,8 @@ export function ProfileIdentityRow({
   handle,
   avatarUri,
   fonts,
+  badgeSlot,
+  levelCode,
   onEditProfile,
   actionLabel = 'Modifier le profil',
   actionVariant = 'primary',
@@ -30,15 +37,26 @@ export function ProfileIdentityRow({
       <View style={styles.left}>
         <Image source={{ uri: avatarUri }} style={styles.avatar} />
         <View style={styles.textCol}>
-          <Text style={[styles.name, fonts.bold && { fontFamily: fonts.bold }]} numberOfLines={1}>
-            {displayName}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, fonts.extraBold && { fontFamily: fonts.extraBold }]} numberOfLines={1}>
+              {displayName}
+            </Text>
+            {badgeSlot}
+          </View>
           <Text
             style={[styles.handle, fonts.medium && { fontFamily: fonts.medium }]}
             numberOfLines={1}
           >
             {handle}
           </Text>
+          {levelCode ? (
+            <View style={styles.levelRow}>
+              <LevelBadge code={levelCode} />
+              <Text style={[styles.levelLabel, fonts.semiBold && { fontFamily: fonts.semiBold }]} numberOfLines={1}>
+                {formatLevelCodeLabel(levelCode).split('·').pop()?.trim()}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
       <Pressable
@@ -97,18 +115,35 @@ const styles = StyleSheet.create({
     gap: 4,
     minWidth: 0,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
   name: {
+    flexShrink: 1,
     fontSize: 20,
     lineHeight: 32,
-    fontWeight: '700',
     color: ProfileTheme.grey900,
   },
   handle: {
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '500',
     letterSpacing: 0.2,
     color: ProfileTheme.grey700,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  levelLabel: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: ProfileTheme.grey900,
   },
   editBtn: {
     paddingHorizontal: 16,
@@ -136,7 +171,6 @@ const styles = StyleSheet.create({
   editLabel: {
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '600',
     letterSpacing: 0.2,
   },
   editLabelPrimary: {

@@ -10,15 +10,24 @@ export function OfflineBanner() {
 
   if (isOnline && pendingSyncCount <= 0) return null;
 
+  const title = isOnline ? 'Synchronisation en cours' : 'Mode hors ligne';
+  const body = isOnline
+    ? pendingSyncCount === 1
+      ? '1 action est en cours d’envoi vers le serveur…'
+      : `${pendingSyncCount} actions sont en cours d’envoi vers le serveur…`
+    : pendingSyncCount > 0
+      ? pendingSyncCount === 1
+        ? '1 action en attente — elle sera envoyée à la reconnexion.'
+        : `${pendingSyncCount} actions en attente — elles seront envoyées à la reconnexion.`
+      : 'Vos données en cache restent disponibles. Les modifications seront envoyées à la reconnexion.';
+
   return (
     <View style={styles.banner} accessibilityRole="alert">
-      <Text style={styles.title}>{isOnline ? 'Synchronisation' : 'Mode hors ligne'}</Text>
-      <Text style={styles.body}>
-        {isOnline
-          ? `${pendingSyncCount} action(s) en cours de synchronisation…`
-          : pendingSyncCount > 0
-            ? `${pendingSyncCount} action(s) en attente — elles seront envoyées à la reconnexion.`
-            : 'Vos données en cache restent disponibles. Les modifications seront envoyées à la reconnexion.'}
+      <Text style={styles.title} numberOfLines={1} allowFontScaling={false}>
+        {title}
+      </Text>
+      <Text style={styles.body} numberOfLines={2} allowFontScaling={false}>
+        {body}
       </Text>
     </View>
   );
@@ -34,13 +43,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   title: {
-    fontFamily: 'Nunito_700Bold',
     fontSize: 13,
+    fontWeight: '700',
     color: COLORS.primaryDark,
   },
   body: {
-    fontFamily: 'Nunito_600SemiBold',
     fontSize: 12,
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
 });

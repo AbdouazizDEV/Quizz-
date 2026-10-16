@@ -1,6 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+
+import { decodeFriendQrPayload, isRecognizedFriendInvitePayload } from '@utils/friendQrPayload';
 
 interface FriendQrScannerPanelProps {
   busy: boolean;
@@ -9,12 +11,23 @@ interface FriendQrScannerPanelProps {
 
 export function FriendQrScannerPanel({ busy, onScan }: FriendQrScannerPanelProps) {
   const [permission, requestPermission] = useCameraPermissions();
+  const lastScanAtRef = useRef(0);
 
   const onBarcodeScanned = useCallback(
     ({ data }: { data: string }) => {
-      onScan(data);
+      if (busy) return;
+
+      const now = Date.now();
+      if (now - lastScanAtRef.current < 700) return;
+
+      const payload = data.trim();
+      if (!payload || !isRecognizedFriendInvitePayload(payload)) return;
+      if (!decodeFriendQrPayload(payload)) return;
+
+      lastScanAtRef.current = now;
+      onScan(payload);
     },
-    [onScan],
+    [busy, onScan],
   );
 
   if (!permission) {
@@ -47,7 +60,7 @@ export function FriendQrScannerPanel({ busy, onScan }: FriendQrScannerPanelProps
         onBarcodeScanned={busy ? undefined : onBarcodeScanned}
       />
       <View style={styles.scanFrame} pointerEvents="none" />
-      <Text style={styles.scanHint}>Place le QR code de ton ami dans le cadre</Text>
+      <Text style={styles.scanHint}>Place le QR code Quizz+ de ton ami dans le cadre</Text>
     </View>
   );
 }
@@ -75,10 +88,10 @@ const styles = StyleSheet.create({
   camera: { flex: 1 },
   scanFrame: {
     position: 'absolute',
-    top: '22%',
-    left: '12%',
-    right: '12%',
-    bottom: '28%',
+    top: '18%',
+    left: '10%',
+    right: '10%',
+    bottom: '24%',
     borderWidth: 2,
     borderColor: '#F5D24A',
     borderRadius: 16,

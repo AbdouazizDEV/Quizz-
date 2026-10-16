@@ -2,8 +2,13 @@ import * as ImagePicker from 'expo-image-picker';
 
 import type { ICoverPhotoPickerService } from './ICoverPhotoPickerService';
 
+export type ProfileImagePickerOptions = {
+  aspect?: [number, number];
+  quality?: number;
+};
+
 export class ExpoImagePickerService implements ICoverPhotoPickerService {
-  async openPicker(): Promise<
+  async openPicker(options?: ProfileImagePickerOptions): Promise<
     | { cancelled: true }
     | { cancelled: false; uri: string; base64?: string; mimeType?: string | null }
   > {
@@ -15,9 +20,10 @@ export class ExpoImagePickerService implements ICoverPhotoPickerService {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      quality: 0.85,
+      quality: options?.quality ?? 0.45,
       base64: true,
-      aspect: [1, 1],
+      aspect: options?.aspect ?? [16, 9],
+      exif: false,
     });
     if (result.canceled || !result.assets?.length) return { cancelled: true };
 
@@ -29,5 +35,8 @@ export class ExpoImagePickerService implements ICoverPhotoPickerService {
       mimeType: asset.mimeType ?? null,
     };
   }
-}
 
+  openAvatarPicker(): ReturnType<ExpoImagePickerService['openPicker']> {
+    return this.openPicker({ aspect: [1, 1], quality: 0.4 });
+  }
+}

@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppQueryProvider } from '@providers/AppQueryProvider';
 import { AppErrorProvider } from '@providers/AppErrorProvider';
+import { AppFonts } from '@providers/AppFonts';
 import { OfflineProvider } from '@providers/OfflineProvider';
 import { OfflineSyncBridge } from '@providers/OfflineSyncBridge';
 import { AuthSessionRefreshBridge } from '@providers/AuthSessionRefreshBridge';
@@ -22,17 +23,19 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppQueryProvider>
-        <OfflineProvider>
-          <AppErrorProvider>
-            <OfflineSyncBridge />
-            <AuthSessionRefreshBridge />
-            <FriendDeepLinkBridge />
-            <OfflineBanner />
-            <Stack screenOptions={{ headerShown: false }} />
-          </AppErrorProvider>
-        </OfflineProvider>
-      </AppQueryProvider>
+      <AppFonts>
+        <AppQueryProvider>
+          <OfflineProvider>
+            <AppErrorProvider>
+              <OfflineSyncBridge />
+              <AuthSessionRefreshBridge />
+              <FriendDeepLinkBridge />
+              <OfflineBanner />
+              <Stack screenOptions={{ headerShown: false }} />
+            </AppErrorProvider>
+          </OfflineProvider>
+        </AppQueryProvider>
+      </AppFonts>
     </GestureHandlerRootView>
   );
 }

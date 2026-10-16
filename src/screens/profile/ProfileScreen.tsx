@@ -8,12 +8,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import {
-  Nunito_500Medium,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-  useFonts,
-} from '@expo-google-fonts/nunito';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +16,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { ProfileTabId } from '@app-types/profile.types';
 import { ProfileAvatarActionSheet } from '@components/ui/profile/ProfileAvatarActionSheet';
 import { CoverPhotoChangeModal } from '@components/ui/profile/CoverPhotoChangeModal';
+import { BadgeChip } from '@components/ui/badges/BadgeChip';
 import { ProfileHeaderSection } from '@components/ui/profile/ProfileHeaderSection';
+import { profileFonts } from '@components/ui/profile/ProfileFonts';
 import { HomeBottomNav } from '@components/ui/home/HomeBottomNav';
 import { ProfileNavbar } from '@components/ui/profile/ProfileNavbar';
 import { ProfileSegmentedTabs } from '@components/ui/profile/ProfileSegmentedTabs';
@@ -30,7 +26,9 @@ import { ProfileTabContent } from '@components/ui/profile/ProfileTabContent';
 import { StatisticsNavbar } from '@components/ui/statistics/StatisticsNavbar';
 import { Routes } from '@constants/Routes';
 import { Spacing } from '@constants/Spacing';
+import { pickFeaturedBadge } from '@constants/westAfricanBadges';
 import { useAuthMe } from '@hooks/useAuthMe';
+import { usePlayerBadges } from '@hooks/usePlayerBadges';
 import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import { useProfileScreenData } from '@hooks/useProfileScreenData';
 import { isOfflineCacheMissError } from '@services/offline';
@@ -40,6 +38,7 @@ import { uploadMyAvatar } from '@services/profile/profileAvatarApi';
 import { uploadMyCover } from '@services/profile/profileCoverApi';
 import { useAppError } from '@providers/AppErrorProvider';
 import { getLevelProgressDetail } from '@utils/levelDisplay';
+import { premiumStatusPresentation } from '@utils/premiumStatusCopy';
 
 const BOTTOM_NAV_HEIGHT = 86;
 
@@ -53,22 +52,12 @@ export default function ProfileScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, Spacing.onboardingMaxWidth);
 
-  const [fontsLoaded] = useFonts({
-    Nunito_700Bold,
-    Nunito_600SemiBold,
-    Nunito_500Medium,
-  });
+  const fonts = profileFonts;
 
-  const fonts = useMemo(
-    () => ({
-      bold: fontsLoaded ? 'Nunito_700Bold' : undefined,
-      semiBold: fontsLoaded ? 'Nunito_600SemiBold' : undefined,
-      medium: fontsLoaded ? 'Nunito_500Medium' : undefined,
-    }),
-    [fontsLoaded],
-  );
-
-  const { data: authMe } = useAuthMe();
+  const { data: authMe, loading: meLoading, error: meError, refetch: refetchAuthMe } = useAuthMe();
+  const { badges } = usePlayerBadges();
+  const featuredBadge = pickFeaturedBadge(badges);
+  const earnedBadges = useMemo(() => badges.filter((badge) => badge.earned), [badges]);
   const profileUserId = viewedUserId ?? authMe?.user?.id;
   const progressDetail = useMemo(
     () => getLevelProgressDetail(authMe?.profile?.total_score ?? 0),
@@ -157,14 +146,18 @@ export default function ProfileScreen() {
     useCallback(() => {
       setRelationshipOverride(null);
       void refetch();
-    }, [refetch]),
+      if (!isExternalProfile) {
+        void refetchAuthMe({ force: true });
+      }
+    }, [isExternalProfile, refetch, refetchAuthMe]),
   );
 
   const onChooseCoverPhoto = useCallback(async () => {
     try {
       setCoverBusy(true);
+      await refetchAuthMe({ force: true });
       const picker = getCoverPhotoPickerService();
-      const result = await picker.openPicker();
+      const result = await picker.openPicker({ aspect: [16, 9], quality: 0.45 });
       setCoverModalVisible(false);
       if (result.cancelled) return;
       if (!result.base64) {
@@ -173,6 +166,7 @@ export default function ProfileScreen() {
       }
       await uploadMyCover(result.base64);
       void refetch();
+      void refetchAuthMe({ force: true });
       Alert.alert('Profil', 'Photo de couverture mise à jour.');
     } catch (e) {
       showAppError(
@@ -182,13 +176,17 @@ export default function ProfileScreen() {
     } finally {
       setCoverBusy(false);
     }
-  }, [refetch, showAppError]);
+  }, [refetch, refetchAuthMe, showAppError]);
 
   const onChooseAvatarFromGallery = useCallback(async () => {
     try {
       setAvatarBusy(true);
+      await refetchAuthMe({ force: true });
       const picker = getCoverPhotoPickerService();
-      const result = await picker.openPicker();
+      const result =
+        typeof picker.openAvatarPicker === 'function'
+          ? await picker.openAvatarPicker()
+          : await picker.openPicker({ aspect: [1, 1], quality: 0.4 });
       if (result.cancelled) return;
       if (!result.base64) {
         showAppError("Impossible de lire l'image sélectionnée.", { title: 'Image' });
@@ -197,6 +195,7 @@ export default function ProfileScreen() {
       await uploadMyAvatar(result.base64);
       setAvatarSheetVisible(false);
       void refetch();
+      void refetchAuthMe({ force: true });
       Alert.alert('Profil', 'Avatar mis à jour avec succès.');
     } catch (e) {
       showAppError(
@@ -206,7 +205,7 @@ export default function ProfileScreen() {
     } finally {
       setAvatarBusy(false);
     }
-  }, [refetch, showAppError]);
+  }, [refetch, refetchAuthMe, showAppError]);
 
   return (
     <View style={styles.root}>
@@ -282,17 +281,34 @@ export default function ProfileScreen() {
                 identityActionDisabled={identityActionVm.disabled}
                 showInsightsCarousel={!isExternalProfile}
                 progressDetail={progressDetail}
-                quizzesCompleted={authMe?.profile?.quizzes_completed ?? data.quizTotalCount}
+                quizzesCompleted={data.quizTotalCount}
                 streakDays={authMe?.profile?.streak_days ?? 0}
-                isPremium={Boolean(authMe?.profile?.is_premium)}
-                premiumDaysLeft={9}
+                isPremium={authMe?.premium?.status === 'active'}
+                premiumTitle={
+                  premiumStatusPresentation({
+                    loading: meLoading,
+                    error: Boolean(meError),
+                    premium: authMe?.premium,
+                  }).title
+                }
+                premiumBody={
+                  premiumStatusPresentation({
+                    loading: meLoading,
+                    error: Boolean(meError),
+                    premium: authMe?.premium,
+                  }).body
+                }
+                premiumContract={authMe?.premium}
+                earnedBadges={!isExternalProfile ? earnedBadges : undefined}
+                badgeSlot={
+                  !isExternalProfile && featuredBadge ? <BadgeChip badge={featuredBadge} /> : null
+                }
               />
 
               <ProfileSegmentedTabs active={tab} onChange={setTab} fonts={fonts} />
 
               <ProfileTabContent
                 tab={tab}
-                quizTotalCount={data.quizTotalCount}
                 quizzes={data.quizzes}
                 fonts={fonts}
               />

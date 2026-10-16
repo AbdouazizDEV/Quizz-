@@ -4,6 +4,7 @@ import type { QuizAnswerRecord, QuizPlayPayload, QuizPlayQuestion } from '@app-t
 import { getTimerSecondsForDifficulty } from '@constants/quiz.constants';
 
 export type QuizFeedbackPhase = 'idle' | 'correct' | 'incorrect' | 'timeout';
+export type QuizSessionPhase = 'playing' | 'submitting';
 
 const TIMEOUT_OPTION_ID = '__timeout__';
 
@@ -19,6 +20,8 @@ interface QuizPlaySessionState {
   categorySlug: string | null;
   duelId: string | null;
   challengeId: string | null;
+  competitionId: string | null;
+  matchId: string | null;
   payload: QuizPlayPayload | null;
   currentIndex: number;
   sessionPoints: number;
@@ -29,12 +32,15 @@ interface QuizPlaySessionState {
   feedbackChipLabel: string;
   correctAnswerLabel: string;
   secondsPerQuestion: number;
+  sessionPhase: QuizSessionPhase;
   reset: () => void;
   bootstrap: (
     payload: QuizPlayPayload,
     categorySlug: string | null,
     duelId?: string | null,
     challengeId?: string | null,
+    competitionId?: string | null,
+    matchId?: string | null,
   ) => void;
   selectOption: (optionId: string, isCorrect: boolean, pointsIfCorrect: number, correctLabel: string) => void;
   /** Après « Suivant » : enregistre la réponse courante et passe à la suite ou termine. */
@@ -48,6 +54,8 @@ const initial = {
   categorySlug: null as string | null,
   duelId: null as string | null,
   challengeId: null as string | null,
+  competitionId: null as string | null,
+  matchId: null as string | null,
   payload: null as QuizPlayPayload | null,
   currentIndex: 0,
   sessionPoints: 0,
@@ -58,21 +66,32 @@ const initial = {
   feedbackChipLabel: '',
   correctAnswerLabel: '',
   secondsPerQuestion: 16,
+  sessionPhase: 'playing' as QuizSessionPhase,
 };
 
 export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) => ({
   ...initial,
   reset: () => set({ ...initial }),
-  bootstrap: (payload, categorySlug, duelId = null, challengeId = null) =>
+  bootstrap: (
+    payload,
+    categorySlug,
+    duelId = null,
+    challengeId = null,
+    competitionId = null,
+    matchId = null,
+  ) =>
     set({
       ...initial,
       payload,
       categorySlug,
       duelId: duelId ?? null,
       challengeId: challengeId ?? null,
+      competitionId: competitionId ?? null,
+      matchId: matchId ?? null,
       secondsPerQuestion: getTimerSecondsForDifficulty(payload.quiz.difficultyLevel),
     }),
-  selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) =>
+  selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) => {
+    if (get().sessionPhase !== 'playing') return;
     set({
       selectedOptionId: optionId,
       feedbackPhase: isCorrect ? 'correct' : 'incorrect',
@@ -80,8 +99,10 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
       feedbackChipLabel: isCorrect ? `+${pointsIfCorrect}` : correctLabel,
       correctAnswerLabel: correctLabel,
       sessionPoints: isCorrect ? get().sessionPoints + pointsIfCorrect : get().sessionPoints,
-    }),
+    });
+  },
   advanceFromFeedback: () => {
+    if (get().sessionPhase === 'submitting') return 'finished';
     const p = get().payload;
     const idx = get().currentIndex;
     const q = p?.questions[idx];
@@ -99,6 +120,7 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
     if (isLast) {
       set({
         answers,
+        sessionPhase: 'submitting',
         ...clearFeedbackFields,
       });
       return 'finished';
@@ -116,6 +138,7 @@ export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) =
     return payload.questions[currentIndex] ?? null;
   },
   expireQuestion: (correctLabel) => {
+    if (get().sessionPhase !== 'playing') return;
     if (!get().getCurrentQuestion()) return;
     set({
       selectedOptionId: TIMEOUT_OPTION_ID,

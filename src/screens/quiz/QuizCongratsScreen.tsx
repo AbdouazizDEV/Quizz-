@@ -36,11 +36,13 @@ import { useQuizPlaySessionStore } from '@stores/quizPlaySessionStore';
 export default function QuizCongratsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { quizId: idParam, duelId: duelParam, challengeId: challengeParam } = useLocalSearchParams<{
-    quizId: string | string[];
-    duelId?: string | string[];
-    challengeId?: string | string[];
-  }>();
+  const { quizId: idParam, duelId: duelParam, challengeId: challengeParam, competitionId: competitionParam } =
+    useLocalSearchParams<{
+      quizId: string | string[];
+      duelId?: string | string[];
+      challengeId?: string | string[];
+      competitionId?: string | string[];
+    }>();
   const quizId = typeof idParam === 'string' ? idParam : idParam?.[0];
   const duelId =
     typeof duelParam === 'string' ? duelParam : Array.isArray(duelParam) ? duelParam[0] : undefined;
@@ -51,6 +53,14 @@ export default function QuizCongratsScreen() {
       ? challengeParam
       : Array.isArray(challengeParam)
         ? challengeParam[0]
+        : undefined);
+  const competitionIdFromStore = useQuizPlaySessionStore((s) => s.competitionId);
+  const competitionId =
+    competitionIdFromStore ??
+    (typeof competitionParam === 'string'
+      ? competitionParam
+      : Array.isArray(competitionParam)
+        ? competitionParam[0]
         : undefined);
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(screenWidth - Spacing.screenHorizontal * 2, QuizPlayTheme.contentMaxWidth);
@@ -117,6 +127,10 @@ export default function QuizCongratsScreen() {
 
   const goCategory = useCallback(() => {
     reset();
+    if (competitionId) {
+      router.replace(DefisRoutes.tournoiBracket(competitionId));
+      return;
+    }
     if (duelId) {
       router.replace(DefisRoutes.duelResult(duelId));
       return;
@@ -130,7 +144,7 @@ export default function QuizCongratsScreen() {
       return;
     }
     router.dismissTo(Routes.HOME);
-  }, [categorySlug, challengeId, duelId, reset, router]);
+  }, [categorySlug, challengeId, competitionId, duelId, reset, router]);
 
   const shareInput = useMemo(
     () =>

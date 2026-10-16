@@ -6,14 +6,19 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScoreboardList } from '@components/ui/leaderboard/ScoreboardList';
+import { titleText } from '@constants/appText';
 import { buildUserProfileHref } from '@constants/Routes';
+import { pickFeaturedBadge } from '@constants/westAfricanBadges';
 import { useGlobalLeaderboard } from '@hooks/useGlobalLeaderboard';
+import { usePlayerBadges } from '@hooks/usePlayerBadges';
 
 export default function ScoreboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { items, me, loading, error, refetch } = useGlobalLeaderboard(100);
+  const { badges } = usePlayerBadges();
+  const featuredBadge = pickFeaturedBadge(badges);
   const contentWidth = Math.min(width - 48, 382);
 
   useFocusEffect(
@@ -40,6 +45,7 @@ export default function ScoreboardScreen() {
               currentUserId={me?.userId}
               loading={loading}
               error={error ? 'Impossible de charger le classement.' : undefined}
+              featuredBadge={featuredBadge}
               onPressAvatar={(userId) => router.push(buildUserProfileHref(userId))}
             />
           </View>
@@ -75,7 +81,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: '#FFFFFF',
     fontSize: 29,
-    fontWeight: '700',
+    ...titleText,
   },
   headerSpacer: {
     width: 22,

@@ -6,6 +6,7 @@ import { fetchNetworkOnline } from '@services/offline/networkStatus';
 import { useAuthStore } from '@stores/authStore';
 import { formatCompactNumber } from '@utils/formatCompactNumber';
 import { getUserAvatarUri } from '@utils/getUserAvatarUri';
+import { levelCodeFromScore } from '@utils/levelDisplay';
 
 import type { IProfileDataProvider } from './IProfileDataProvider';
 
@@ -29,6 +30,7 @@ interface ApiProfilePayload {
     collections?: number;
     followers?: number;
     following?: number;
+    total_score?: number;
   };
   quizzes?: Array<{
     id: string;
@@ -61,10 +63,11 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
   const identity = data.identity;
   const stats = data.stats;
   const quizzes = data.quizzes ?? [];
+  const completedQuizCount = quizzes.length;
 
   const displayName = identity?.display_name?.trim() || 'Joueur';
   const uid = identity?.id || userId || '';
-  const avatarUri = getUserAvatarUri(uid, identity?.avatar_url);
+  const avatarUri = getUserAvatarUri(uid, identity?.avatar_url, identity?.gender ?? 'unknown');
 
   return {
     identity: {
@@ -77,14 +80,14 @@ function mapProfilePayload(data: ApiProfilePayload, userId?: string): ProfileScr
       viewerRelationship: identity?.viewer_relationship ?? (userId ? 'none' : 'self'),
     },
     stats: [
-      { id: 'quizzo', valueLabel: String(stats?.quiz_count ?? 0), caption: 'Quiz' },
+      { id: 'quizzo', valueLabel: String(completedQuizCount), caption: 'Quiz' },
       { id: 'plays', valueLabel: formatCompactNumber(stats?.plays ?? 0), caption: 'Parties' },
-      { id: 'players', valueLabel: formatCompactNumber(stats?.players ?? 0), caption: 'Joueurs' },
+      { id: 'level', valueLabel: levelCodeFromScore(stats?.total_score ?? 0), caption: 'Niveau' },
       { id: 'collections', valueLabel: String(stats?.collections ?? 0), caption: 'Trophées' },
       { id: 'followers', valueLabel: formatCompactNumber(stats?.followers ?? 0), caption: 'Abonnés' },
       { id: 'following', valueLabel: String(stats?.following ?? 0), caption: 'Abonnements' },
     ],
-    quizTotalCount: stats?.quiz_count ?? 0,
+    quizTotalCount: completedQuizCount,
     quizzes: quizzes.map((q, index) => ({
       id: q.id || `${q.quiz_id ?? 'quiz'}-${index}`,
       title: q.title?.trim() || 'Quiz',

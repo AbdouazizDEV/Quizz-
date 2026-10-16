@@ -212,7 +212,7 @@ export default function NotificationsScreen() {
                       ? () => void onRejectDuel(item)
                       : undefined
                   }
-                  onDeleteRequest={() => requestDelete(item)}
+                  onSwipeDelete={() => requestDelete(item)}
                 />
               ))}
             </View>
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   markAllTxt: { fontSize: 14, fontWeight: '700', color: '#1F2261' },
   loader: { marginTop: 40 },
   moreLoader: { marginTop: 16 },
-  list: { gap: 10 },
+  list: { gap: 14 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 10, paddingHorizontal: 16 },
   emptyIcon: {
     width: 72,
