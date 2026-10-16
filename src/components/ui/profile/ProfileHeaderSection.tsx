@@ -1,6 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 
+import type { ReactNode } from 'react';
+
 import type { ProfileStatItem } from '@app-types/profile.types';
+import type { PlayerBadgeView } from '@constants/westAfricanBadges';
 import { ProfileTheme } from '@constants/profileTheme';
 import { getLevelProgressDetail, type LevelProgressDetail } from '@utils/levelDisplay';
 
@@ -29,6 +32,11 @@ interface ProfileHeaderSectionProps {
   streakDays?: number;
   isPremium?: boolean;
   premiumDaysLeft?: number;
+  premiumTitle?: string;
+  premiumBody?: string;
+  premiumContract?: { source?: string | null; edition_key?: string | null } | null;
+  badgeSlot?: ReactNode;
+  earnedBadges?: PlayerBadgeView[];
 }
 
 export function ProfileHeaderSection({
@@ -49,6 +57,11 @@ export function ProfileHeaderSection({
   streakDays = 0,
   isPremium = false,
   premiumDaysLeft = 0,
+  premiumTitle,
+  premiumBody,
+  premiumContract,
+  badgeSlot,
+  earnedBadges,
 }: ProfileHeaderSectionProps) {
   const resolvedProgress = progressDetail ?? getLevelProgressDetail(0);
 
@@ -65,6 +78,8 @@ export function ProfileHeaderSection({
           actionLabel={identityActionLabel}
           actionVariant={identityActionVariant}
           actionDisabled={identityActionDisabled}
+          badgeSlot={badgeSlot}
+          levelCode={stats.find((item) => item.id === 'level')?.valueLabel}
         />
         <View style={styles.divider} />
         {showInsightsCarousel ? (
@@ -75,7 +90,11 @@ export function ProfileHeaderSection({
             streakDays={streakDays}
             isPremium={isPremium}
             premiumDaysLeft={premiumDaysLeft}
+            premiumTitle={premiumTitle}
+            premiumBody={premiumBody}
+            premiumContract={premiumContract}
             fonts={fonts}
+            earnedBadges={earnedBadges}
           />
         ) : (
           <ProfileStatsGrid stats={stats} fonts={fonts} />

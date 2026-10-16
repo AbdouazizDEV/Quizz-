@@ -1,14 +1,20 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { LeaderboardItem } from '@app-types/leaderboard.types';
+import { BadgeChip } from '@components/ui/badges/BadgeChip';
+import { LevelBadge } from '@components/ui/home/LevelBadge';
+import { titleText } from '@constants/appText';
+import type { PlayerBadgeView } from '@constants/westAfricanBadges';
+import { levelCodeFromScore } from '@utils/levelDisplay';
 
 interface ScoreboardRowProps {
   item: LeaderboardItem;
   highlighted: boolean;
+  featuredBadge?: PlayerBadgeView | null;
   onPressAvatar?: (userId: string) => void;
 }
 
-export function ScoreboardRow({ item, highlighted, onPressAvatar }: ScoreboardRowProps) {
+export function ScoreboardRow({ item, highlighted, featuredBadge, onPressAvatar }: ScoreboardRowProps) {
   return (
     <View style={[styles.row, highlighted && styles.rowHighlighted]}>
       <Text style={[styles.rank, highlighted && styles.rankHighlighted]}>{item.rank}</Text>
@@ -23,9 +29,13 @@ export function ScoreboardRow({ item, highlighted, onPressAvatar }: ScoreboardRo
           <Text style={styles.avatarFallback}>{item.displayName[0]?.toUpperCase() ?? '?'}</Text>
         )}
       </Pressable>
-      <Text style={[styles.name, highlighted && styles.nameHighlighted]} numberOfLines={1}>
-        {item.displayName}
-      </Text>
+      <View style={styles.nameCol}>
+        <Text style={[styles.name, highlighted && styles.nameHighlighted]} numberOfLines={1}>
+          {item.displayName}
+        </Text>
+        {highlighted && featuredBadge ? <BadgeChip badge={featuredBadge} /> : null}
+      </View>
+      <LevelBadge code={levelCodeFromScore(item.score)} compact />
       <Text style={[styles.score, highlighted && styles.scoreHighlighted]}>{item.score}</Text>
     </View>
   );
@@ -46,11 +56,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
   },
+  nameCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
   rank: {
     width: 26,
     textAlign: 'center',
     color: '#FFFFFF',
-    fontWeight: '700',
+    ...titleText,
     fontSize: 22,
   },
   rankHighlighted: {
@@ -66,18 +83,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8EEFF',
   },
   avatarImage: { width: '100%', height: '100%' },
-  avatarFallback: { color: '#315ECC', fontSize: 18, fontWeight: '800' },
+  avatarFallback: { color: '#315ECC', fontSize: 18, ...titleText },
   name: {
-    flex: 1,
+    flexShrink: 1,
     color: '#FFFFFF',
     fontSize: 17,
-    fontWeight: '700',
+    ...titleText,
   },
   nameHighlighted: { color: '#212121' },
   score: {
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '700',
+    ...titleText,
   },
   scoreHighlighted: { color: '#212121' },
 });

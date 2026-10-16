@@ -61,6 +61,11 @@ import {
   FALLBACK_HOME_INSIGHTS,
   mapFunFactsToInsights,
 } from '@utils/homeFunFactsDisplay';
+import { PremiumStatusCard } from '@components/ui/premium/PremiumStatusCard';
+import { pickFeaturedBadge } from '@constants/westAfricanBadges';
+import { usePlayerBadges } from '@hooks/usePlayerBadges';
+import { isLikelyArenaRegistered } from '@utils/arenaDisplay';
+import { premiumStatusPresentation } from '@utils/premiumStatusCopy';
 
 const BOTTOM_NAV_HEIGHT = 86;
 
@@ -75,8 +80,10 @@ export default function HomeRefactoredScreen() {
   const glowAnim = useRef(new Animated.Value(0.35)).current;
   const token = useAuthStore((s) => s.token);
   const hasRegisteredAccount = useAuthStore((s) => s.hasRegisteredAccount);
-  const { data: me, loading: meLoading, refetch: refetchAuthMe } = useAuthMe();
-  const { items: leaderboardRows, refetch: refetchLeaderboard } = useGlobalLeaderboard(5);
+  const { data: me, loading: meLoading, error: meError, refetch: refetchAuthMe } = useAuthMe();
+  const { badges } = usePlayerBadges();
+  const featuredBadge = pickFeaturedBadge(badges);
+  const { items: leaderboardRows, me: leaderboardMe, refetch: refetchLeaderboard } = useGlobalLeaderboard(5);
   const {
     data: dailyQuizzes,
     isLoading: dailyQuizzesLoading,
@@ -288,12 +295,9 @@ export default function HomeRefactoredScreen() {
     const progressDetail = getLevelProgressDetail(score);
     const progress = progressDetail.progress;
     const { left, right } = levelProgressEndpoints(score);
-    const streak = profile?.streak_days ?? 0;
-    const createdAt = typeof userRaw?.created_at === 'string' ? userRaw.created_at : undefined;
-    const elapsedDays = elapsedDaysSince(createdAt);
-    const daysActive = Math.max(profile?.days_active ?? 0, elapsedDays);
-    const clockLabel =
-      streak > 0 ? formatJoursLabel(streak) : daysActive > 0 ? formatJoursLabel(daysActive) : '0 jour';
+    const createdRaw = (profile as { created_at?: string } | undefined)?.created_at ?? userRaw?.created_at;
+    const createdAt = typeof createdRaw === 'string' ? createdRaw : undefined;
+    const clockLabel = formatJoursLabel(elapsedDaysSince(createdAt));
     const loadingPlaceholders = Boolean(token?.trim()) && meLoading && !profile;
     const gender = resolveProfileGender(
       (profile as Record<string, unknown> | undefined)?.gender,
@@ -311,7 +315,8 @@ export default function HomeRefactoredScreen() {
       displayNameWithEmoji: loadingPlaceholders ? '··· 👋' : `${first} 👋`,
       totalScoreDisplay: loadingPlaceholders ? '—' : String(score),
       levelLabel: formatLevelCodeLabel(levelCode),
-      rankLabel: '#—',
+      levelCode,
+      rankLabel: leaderboardMe?.rank ? `#${leaderboardMe.rank}` : '#—',
       streakOrDaysLabel: loadingPlaceholders ? '···' : clockLabel,
       progressLabelLeft: left,
       progressLabelRight: right,
@@ -319,7 +324,7 @@ export default function HomeRefactoredScreen() {
       progressPercentLabel: loadingPlaceholders ? '' : `${progressDetail.percent}%`,
       progress,
     };
-  }, [me, meLoading, token]);
+  }, [leaderboardMe?.rank, me, meLoading, token]);
 
   const leaderboardUsers = useMemo<HomeLeaderboardUser[]>(
     () =>
@@ -366,6 +371,8 @@ export default function HomeRefactoredScreen() {
             displayNameWithEmoji={headerVm.displayNameWithEmoji}
             totalScoreDisplay={headerVm.totalScoreDisplay}
             levelLabel={headerVm.levelLabel}
+            levelCode={headerVm.levelCode}
+            featuredBadge={featuredBadge}
             rankLabel={headerVm.rankLabel}
             streakOrDaysLabel={headerVm.streakOrDaysLabel}
             progressLabelLeft={headerVm.progressLabelLeft}
@@ -373,6 +380,31 @@ export default function HomeRefactoredScreen() {
             pointsRemainingLabel={headerVm.pointsRemainingLabel}
             progressPercentLabel={headerVm.progressPercentLabel}
             onPressAvatar={goToProfile}
+          />
+
+          <PremiumStatusCard
+            title={
+              premiumStatusPresentation({
+                loading: meLoading,
+                error: Boolean(meError),
+                premium: me?.premium,
+              }).title
+            }
+            body={
+              premiumStatusPresentation({
+                loading: meLoading,
+                error: Boolean(meError),
+                premium: me?.premium,
+              }).body
+            }
+            loading={meLoading && !me?.premium}
+            arenaCtaLabel={
+              isLikelyArenaRegistered(me?.premium) ? 'Voir mon Arena' : 'Entrer dans Arena'
+            }
+            onPressArena={() => router.push(Routes.ARENA)}
+            secondaryCtaLabel={me?.premium?.status === 'active' ? 'Carnet et badges' : 'Voir le Premium'}
+            onPressSecondary={() => router.push(me?.premium?.status === 'active' ? Routes.CARNET : Routes.PREMIUM)}
+            featuredBadge={featuredBadge}
           />
 
           <View style={styles.section}>

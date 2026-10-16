@@ -5,7 +5,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -43,6 +43,7 @@ import { getAuthMeFromStore } from '@services/auth/authMeRepository';
 import { loginGateway } from '@services/auth/loginGatewayInstance';
 import { toFrenchPasskeyError } from '@services/auth/passkeyAuthService';
 import { loginWithPassword } from '@services/auth/passwordAuthService';
+import { resolvePostLoginHref } from '@utils/postLoginRedirect';
 
 const FOOTER_BAR_HEIGHT = 118;
 const CONTENT_GAP = 28;
@@ -50,6 +51,8 @@ const FORM_GAP = 32;
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const postLoginHref = resolvePostLoginHref(returnTo);
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -117,9 +120,9 @@ export default function LoginScreen() {
         await signOutAndSyncStore();
         throw new Error('Profil introuvable après connexion.');
       }
-      router.replace(Routes.HOME);
+      router.replace(postLoginHref);
     },
-    [router],
+    [postLoginHref, router],
   );
 
   const onSubmit = useCallback(async () => {

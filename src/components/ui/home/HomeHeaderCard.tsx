@@ -1,3 +1,6 @@
+import { BadgeChip } from '@components/ui/badges/BadgeChip';
+import { LevelBadge } from '@components/ui/home/LevelBadge';
+import type { PlayerBadgeView } from '@constants/westAfricanBadges';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react';
 import {
@@ -23,6 +26,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { bodyText, mutedText, titleText } from '@constants/appText';
 import { Routes } from '@constants/Routes';
 import { shareFriendProfile } from '@services/network/shareFriendProfile';
 import { buildFriendQrProfile, encodeFriendQrScanPayload } from '@utils/friendQrPayload';
@@ -44,9 +48,11 @@ interface HomeHeaderCardProps {
   totalScoreDisplay?: string;
   /** Sous le score (niveau + libellé). */
   levelLabel?: string;
-  /** Texte à droite avec l’icône médaille (classement — pas encore côté API). */
+  levelCode?: string;
+  featuredBadge?: PlayerBadgeView | null;
+  /** Rang du joueur, à côté de son badge. */
   rankLabel?: string;
-  /** Texte à droite avec l’icône horloge (série ou jours actifs). */
+  /** Jours écoulés depuis l’inscription. */
   streakOrDaysLabel?: string;
   progressLabelLeft?: string;
   progressLabelRight?: string;
@@ -136,6 +142,8 @@ export function HomeHeaderCard({
   displayNameWithEmoji = 'Joueur 👋',
   totalScoreDisplay = '0',
   levelLabel = '🌱 Niveau 1 · Débutant',
+  levelCode,
+  featuredBadge = null,
   rankLabel = '#—',
   streakOrDaysLabel = '0 jour',
   progressLabelLeft = 'Niv. 1',
@@ -331,11 +339,14 @@ export function HomeHeaderCard({
           <Text style={[styles.scoreValue, { fontSize: sizes.scoreValue, lineHeight: sizes.scoreValueLine }]}>
             {totalScoreDisplay}
           </Text>
-          <Text style={[styles.scoreLevel, { fontSize: sizes.level }]}>{levelLabel}</Text>
+          <View style={styles.levelRow}>
+            <LevelBadge code={levelCode} />
+            <Text style={[styles.scoreLevel, { fontSize: sizes.level }]}>{levelLabel}</Text>
+          </View>
         </View>
         <View style={styles.scoreMeta}>
           <View style={styles.metaItem}>
-            <Feather name="award" size={sizes.metaIcon} color="#F1C943" />
+            {featuredBadge ? <BadgeChip badge={featuredBadge} /> : <Feather name="award" size={sizes.metaIcon} color="#F1C943" />}
             <Text style={[styles.metaText, { fontSize: sizes.meta, lineHeight: sizes.metaLine }]}>{rankLabel}</Text>
           </View>
           <View style={styles.metaItem}>
@@ -554,7 +565,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   avatarText: {
-    fontWeight: '700',
+    ...titleText,
     color: '#FFFFFF',
   },
   headerIdentity: {
@@ -563,10 +574,11 @@ const styles = StyleSheet.create({
   },
   headerGreeting: {
     color: '#C8CFF8',
+    ...mutedText,
   },
   headerName: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    ...titleText,
   },
   scoreCard: {
     borderRadius: 18,
@@ -583,14 +595,20 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     color: '#AAB3E8',
-    fontWeight: '600',
+    ...bodyText,
   },
   scoreValue: {
     color: '#F5D24A',
-    fontWeight: '900',
+    ...titleText,
   },
   scoreLevel: {
     color: '#CDD3F8',
+    flexShrink: 1,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   scoreMeta: {
     position: 'absolute',
@@ -605,7 +623,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    ...titleText,
   },
   progressLabels: {
     marginTop: 14,
@@ -616,11 +634,11 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: '#AAB3E8',
-    fontWeight: '600',
+    ...bodyText,
   },
   progressRemaining: {
     color: '#F5D24A',
-    fontWeight: '700',
+    ...titleText,
     flex: 1,
     textAlign: 'center',
   },
@@ -643,7 +661,7 @@ const styles = StyleSheet.create({
   },
   progressPercent: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    ...titleText,
     minWidth: 36,
     textAlign: 'right',
   },
@@ -661,11 +679,12 @@ const styles = StyleSheet.create({
   },
   backTitle: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    ...titleText,
   },
   backHint: {
     color: '#C8CFF8',
     textAlign: 'center',
+    ...mutedText,
   },
   qrWrap: {
     padding: 8,
@@ -711,7 +730,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     color: '#2A2D5E',
-    fontWeight: '800',
+    ...titleText,
     fontSize: 14,
   },
   actionBtnTextSecondary: {

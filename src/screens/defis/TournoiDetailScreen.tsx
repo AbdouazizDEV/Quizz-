@@ -14,11 +14,13 @@ import { useAuthMe } from '@hooks/useAuthMe';
 import { useNetworkStatus } from '@hooks/useNetworkStatus';
 import {
   fetchCompetitionById,
+  drawCompetitionMatch,
   registerForCompetition,
   unregisterFromCompetition,
 } from '@services/defis/competitionRepository';
 import { resolveEffectiveCompetitionStatus } from '@utils/defis/competitionDisplay';
 import { useAppError } from '@providers/AppErrorProvider';
+import { buildQuizEntryHref } from '@constants/Routes';
 
 export default function TournoiDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -80,6 +82,32 @@ export default function TournoiDetailScreen() {
         unregisterError instanceof Error ? unregisterError.message : 'Désinscription impossible.',
         { title: 'Tournoi' },
       );
+    }
+  };
+
+  const onPlayMatch = async () => {
+    if (!userId || !competitionId) return;
+    try {
+      const draw = await drawCompetitionMatch(competitionId);
+      Alert.alert(
+        'Tournoi',
+        `Match ${draw.phase ?? ''} · ${draw.questionsCount} questions`,
+      );
+      router.push(
+        buildQuizEntryHref(draw.quizId, {
+          competitionId,
+          matchId: draw.matchId,
+        }) as never,
+      );
+    } catch (playError) {
+      const message =
+        playError instanceof Error ? playError.message : 'Impossible de démarrer le match.';
+      if (/déjà joué|attendez|bracket/i.test(message)) {
+        Alert.alert('Tournoi', message);
+        router.push(DefisRoutes.tournoiBracket(competitionId));
+      } else {
+        showAppError(message, { title: 'Tournoi' });
+      }
     }
   };
 
@@ -169,7 +197,7 @@ export default function TournoiDetailScreen() {
               Jouez quand vous voulez avant la fin du tournoi. Chaque victoire vous rapproche du
               titre.
             </Text>
-            <Pressable style={styles.matchCta}>
+            <Pressable style={styles.matchCta} onPress={() => void onPlayMatch()}>
               <Text style={styles.matchCtaText}>Jouer mon match →</Text>
             </Pressable>
           </LinearGradient>

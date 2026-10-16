@@ -1,5 +1,8 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { LevelBadge } from '@components/ui/home/LevelBadge';
+import { levelCodeFromScore } from '@utils/levelDisplay';
+
 export interface HomeLeaderboardUser {
   id: string;
   name: string;
@@ -46,6 +49,7 @@ export function HomeLeaderboardSection({ users, onPressAvatar }: HomeLeaderboard
               <Text style={styles.rankName} numberOfLines={1}>
                 {user.name}
               </Text>
+              <LevelBadge code={levelCodeFromScore(user.points)} compact />
             </View>
             <Text style={styles.rankPoints}>{user.points} pts</Text>
           </View>

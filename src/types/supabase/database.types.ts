@@ -4,7 +4,7 @@
  */
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type LevelCode = 'Z0' | 'Z1' | 'Z2' | 'Z3' | 'A1' | 'A2' | 'A3';
+export type LevelCode = 'Z0' | 'Z1' | 'Z2' | 'Z3' | 'A1' | 'A2' | 'A3' | 'B1' | 'B2' | 'B3' | 'B4' | 'B5';
 
 export interface Database {
   public: {

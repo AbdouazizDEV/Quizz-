@@ -176,3 +176,84 @@ export async function unregisterFromCompetition(
     throw new Error(extractApiError(error, 'Impossible de se désinscrire de ce tournoi.'));
   }
 }
+
+export interface CompetitionMatchDrawResult {
+  quizId: string;
+  matchId: string;
+  phase: string | null;
+  difficultyLevel: string | null;
+  questionsCount: number;
+}
+
+export async function drawCompetitionMatch(
+  competitionId: string,
+  matchId?: string,
+): Promise<CompetitionMatchDrawResult> {
+  try {
+    const { data } = await apiClient.post(
+      `/defis/competitions/${encodeURIComponent(competitionId)}/matches/draw`,
+      matchId ? { match_id: matchId } : {},
+      { headers: authHeaders() },
+    );
+    const root = asRecord(data) ?? {};
+    const match = asRecord(root.match) ?? {};
+    const quiz = asRecord(root.quiz) ?? {};
+    const quizId = readString(quiz.id) ?? readString(match.quiz_id);
+    const resolvedMatchId = readString(match.id);
+    if (!quizId || !resolvedMatchId) {
+      throw new Error('Tirage de match invalide.');
+    }
+    return {
+      quizId,
+      matchId: resolvedMatchId,
+      phase: readString(match.phase),
+      difficultyLevel: readString(match.difficulty_level) ?? readString(match.difficultyLevel),
+      questionsCount:
+        readFiniteNumber(quiz.questions_count) ??
+        readFiniteNumber(quiz.total_questions) ??
+        0,
+    };
+  } catch (error) {
+    throwIfNestRouteMissing(
+      error,
+      `POST /api/v1/defis/competitions/${competitionId}/matches/draw`,
+    );
+    throw new Error(extractApiError(error, 'Impossible de démarrer le match.'));
+  }
+}
+
+export interface CompetitionMatchScoreResult {
+  waitingForOthers: boolean;
+  tiebreak: boolean;
+  advanced: boolean;
+  status: string | null;
+}
+
+export async function submitCompetitionMatchScore(
+  competitionId: string,
+  input: { score: number; matchId?: string | null; quizId?: string | null },
+): Promise<CompetitionMatchScoreResult> {
+  try {
+    const body: Record<string, unknown> = { score: input.score };
+    if (input.matchId) body.match_id = input.matchId;
+    if (input.quizId) body.quiz_id = input.quizId;
+    const { data } = await apiClient.post(
+      `/defis/competitions/${encodeURIComponent(competitionId)}/matches/score`,
+      body,
+      { headers: authHeaders() },
+    );
+    const root = asRecord(data) ?? {};
+    return {
+      waitingForOthers: root.waiting_for_others === true,
+      tiebreak: root.tiebreak === true,
+      advanced: root.advanced === true,
+      status: readString(root.status),
+    };
+  } catch (error) {
+    throwIfNestRouteMissing(
+      error,
+      `POST /api/v1/defis/competitions/${competitionId}/matches/score`,
+    );
+    throw new Error(extractApiError(error, 'Impossible d’enregistrer le score du match.'));
+  }
+}

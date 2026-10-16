@@ -52,11 +52,15 @@ export default function QuizEntryScreen() {
     categorySlug: catParam,
     duelId: duelParam,
     challengeId: challengeParam,
+    competitionId: competitionParam,
+    matchId: matchParam,
   } = useLocalSearchParams<{
     quizId: string | string[];
     categorySlug?: string | string[];
     duelId?: string | string[];
     challengeId?: string | string[];
+    competitionId?: string | string[];
+    matchId?: string | string[];
   }>();
   const quizId = decodeQuizRouteId(typeof idParam === 'string' ? idParam : idParam?.[0]);
   const categorySlug =
@@ -68,6 +72,18 @@ export default function QuizEntryScreen() {
       ? challengeParam
       : Array.isArray(challengeParam)
         ? challengeParam[0]
+        : undefined;
+  const competitionId =
+    typeof competitionParam === 'string'
+      ? competitionParam
+      : Array.isArray(competitionParam)
+        ? competitionParam[0]
+        : undefined;
+  const matchId =
+    typeof matchParam === 'string'
+      ? matchParam
+      : Array.isArray(matchParam)
+        ? matchParam[0]
         : undefined;
 
   const [fontsLoaded] = useFonts({ Nunito_700Bold, Nunito_600SemiBold });
@@ -107,10 +123,17 @@ export default function QuizEntryScreen() {
         ...raw,
         questions: composed.questions,
       };
-      bootstrap(payload, categorySlug ?? null, duelId ?? null, challengeId ?? null);
+      bootstrap(
+        payload,
+        categorySlug ?? null,
+        duelId ?? null,
+        challengeId ?? null,
+        competitionId ?? null,
+        matchId ?? null,
+      );
       router.replace(`/quiz/${encodeURIComponent(playId)}/play`);
     },
-    [bootstrap, categorySlug, challengeId, duelId, quizId, router],
+    [bootstrap, categorySlug, challengeId, competitionId, duelId, matchId, quizId, router],
   );
 
   useEffect(() => {

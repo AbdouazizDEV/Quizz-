@@ -20,6 +20,8 @@ interface QuizPlaySessionState {
   categorySlug: string | null;
   duelId: string | null;
   challengeId: string | null;
+  competitionId: string | null;
+  matchId: string | null;
   payload: QuizPlayPayload | null;
   currentIndex: number;
   sessionPoints: number;
@@ -37,6 +39,8 @@ interface QuizPlaySessionState {
     categorySlug: string | null,
     duelId?: string | null,
     challengeId?: string | null,
+    competitionId?: string | null,
+    matchId?: string | null,
   ) => void;
   selectOption: (optionId: string, isCorrect: boolean, pointsIfCorrect: number, correctLabel: string) => void;
   /** Après « Suivant » : enregistre la réponse courante et passe à la suite ou termine. */
@@ -50,6 +54,8 @@ const initial = {
   categorySlug: null as string | null,
   duelId: null as string | null,
   challengeId: null as string | null,
+  competitionId: null as string | null,
+  matchId: null as string | null,
   payload: null as QuizPlayPayload | null,
   currentIndex: 0,
   sessionPoints: 0,
@@ -66,13 +72,22 @@ const initial = {
 export const useQuizPlaySessionStore = create<QuizPlaySessionState>((set, get) => ({
   ...initial,
   reset: () => set({ ...initial }),
-  bootstrap: (payload, categorySlug, duelId = null, challengeId = null) =>
+  bootstrap: (
+    payload,
+    categorySlug,
+    duelId = null,
+    challengeId = null,
+    competitionId = null,
+    matchId = null,
+  ) =>
     set({
       ...initial,
       payload,
       categorySlug,
       duelId: duelId ?? null,
       challengeId: challengeId ?? null,
+      competitionId: competitionId ?? null,
+      matchId: matchId ?? null,
       secondsPerQuestion: getTimerSecondsForDifficulty(payload.quiz.difficultyLevel),
     }),
   selectOption: (optionId, isCorrect, pointsIfCorrect, correctLabel) => {

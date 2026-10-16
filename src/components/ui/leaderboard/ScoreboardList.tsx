@@ -1,6 +1,9 @@
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import type { LeaderboardItem } from '@app-types/leaderboard.types';
+import { bodyText } from '@constants/appText';
+import type { PlayerBadgeView } from '@constants/westAfricanBadges';
+
 import { ScoreboardRow } from './ScoreboardRow';
 
 interface ScoreboardListProps {
@@ -8,10 +11,11 @@ interface ScoreboardListProps {
   currentUserId?: string;
   loading: boolean;
   error?: string;
+  featuredBadge?: PlayerBadgeView | null;
   onPressAvatar?: (userId: string) => void;
 }
 
-export function ScoreboardList({ items, currentUserId, loading, error, onPressAvatar }: ScoreboardListProps) {
+export function ScoreboardList({ items, currentUserId, loading, error, featuredBadge, onPressAvatar }: ScoreboardListProps) {
   if (loading) {
     return (
       <View style={styles.stateContainer}>
@@ -44,6 +48,7 @@ export function ScoreboardList({ items, currentUserId, loading, error, onPressAv
         <ScoreboardRow
           item={item}
           highlighted={item.id === currentUserId}
+          featuredBadge={item.id === currentUserId ? featuredBadge : null}
           onPressAvatar={onPressAvatar}
         />
       )}
@@ -70,7 +75,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     textAlign: 'center',
-    fontWeight: '600',
+    ...bodyText,
   },
 });
 

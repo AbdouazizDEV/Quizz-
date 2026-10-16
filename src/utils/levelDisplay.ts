@@ -1,6 +1,6 @@
 import type { LevelCode } from '@app-types/supabase/database.types';
 
-const LEVEL_ORDER: LevelCode[] = ['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3'];
+const LEVEL_ORDER: LevelCode[] = ['Z0', 'Z1', 'Z2', 'Z3', 'A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5'];
 export const SCORE_PER_LEVEL = 250;
 
 export interface LevelProgressDetail {
@@ -26,6 +26,11 @@ const LEVEL_LABELS: Partial<Record<LevelCode, string>> = {
   A1: '🏅 Niveau 5 · Avancé',
   A2: '🔥 Niveau 6 · Expert',
   A3: '👑 Niveau 7 · Maître',
+  B1: '🎖️ Niveau 8 · Grand maître',
+  B2: '📜 Niveau 9 · Sage',
+  B3: '🏆 Niveau 10 · Champion',
+  B4: '🌟 Niveau 11 · Légende',
+  B5: '⚜️ Niveau 12 · Icône',
 };
 
 export function formatLevelCodeLabel(code: string | undefined): string {

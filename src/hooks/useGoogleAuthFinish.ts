@@ -1,7 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 
-import { Routes } from '@constants/Routes';
 import {
   persistPasskeyAuthResult,
   signOutAndSyncStore,
@@ -14,9 +13,12 @@ import {
 } from '@services/auth/googleAuthService';
 import { requestGoogleIdToken } from '@services/auth/googleSignInNative';
 import { mapLoginUserToAuthMe } from '@services/auth/mapLoginToAuthMe';
+import { resolvePostLoginHref } from '@utils/postLoginRedirect';
 
 export function useGoogleAuthFinish() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const postLoginHref = resolvePostLoginHref(returnTo);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [showRegisterPrompt, setShowRegisterPrompt] = useState(false);
@@ -29,9 +31,9 @@ export function useGoogleAuthFinish() {
         await signOutAndSyncStore();
         throw new Error('Profil introuvable après connexion Google.');
       }
-      router.replace(Routes.HOME);
+      router.replace(postLoginHref);
     },
-    [router],
+    [postLoginHref, router],
   );
 
   const signInWithGoogle = useCallback(async () => {

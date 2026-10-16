@@ -24,6 +24,7 @@ import { useAuthMe } from '@hooks/useAuthMe';
 import { useQuestionTimer } from '@hooks/useQuestionTimer';
 import { recordChallengeParticipation } from '@services/defis/participateChallenge.service';
 import { submitDuelScore } from '@services/defis/duelRepository';
+import { submitCompetitionMatchScore } from '@services/defis/competitionRepository';
 import { loadAuthMe } from '@services/auth/authMeRepository';
 import { getQuizSessionPersistence } from '@services/quiz/session/quizSessionPersistenceInstance';
 import { extractApiError } from '@utils/extractApiError';
@@ -58,6 +59,8 @@ export default function QuizPlayScreen() {
   const payload = useQuizPlaySessionStore((s) => s.payload);
   const duelId = useQuizPlaySessionStore((s) => s.duelId);
   const challengeId = useQuizPlaySessionStore((s) => s.challengeId);
+  const competitionId = useQuizPlaySessionStore((s) => s.competitionId);
+  const matchId = useQuizPlaySessionStore((s) => s.matchId);
   const currentIndex = useQuizPlaySessionStore((s) => s.currentIndex);
   const sessionPoints = useQuizPlaySessionStore((s) => s.sessionPoints);
   const feedbackPhase = useQuizPlaySessionStore((s) => s.feedbackPhase);
@@ -253,9 +256,31 @@ export default function QuizPlayScreen() {
       }
     }
 
+    if (competitionId) {
+      try {
+        const result = await submitCompetitionMatchScore(competitionId, {
+          score: earned,
+          matchId: matchId && !matchId.startsWith('g') ? matchId : undefined,
+          quizId: completeQuizId,
+        });
+        if (result.waitingForOthers) {
+          Alert.alert('Tournoi', 'Score enregistré — en attente des autres joueurs.');
+        } else if (result.tiebreak) {
+          Alert.alert('Tournoi', 'Égalité ! Un quiz de barrage va être proposé.');
+        }
+        await queryClient.invalidateQueries({ queryKey: ['competition'] });
+        await queryClient.invalidateQueries({ queryKey: ['competitions'] });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Score tournoi non enregistré.';
+        if (!/déjà/i.test(message)) showAppError(message, { title: 'Tournoi' });
+      }
+    }
+
     const congratsParams = new URLSearchParams();
     if (duelId) congratsParams.set('duelId', duelId);
     if (challengeId) congratsParams.set('challengeId', challengeId);
+    if (competitionId) congratsParams.set('competitionId', competitionId);
+    if (matchId) congratsParams.set('matchId', matchId);
     const congratsQs = congratsParams.toString();
     const congratsHref = congratsQs
       ? `/quiz/${quizId}/congrats?${congratsQs}`
@@ -264,8 +289,10 @@ export default function QuizPlayScreen() {
   }, [
     advanceFromFeedback,
     challengeId,
+    competitionId,
     currentIndex,
     duelId,
+    matchId,
     queryClient,
     quizId,
     payload,

@@ -12,8 +12,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
 import type { ProfileStatItem } from '@app-types/profile.types';
+import { BadgeChip } from '@components/ui/badges/BadgeChip';
+import { Colors } from '@constants/Colors';
 import { ProfileTheme } from '@constants/profileTheme';
 import { Routes } from '@constants/Routes';
+import type { PlayerBadgeView } from '@constants/westAfricanBadges';
+import { LevelBadge } from '@components/ui/home/LevelBadge';
+import { formatLevelCodeLabel, type LevelProgressDetail } from '@utils/levelDisplay';
+import { isLikelyArenaRegistered } from '@utils/arenaDisplay';
 import type { LevelProgressDetail } from '@utils/levelDisplay';
 
 import type { ProfileFontFamilies } from './ProfileFonts';
@@ -30,7 +36,11 @@ interface ProfileInsightsCarouselProps {
   streakDays: number;
   isPremium: boolean;
   premiumDaysLeft?: number;
+  premiumTitle?: string;
+  premiumBody?: string;
+  premiumContract?: { source?: string | null; edition_key?: string | null } | null;
   fonts: ProfileFontFamilies;
+  earnedBadges?: PlayerBadgeView[];
 }
 
 function SlideChrome({
@@ -64,9 +74,14 @@ export function ProfileInsightsCarousel({
   streakDays,
   isPremium,
   premiumDaysLeft = 0,
+  premiumTitle,
+  premiumBody,
+  premiumContract,
   fonts,
+  earnedBadges = [],
 }: ProfileInsightsCarouselProps) {
   const router = useRouter();
+  const arenaCtaLabel = isLikelyArenaRegistered(premiumContract) ? 'Voir mon Arena' : 'Entrer dans Arena';
   const [index, setIndex] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
   const pausedRef = useRef(false);
@@ -109,10 +124,13 @@ export function ProfileInsightsCarousel({
       id: 'progression',
       node: (
         <SlideChrome icon="bookmark" title="Progression" fonts={fonts}>
-          <Text style={[styles.levelLine, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-            Niveau {progress.levelNumber}
-            {progress.nextLevelNumber ? ` → Niveau ${progress.nextLevelNumber}` : ' · Max'}
-          </Text>
+          <View style={styles.levelRow}>
+            <LevelBadge code={progress.levelCode} />
+            <Text style={[styles.levelLine, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+              {formatLevelCodeLabel(progress.levelCode)}
+              {progress.nextLevelNumber ? ` → Niveau ${progress.nextLevelNumber}` : ' · Max'}
+            </Text>
+          </View>
           <Text style={[styles.remaining, fonts.bold && { fontFamily: fonts.bold }]}>
             {progress.remainingLabel}
           </Text>
@@ -160,12 +178,20 @@ export function ProfileInsightsCarousel({
       id: 'badges',
       node: (
         <SlideChrome icon="award" title="Badges" fonts={fonts}>
-          <Text style={[styles.badgesLine, fonts.medium && { fontFamily: fonts.medium }]}>
-            Curieux du jour · Série {Math.max(streakDays, 1)} jours · Top 10 hebdo
-          </Text>
+          {earnedBadges.length > 0 ? (
+            <View style={styles.badgeChips}>
+              {earnedBadges.map((badge) => (
+                <BadgeChip key={badge.code} badge={badge} />
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.badgesLine, fonts.medium && { fontFamily: fonts.medium }]}>
+              Jouez pour gagner les médaillons. Ils n’ajoutent aucun point au classement.
+            </Text>
+          )}
           <Pressable
             style={({ pressed }) => [styles.outlineBtn, pressed && { opacity: 0.88 }]}
-            onPress={() => router.push(Routes.STATISTICS)}
+            onPress={() => router.push(Routes.CARNET)}
           >
             <Text style={[styles.outlineBtnText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
               Voir mes badges
@@ -177,20 +203,31 @@ export function ProfileInsightsCarousel({
     {
       id: 'premium',
       node: (
-        <SlideChrome icon="star" title="Essai premium" fonts={fonts}>
+        <SlideChrome icon="star" title={premiumTitle ?? 'Essai premium'} fonts={fonts}>
           <Text style={[styles.premiumStatus, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-            {isPremium
-              ? `Actif${premiumDaysLeft > 0 ? ` · ${premiumDaysLeft} jours restants` : ''}`
-              : 'Non activé · Débloquez plus de quiz'}
+            {premiumBody ??
+              (isPremium
+                ? `Actif${premiumDaysLeft > 0 ? ` · ${premiumDaysLeft} jours restants` : ''}`
+                : 'Non activé · Débloquez plus de quiz')}
           </Text>
-          <Pressable
-            style={({ pressed }) => [styles.outlineBtn, pressed && { opacity: 0.88 }]}
-            onPress={() => router.push(Routes.PREMIUM)}
-          >
-            <Text style={[styles.outlineBtnText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
-              Voir les avantages
-            </Text>
-          </Pressable>
+          <View style={styles.premiumActions}>
+            <Pressable
+              style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}
+              onPress={() => router.push(Routes.ARENA)}
+            >
+              <Text style={[styles.primaryBtnText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+                {arenaCtaLabel}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.outlineBtn, pressed && { opacity: 0.88 }]}
+              onPress={() => router.push(Routes.PREMIUM)}
+            >
+              <Text style={[styles.outlineBtnText, fonts.semiBold && { fontFamily: fonts.semiBold }]}>
+                Voir les avantages
+              </Text>
+            </Pressable>
+          </View>
         </SlideChrome>
       ),
     },
@@ -251,7 +288,7 @@ const styles = StyleSheet.create({
   viewport: {
     width: '100%',
     overflow: 'hidden',
-    minHeight: 168,
+    minHeight: 200,
   },
   track: {
     flexDirection: 'row',
@@ -263,7 +300,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0E6B8',
     padding: 16,
-    minHeight: 160,
+    minHeight: 192,
     gap: 12,
     shadowColor: '#C9A000',
     shadowOpacity: 0.08,
@@ -281,7 +318,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   slideTitle: { fontSize: 16, fontWeight: '800', color: ProfileTheme.grey900 },
-  levelLine: { fontSize: 15, color: ProfileTheme.grey800 },
+  levelLine: { fontSize: 15, color: ProfileTheme.grey800, flexShrink: 1 },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   remaining: { fontSize: 18, color: '#C9A000', fontWeight: '800' },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   barTrack: {
@@ -303,9 +341,20 @@ const styles = StyleSheet.create({
   statLine: { fontSize: 13, color: ProfileTheme.grey700 },
   statStrong: { fontWeight: '800', color: ProfileTheme.grey900 },
   badgesLine: { fontSize: 14, lineHeight: 21, color: ProfileTheme.grey700 },
+  badgeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   premiumStatus: { fontSize: 15, color: ProfileTheme.grey800 },
+  premiumActions: { gap: 8, marginTop: 4 },
+  primaryBtn: {
+    borderRadius: 100,
+    paddingVertical: 11,
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  primaryBtnText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
   outlineBtn: {
-    marginTop: 4,
+    marginTop: 0,
     borderWidth: 1.5,
     borderColor: '#FFB703',
     borderRadius: 100,

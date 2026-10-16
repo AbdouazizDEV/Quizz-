@@ -1,4 +1,10 @@
-import { Nunito_700Bold, useFonts } from '@expo-google-fonts/nunito';
+import {
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/nunito';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
@@ -134,7 +140,12 @@ function useSplashBrandMetrics() {
 
 export default function SplashScreen() {
   const router = useRouter();
-  const [fontsLoaded] = useFonts({ Nunito_700Bold });
+  const [fontsLoaded] = useFonts({
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+  });
   const brand = useSplashBrandMetrics();
 
   useEffect(() => {
@@ -196,7 +207,7 @@ export default function SplashScreen() {
                   fontSize: brand.titleFontSize,
                   lineHeight: brand.titleLineHeight,
                 },
-                fontsLoaded ? { fontFamily: 'Nunito_700Bold' } : { fontWeight: '700' },
+                fontsLoaded ? { fontFamily: 'Nunito_800ExtraBold' } : { fontWeight: '800' },
               ]}
               accessibilityRole="header"
             >
